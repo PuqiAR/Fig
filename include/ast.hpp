@@ -1,0 +1,23 @@
+#pragma once
+
+#include <Ast/astBase.hpp>
+#include <Ast/AccessModifier.hpp>
+#include <Ast/BinaryExpr.hpp>
+#include <Ast/ContainerInitExprs.hpp>
+#include <Ast/ControlSt.hpp>
+#include <Ast/ExpressionStmt.hpp>
+#include <Ast/FunctionCall.hpp>
+#include <Ast/functionParameters.hpp>
+#include <Ast/FunctionDefSt.hpp>
+#include <Ast/IfSt.hpp>
+#include <Ast/ImplementSt.hpp>
+#include <Ast/InitExpr.hpp>
+#include <Ast/LambdaExpr.hpp>
+#include <Ast/StructDefSt.hpp>
+#include <Ast/TernaryExpr.hpp>
+#include <Ast/UnaryExpr.hpp>
+#include <Ast/ValueExpr.hpp>
+#include <Ast/VarAssignSt.hpp>
+#include <Ast/VarDef.hpp>
+#include <Ast/VarExpr.hpp>
+#include <Ast/WhileSt.hpp>

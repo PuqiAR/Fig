@@ -1,0 +1,90 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Fig",
+	"scopeName": "source.fig",
+	"fileTypes": [
+		".fl"
+	],
+	"patterns": [
+		{
+			"name": "comment.line.double-slash",
+			"match": "//.*"
+		},
+		{
+			"name": "comment.block",
+			"begin": "/\\*",
+			"end": "\\*/",
+			"captures": {
+				"0": {
+					"name": "comment.block.fig"
+				}
+			}
+		},
+		{
+			"name": "keyword.control",
+			"match": "\\b(if|else|for|while|continue|break|return|or|not)\\b"
+		},
+		{
+			"name": "keyword.declaration",
+			"match": "\\b(var|val|func|module)\\b"
+		},
+		{
+			"name": "storage.type",
+			"match": "\\b(Int32|Int64|Float|Double|Map|Bool|Null|String)\\b"
+		},
+		{
+			"name": "entity.name.function",
+			"match": "(?<=\\bfunc\\b)\\s+\\w+"
+		},
+		{
+			"name": "keyword.operator.arrow",
+			"match": "->"
+		},
+		{
+			"name": "keyword.operator",
+			"match": "[+\\-*/%&|><!]=?|&&|\\|\\||=="
+		},
+		{
+			"name": "string.quoted.double",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape",
+					"match": "\\\\."
+				}
+			]
+		},
+		{
+			"name": "string.quoted.multiline",
+			"begin": "\\/\\\"",
+			"end": "\\\"/",
+			"patterns": [
+				{
+					"name": "constant.character.escape",
+					"match": "\\\\."
+				}
+			]
+		},
+		{
+			"name": "constant.numeric.integer",
+			"match": "\\b\\d+\\b"
+		},
+		{
+			"name": "constant.numeric.float",
+			"match": "\\b\\d+\\.\\d+([eE][+-]?\\d+)?[f]?\\b"
+		},
+		{
+			"name": "punctuation.curly",
+			"match": "[{}]"
+		},
+		{
+			"name": "punctuation.parenthesis",
+			"match": "[()]"
+		},
+		{
+			"name": "punctuation.square",
+			"match": "[\\[\\]]"
+		}
+	]
+}

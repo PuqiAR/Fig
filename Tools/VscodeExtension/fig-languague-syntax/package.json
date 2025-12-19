@@ -1,0 +1,33 @@
+{
+  "name": "fig-languague-syntax",
+  "displayName": "Fig Languague Syntax",
+  "description": ":)",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "fig",
+        "extensions": [
+          ".fl"
+        ],
+        "aliases": [
+          "Fig"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "fig",
+        "scopeName": "source.fig",
+        "path": "./syntaxes/fig.tmLanguage.json"
+      }
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+var callCnt:Int = 0;
+fun fib(x:Int) -> Int
+{
+    callCnt = callCnt + 1;
+    if (x <= 1)
+    {
+        return x;
+    }
+    return fib(x-1) + fib(x-2);
+} 
+
+var fibx:Int;
+__fstdout_print("input an index of fib ");
+fibx = __fvalue_int_parse(__fstdin_read());
+
+var cnt:Int = 0;
+__fstdout_println("test forever"); 
+while (true)
+{
+    cnt = cnt + 1;
+    __fstdout_println("test ", cnt,",result: ", fib(fibx));
+    __fstdout_println("func `fib` called ", callCnt);
+    callCnt = 0;
+}

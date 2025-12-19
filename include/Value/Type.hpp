@@ -1,0 +1,79 @@
+#pragma once
+
+#include <fig_string.hpp>
+
+#include <variant>
+#include <map>
+#include <vector>
+#include <list>
+
+namespace Fig
+{
+
+    class TypeInfo final
+    {
+    private:
+        size_t id;
+
+    public:
+        FString name;
+
+        FString toString() const
+        {
+            return name;
+        }
+
+        static std::map<FString, size_t> typeMap;
+
+        static size_t getID(FString _name)
+        {
+            return typeMap.at(_name);
+        }
+        size_t getInstanceID(FString _name) const
+        {
+            return id;
+        }
+
+        TypeInfo();
+        TypeInfo(FString _name, bool reg = false);
+        TypeInfo(const TypeInfo &other) = default;
+
+        bool operator==(const TypeInfo &other) const
+        {
+            return id == other.id;
+        }
+    };
+
+    // class Value;
+    namespace ValueType
+    {
+        extern const TypeInfo Any;
+        extern const TypeInfo Null;
+        extern const TypeInfo Int;
+        extern const TypeInfo String;
+        extern const TypeInfo Bool;
+        extern const TypeInfo Double;
+        extern const TypeInfo Function;
+        extern const TypeInfo StructType;
+        extern const TypeInfo StructInstance;
+        extern const TypeInfo List;
+        extern const TypeInfo Map;
+        extern const TypeInfo Tuple;
+
+        using IntClass = int64_t;
+        using DoubleClass = double;
+        using BoolClass = bool;
+        using NullClass = std::monostate;
+        using StringClass = FString;
+
+        /* complex types */
+        struct FunctionStruct;
+        using FunctionClass = FunctionStruct;
+
+        struct StructT;
+        using StructTypeClass = StructT;
+
+        struct StructInstanceT;
+        using StructInstanceClass = StructInstanceT;
+    }; // namespace ValueType
+}; // namespace Fig
