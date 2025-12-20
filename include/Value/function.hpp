@@ -2,6 +2,7 @@
 
 #include <Value/BaseValue.hpp>
 #include <Ast/functionParameters.hpp>
+#include <context_forward.hpp>
 
 #include <atomic>
 
@@ -21,18 +22,28 @@ namespace Fig
         std::function<Value(const std::vector<Value> &)> builtin;
         int builtinParamCount = -1;
 
-        FunctionStruct(Ast::FunctionParameters _paras, TypeInfo _retType, Ast::BlockStatement _body) :
+        std::shared_ptr<Context> closureContext;
+
+        FunctionStruct(Ast::FunctionParameters _paras, TypeInfo _retType, Ast::BlockStatement _body, ContextPtr _closureContext) :
             id(nextId()), // 分配唯一 ID
             paras(std::move(_paras)),
             retType(std::move(_retType)),
-            body(std::move(_body))
+            body(std::move(_body)),
+            closureContext(std::move(_closureContext))
         {
         }
 
         FunctionStruct(std::function<Value(const std::vector<Value> &)> fn, int argc);
 
         FunctionStruct(const FunctionStruct &other) :
-            id(other.id), paras(other.paras), retType(other.retType), body(other.body), isBuiltin(other.isBuiltin), builtin(other.builtin), builtinParamCount(other.builtinParamCount) {}
+            id(other.id),
+            paras(other.paras),
+            retType(other.retType),
+            body(other.body),
+            isBuiltin(other.isBuiltin),
+            builtin(other.builtin),
+            builtinParamCount(other.builtinParamCount),
+            closureContext(other.closureContext) {}
 
         FunctionStruct &operator=(const FunctionStruct &other) = default;
         FunctionStruct(FunctionStruct &&) noexcept = default;
@@ -63,11 +74,11 @@ namespace Fig
         {
             data = std::make_unique<FunctionStruct>(x);
         }
-        Function(Ast::FunctionParameters paras, TypeInfo ret, Ast::BlockStatement body) :
+        Function(Ast::FunctionParameters paras, TypeInfo ret, Ast::BlockStatement body, ContextPtr closureContext) :
             __ValueWrapper(ValueType::Function)
         {
             data = std::make_unique<FunctionStruct>(
-                std::move(paras), std::move(ret), std::move(body));
+                std::move(paras), std::move(ret), std::move(body), std::move(closureContext));
         }
         Function(std::function<Value(const std::vector<Value> &)> fn, int argc);
 

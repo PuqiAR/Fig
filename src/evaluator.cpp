@@ -132,7 +132,8 @@ namespace Fig
             evaluatedArgs.argv.push_back(defaultVal);
         }
         // create new context for function call
-        auto newContext = std::make_shared<Context>(FString(std::format("<Function {}()>", fnName.toBasicString())), currentContext);
+        auto newContext = std::make_shared<Context>(FString(std::format("<Function {}()>", fnName.toBasicString())),
+                                                    fnStruct.closureContext);
         auto previousContext = currentContext;
         currentContext = newContext;
         // define parameters in new context
@@ -238,8 +239,8 @@ namespace Fig
                     return Function(
                         fn->paras,
                         ValueType::Any,
-                        body
-                    );
+                        body,
+                        currentContext);
                 }
                 else
                 {
@@ -247,8 +248,8 @@ namespace Fig
                     return Function(
                         fn->paras,
                         ValueType::Any,
-                        body
-                    );
+                        body,
+                        currentContext);
                 }
             }
             case AstType::ListExpr: {
@@ -341,7 +342,8 @@ namespace Fig
                     Value(Function(
                         fnDef->paras,
                         TypeInfo(fnDef->retType),
-                        fnDef->body)));
+                        fnDef->body,
+                        currentContext)));
                 return StatementResult::normal();
             };
             case AstType::StructSt: {

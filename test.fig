@@ -1,8 +1,9 @@
-func build_adder(x) -> Function
-{
-    return func(a) => a + x;
+var x = 1;
+
+func f() {
+    x = x + 1;
 }
 
-var add2 = build_adder(2);
-var println = __fstdout_println;
-println(add2(1));
+f();
+var print = __fstdout_println;
+print(x);
