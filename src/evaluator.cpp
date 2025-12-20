@@ -14,6 +14,7 @@ namespace Fig
             case Operator::Multiply: return lhs * rhs;
             case Operator::Divide: return lhs / rhs;
             case Operator::Modulo: return lhs % rhs;
+            case Operator::Power: return power(lhs, rhs);
 
             case Operator::And: return lhs && rhs;
             case Operator::Or: return lhs || rhs;
@@ -291,7 +292,7 @@ namespace Fig
                         if (expectedType != actualType and expectedType != ValueType::Any)
                         {
                             static constexpr char VariableTypeMismatchErrorName[] = "VariableTypeMismatchError";
-                            throw EvaluatorError<VariableTypeMismatchErrorName>(FStringView(std::format("Variable '{}' expects type '{}', but got type '{}'", varDef->name.toBasicString(), expectedType.toString().toBasicString(), actualType.toString().toBasicString())), currentAddressInfo);
+                            throw EvaluatorError<VariableTypeMismatchErrorName>(FStringView(std::format("Variable '{}' expects type '{}', but got type '{}'", varDef->name.toBasicString(), expectedType.toString().toBasicString(), actualType.toString().toBasicString())), varDef->getAAI());
                         }
                     }
                 }

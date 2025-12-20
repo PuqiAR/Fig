@@ -14,6 +14,16 @@
 
 namespace Fig
 {
+    inline bool isDoubleInteger(ValueType::DoubleClass d)
+    {
+        return std::floor(d) == d;
+    }
+    inline bool isNumberExceededIntLimit(ValueType::DoubleClass d)
+    {
+        static constexpr ValueType::DoubleClass intMaxAsDouble = static_cast<ValueType::DoubleClass>(std::numeric_limits<ValueType::IntClass>::max());
+        static constexpr ValueType::DoubleClass intMinAsDouble = static_cast<ValueType::DoubleClass>(std::numeric_limits<ValueType::IntClass>::min());
+        return d > intMaxAsDouble || d < intMinAsDouble;
+    }
     class Value
     {
     public:
@@ -194,7 +204,14 @@ namespace Fig
             if (lhs.isNull() || rhs.isNull())
                 throw ValueError(FStringView(makeTypeErrorMessage("Cannot add", "+", lhs, rhs)));
             if (lhs.isNumeric() and rhs.isNumeric())
-                return lhs.getNumericValue() + rhs.getNumericValue();
+            {
+                ValueType::DoubleClass result = lhs.getNumericValue() + rhs.getNumericValue();
+                if (isDoubleInteger(result) and !isNumberExceededIntLimit(result))
+                {
+                    return Value(static_cast<ValueType::IntClass>(result));
+                }
+                return Value(ValueType::DoubleClass(result));
+            }
             if (lhs.is<String>() && rhs.is<String>())
                 return Value(ValueType::StringClass(lhs.as<String>().getValue() + rhs.as<String>().getValue()));
 
@@ -206,7 +223,14 @@ namespace Fig
             if (lhs.isNull() || rhs.isNull())
                 throw ValueError(FStringView(makeTypeErrorMessage("Cannot subtract", "-", lhs, rhs)));
             if (lhs.isNumeric() and rhs.isNumeric())
-                return lhs.getNumericValue() - rhs.getNumericValue();
+            {
+                ValueType::DoubleClass result = lhs.getNumericValue() - rhs.getNumericValue();
+                if (isDoubleInteger(result) and !isNumberExceededIntLimit(result))
+                {
+                    return Value(static_cast<ValueType::IntClass>(result));
+                }
+                return Value(ValueType::DoubleClass(result));
+            }
             throw ValueError(FStringView(makeTypeErrorMessage("Unsupported operation", "-", lhs, rhs)));
         }
 
@@ -215,7 +239,14 @@ namespace Fig
             if (lhs.isNull() || rhs.isNull())
                 throw ValueError(FStringView(makeTypeErrorMessage("Cannot multiply", "*", lhs, rhs)));
             if (lhs.isNumeric() and rhs.isNumeric())
-                return lhs.getNumericValue() * rhs.getNumericValue();
+            {
+                ValueType::DoubleClass result = lhs.getNumericValue() * rhs.getNumericValue();
+                if (isDoubleInteger(result) and !isNumberExceededIntLimit(result))
+                {
+                    return Value(static_cast<ValueType::IntClass>(result));
+                }
+                return Value(ValueType::DoubleClass(result));
+            }
             throw ValueError(FStringView(makeTypeErrorMessage("Unsupported operation", "*", lhs, rhs)));
         }
 
@@ -225,9 +256,14 @@ namespace Fig
                 throw ValueError(FStringView(makeTypeErrorMessage("Cannot divide", "/", lhs, rhs)));
             if (lhs.isNumeric() and rhs.isNumeric())
             {
-                auto rnv = rhs.getNumericValue();
+                ValueType::DoubleClass rnv = rhs.getNumericValue();
                 if (rnv == 0) throw ValueError(FStringView(makeTypeErrorMessage("Division by zero", "/", lhs, rhs)));
-                return lhs.getNumericValue() / rnv;
+                ValueType::DoubleClass result = lhs.getNumericValue() / rnv;
+                if (isDoubleInteger(result) and !isNumberExceededIntLimit(result))
+                {
+                    return Value(static_cast<ValueType::IntClass>(result));
+                }
+                return Value(ValueType::DoubleClass(result));
             }
             throw ValueError(FStringView(makeTypeErrorMessage("Unsupported operation", "/", lhs, rhs)));
         }
@@ -238,9 +274,14 @@ namespace Fig
                 throw ValueError(FStringView(makeTypeErrorMessage("Cannot modulo", "%", lhs, rhs)));
             if (lhs.isNumeric() and rhs.isNumeric())
             {
-                auto rnv = rhs.getNumericValue();
-                if (rnv == 0) throw ValueError(FStringView(makeTypeErrorMessage("Modulo by zero", "%", lhs, rhs)));
-                return fmod(lhs.getNumericValue(), rhs.getNumericValue());
+                ValueType::DoubleClass rnv = rhs.getNumericValue();
+                if (rnv == 0) throw ValueError(FStringView(makeTypeErrorMessage("Modulo by zero", "/", lhs, rhs)));
+                ValueType::DoubleClass result = fmod(lhs.getNumericValue(), rnv);
+                if (isDoubleInteger(result) and !isNumberExceededIntLimit(result))
+                {
+                    return Value(static_cast<ValueType::IntClass>(result));
+                }
+                return Value(ValueType::DoubleClass(result));
             }
             throw ValueError(FStringView(makeTypeErrorMessage("Unsupported operation", "%", lhs, rhs)));
         }
@@ -366,6 +407,22 @@ namespace Fig
             if (!lhs.is<Int>() || !rhs.is<Int>())
                 throw ValueError(FStringView(makeTypeErrorMessage("Shift right requires int", ">>", lhs, rhs)));
             return Value(lhs.as<Int>().getValue() >> rhs.as<Int>().getValue());
+        }
+
+        friend Value power(const Value &base, const Value &exp)
+        {
+            if (base.isNull() || exp.isNull())
+                throw ValueError(FStringView(makeTypeErrorMessage("Cannot exponentiate", "**", base, exp)));
+            if (base.isNumeric() and exp.isNumeric())
+            {
+                ValueType::DoubleClass result = std::pow(base.getNumericValue(), exp.getNumericValue());
+                if (isDoubleInteger(result) and !isNumberExceededIntLimit(result))
+                {
+                    return Value(static_cast<ValueType::IntClass>(result));
+                }
+                return Value(ValueType::DoubleClass(result));
+            }
+            throw ValueError(FStringView(makeTypeErrorMessage("Unsupported operation", "**", base, exp)));
         }
     };
 

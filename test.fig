@@ -1,9 +1,0 @@
-var x = 1;
-
-func f() {
-    x = x + 1;
-}
-
-f();
-var print = __fstdout_println;
-print(x);
