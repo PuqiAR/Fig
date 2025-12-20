@@ -30,6 +30,7 @@ namespace Fig::Ast
         TupleExpr, // ()
         MapExpr,   // {}
         InitExpr, // struct{}
+        FunctionLiteralExpr,
 
         /* Statement */
         BlockStatement,
@@ -312,7 +313,7 @@ namespace Fig::Ast
     class BlockStatementAst : public StatementAst
     {
     public:
-        const std::vector<Statement> stmts;
+        std::vector<Statement> stmts;
         BlockStatementAst()
         {
             type = AstType::BlockStatement;

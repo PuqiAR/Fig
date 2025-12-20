@@ -9,10 +9,10 @@
 #include <Ast/FunctionCall.hpp>
 #include <Ast/functionParameters.hpp>
 #include <Ast/FunctionDefSt.hpp>
+#include <Ast/FunctionLiteralExpr.hpp>
 #include <Ast/IfSt.hpp>
 #include <Ast/ImplementSt.hpp>
 #include <Ast/InitExpr.hpp>
-#include <Ast/LambdaExpr.hpp>
 #include <Ast/StructDefSt.hpp>
 #include <Ast/TernaryExpr.hpp>
 #include <Ast/UnaryExpr.hpp>

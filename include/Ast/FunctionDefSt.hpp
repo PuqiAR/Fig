@@ -9,7 +9,7 @@
 namespace Fig::Ast
 {
     /*
-        fun greet(greeting, name:String, age:Int, split:String=":") public -> Null
+        func greet(greeting, name:String, age:Int, split:String=":") -> Null
         {
             io.println("{}, {}{}{}", greeting, name, split, age);
         }
@@ -18,7 +18,7 @@ namespace Fig::Ast
         `split`                   -> default parameter
         */
 
-    class FunctionDefSt final : public StatementAst // for define
+    class FunctionDefSt final : public StatementAst // for definition
     {
     public:
         FString name;

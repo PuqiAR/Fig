@@ -30,6 +30,7 @@ namespace Fig
         {FString(u8":="), TokenType::Walrus},
         {FString(u8"**"), TokenType::Power},
         {FString(u8"->"), TokenType::RightArrow},
+        {FString(u8"=>"), TokenType::DoubleArrow},
 
         // 单字符
         {FString(u8"+"), TokenType::Plus},
@@ -62,7 +63,7 @@ namespace Fig
         {FString(u8"or"), TokenType::Or},
         {FString(u8"not"), TokenType::Not},
         {FString(u8"import"), TokenType::Import},
-        {FString(u8"fun"), TokenType::Function},
+        {FString(u8"func"), TokenType::Function},
         {FString(u8"var"), TokenType::Variable},
         {FString(u8"const"), TokenType::Const},
         {FString(u8"final"), TokenType::Final},

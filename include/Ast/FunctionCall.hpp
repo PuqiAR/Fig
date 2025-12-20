@@ -21,7 +21,7 @@ namespace Fig::Ast
     class FunctionCallExpr final : public ExpressionAst
     {
     public:
-        FString name;
+        Expression callee; // 不是 name 了！！
         FunctionArguments arg;
 
         FunctionCallExpr()
@@ -29,15 +29,15 @@ namespace Fig::Ast
             type = AstType::FunctionCall;
         }
 
-        FunctionCallExpr(FString _name, FunctionArguments _arg) :
-            name(std::move(_name)), arg(std::move(_arg))
+        FunctionCallExpr(Expression _callee, FunctionArguments _arg) :
+            callee(std::move(_callee)), arg(std::move(_arg))
         {
             type = AstType::FunctionCall;
         }
 
-        virtual FString toString() override 
+        virtual FString toString() override
         {
-            FString s = name;
+            FString s = callee->toString();
             s += u8"(";
             for (size_t i = 0; i < arg.argv.size(); ++i)
             {

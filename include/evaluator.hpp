@@ -1,8 +1,6 @@
 #pragma once
 
-#include <unordered_map>
-#include <optional>
-
+#include <builtins.hpp>
 #include <error.hpp>
 #include <fig_string.hpp>
 #include <ast.hpp>
@@ -84,6 +82,26 @@ namespace Fig
         {
             globalContext = std::make_shared<Context>(FString(u8"global"));
             currentContext = globalContext;
+
+            for (auto &[name, fn] : Builtins::builtinFunctions)
+            {
+                int argc = Builtins::getBuiltinFunctionParamCount(name);
+                Function f(fn, argc);
+                globalContext->def(
+                    name,
+                    ValueType::Function,
+                    AccessModifier::PublicConst,
+                    Value(f));
+            }
+
+            for (auto &[name, val] : Builtins::builtinValues)
+            {
+                globalContext->def(
+                    name,
+                    val.getTypeInfo(),
+                    AccessModifier::PublicConst,
+                    val);
+            }
         }
 
         std::shared_ptr<Context> getCurrentContext() { return currentContext; }
@@ -94,6 +112,8 @@ namespace Fig
         Value evalUnary(const Ast::UnaryExpr &);
 
         StatementResult evalStatement(const Ast::Statement &);
+
+        Value evalFunctionCall(const Function &, const Ast::FunctionArguments &, FString fnName = u8"<anonymous>");
 
         Value eval(Ast::Expression);
         void run();

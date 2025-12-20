@@ -1,12 +1,14 @@
 #pragma once
 
 #include <Value/BaseValue.hpp>
-#include <Value/Type.hpp>
 #include <Ast/functionParameters.hpp>
 
 #include <atomic>
+
 namespace Fig
 {
+    class Value;
+
     /* complex objects */
     struct FunctionStruct
     {
@@ -14,6 +16,10 @@ namespace Fig
         Ast::FunctionParameters paras;
         TypeInfo retType;
         Ast::BlockStatement body;
+
+        bool isBuiltin = false;
+        std::function<Value(const std::vector<Value> &)> builtin;
+        int builtinParamCount = -1;
 
         FunctionStruct(Ast::FunctionParameters _paras, TypeInfo _retType, Ast::BlockStatement _body) :
             id(nextId()), // 分配唯一 ID
@@ -23,8 +29,10 @@ namespace Fig
         {
         }
 
+        FunctionStruct(std::function<Value(const std::vector<Value> &)> fn, int argc);
+
         FunctionStruct(const FunctionStruct &other) :
-            id(other.id), paras(other.paras), retType(other.retType), body(other.body) {}
+            id(other.id), paras(other.paras), retType(other.retType), body(other.body), isBuiltin(other.isBuiltin), builtin(other.builtin), builtinParamCount(other.builtinParamCount) {}
 
         FunctionStruct &operator=(const FunctionStruct &other) = default;
         FunctionStruct(FunctionStruct &&) noexcept = default;
@@ -61,6 +69,8 @@ namespace Fig
             data = std::make_unique<FunctionStruct>(
                 std::move(paras), std::move(ret), std::move(body));
         }
+        Function(std::function<Value(const std::vector<Value> &)> fn, int argc);
+
         bool operator==(const Function &other) const noexcept
         {
             if (!data || !other.data) return false;

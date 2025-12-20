@@ -62,6 +62,118 @@ namespace Fig
         }
     }
 
+    Value Evaluator::evalFunctionCall(const Function &fn, const Ast::FunctionArguments &fnArgs, FString fnName)
+    {
+        FunctionStruct fnStruct = fn.getValue();
+        Ast::FunctionCallArgs evaluatedArgs;
+        if (fnStruct.isBuiltin)
+        {
+            for (const auto &argExpr : fnArgs.argv)
+            {
+                evaluatedArgs.argv.push_back(eval(argExpr));
+            }
+            if (fnStruct.builtinParamCount != -1 && fnStruct.builtinParamCount != evaluatedArgs.getLength())
+            {
+                static constexpr char BuiltinArgumentMismatchErrorName[] = "BuiltinArgumentMismatchError";
+                throw EvaluatorError<BuiltinArgumentMismatchErrorName>(FStringView(std::format("Builtin function '{}' expects {} arguments, but {} were provided", fnName.toBasicString(), fnStruct.builtinParamCount, evaluatedArgs.getLength())), currentAddressInfo);
+            }
+            return fnStruct.builtin(evaluatedArgs.argv);
+        }
+
+        // check argument, all types of parameters
+        Ast::FunctionParameters fnParas = fnStruct.paras;
+        if (fnArgs.getLength() < fnParas.posParas.size() || fnArgs.getLength() > fnParas.size())
+        {
+            static constexpr char ArgumentMismatchErrorName[] = "ArgumentMismatchError";
+            throw EvaluatorError<ArgumentMismatchErrorName>(FStringView(std::format("Function '{}' expects {} to {} arguments, but {} were provided", fnName.toBasicString(), fnParas.posParas.size(), fnParas.size(), fnArgs.getLength())), currentAddressInfo);
+        }
+
+        // positional parameters type check
+        size_t i;
+        for (i = 0; i < fnParas.posParas.size(); i++)
+        {
+            TypeInfo expectedType(fnParas.posParas[i].second); // look up type info, if exists a type with the name, use it, else throw
+            Value argVal = eval(fnArgs.argv[i]);
+            TypeInfo actualType = argVal.getTypeInfo();
+            if (expectedType != actualType and expectedType != ValueType::Any)
+            {
+                static constexpr char ArgumentTypeMismatchErrorName[] = "ArgumentTypeMismatchError";
+                throw EvaluatorError<ArgumentTypeMismatchErrorName>(FStringView(std::format("In function '{}', argument '{}' expects type '{}', but got type '{}'", fnName.toBasicString(), fnParas.posParas[i].first.toBasicString(), expectedType.toString().toBasicString(), actualType.toString().toBasicString())), currentAddressInfo);
+            }
+            evaluatedArgs.argv.push_back(argVal);
+        }
+        // default parameters type check
+        for (; i < fnArgs.getLength(); i++)
+        {
+            size_t defParamIndex = i - fnParas.posParas.size();
+            TypeInfo expectedType = fnParas.defParas[defParamIndex].second.first;
+
+            Value defaultVal = eval(fnParas.defParas[defParamIndex].second.second);
+            if (expectedType != defaultVal.getTypeInfo() and expectedType != ValueType::Any)
+            {
+                static constexpr char DefaultParameterTypeErrorName[] = "DefaultParameterTypeError";
+                throw EvaluatorError<DefaultParameterTypeErrorName>(FStringView(std::format("In function '{}', default parameter '{}' has type '{}', which does not match the expected type '{}'", fnName.toBasicString(), fnParas.defParas[defParamIndex].first.toBasicString(), defaultVal.getTypeInfo().toString().toBasicString(), expectedType.toString().toBasicString())), currentAddressInfo);
+            }
+
+            Value argVal = eval(fnArgs.argv[i]);
+            TypeInfo actualType = argVal.getTypeInfo();
+            if (expectedType != actualType and expectedType != ValueType::Any)
+            {
+                static constexpr char ArgumentTypeMismatchErrorName[] = "ArgumentTypeMismatchError";
+                throw EvaluatorError<ArgumentTypeMismatchErrorName>(FStringView(std::format("In function '{}', argument '{}' expects type '{}', but got type '{}'", fnName.toBasicString(), fnParas.defParas[defParamIndex].first.toBasicString(), expectedType.toString().toBasicString(), actualType.toString().toBasicString())), currentAddressInfo);
+            }
+            evaluatedArgs.argv.push_back(argVal);
+        }
+        // default parameters filling
+        for (; i < fnParas.size(); i++)
+        {
+            size_t defParamIndex = i - fnParas.posParas.size();
+            Value defaultVal = eval(fnParas.defParas[defParamIndex].second.second);
+            evaluatedArgs.argv.push_back(defaultVal);
+        }
+        // create new context for function call
+        auto newContext = std::make_shared<Context>(FString(std::format("<Function {}()>", fnName.toBasicString())), currentContext);
+        auto previousContext = currentContext;
+        currentContext = newContext;
+        // define parameters in new context
+        for (size_t j = 0; j < fnParas.size(); j++)
+        {
+            FString paramName;
+            TypeInfo paramType;
+            if (j < fnParas.posParas.size())
+            {
+                paramName = fnParas.posParas[j].first;
+                paramType = fnParas.posParas[j].second;
+            }
+            else
+            {
+                size_t defParamIndex = j - fnParas.posParas.size();
+                paramName = fnParas.defParas[defParamIndex].first;
+                paramType = fnParas.defParas[defParamIndex].second.first;
+            }
+            AccessModifier argAm = AccessModifier::Const;
+            currentContext->def(paramName, paramType, argAm, evaluatedArgs.argv[j]);
+        }
+        // execute function body
+        Value retVal = Value::getNullInstance();
+        for (const auto &stmt : fnStruct.body->stmts)
+        {
+            StatementResult sr = evalStatement(stmt);
+            if (sr.shouldReturn())
+            {
+                retVal = sr.result;
+                break;
+            }
+        }
+        currentContext = previousContext;
+        if (fnStruct.retType != retVal.getTypeInfo() and fnStruct.retType != ValueType::Any)
+        {
+            static constexpr char ReturnTypeMismatchErrorName[] = "ReturnTypeMismatchError";
+            throw EvaluatorError<ReturnTypeMismatchErrorName>(FStringView(std::format("Function '{}' expects return type '{}', but got type '{}'", fnName.toBasicString(), fnStruct.retType.toString().toBasicString(), retVal.getTypeInfo().toString().toBasicString())), currentAddressInfo);
+        }
+        return retVal;
+    }
+
     Value Evaluator::eval(Ast::Expression exp)
     {
         using Fig::Ast::AstType;
@@ -78,7 +190,8 @@ namespace Fig
                 {
                     return val.value();
                 }
-                throw RuntimeError(FStringView(std::format("Variable '{}' not defined", varExp->name.toBasicString())));
+                static constexpr char UndefinedVariableErrorName[] = "UndefinedVariableError";
+                throw EvaluatorError<UndefinedVariableErrorName>(FStringView(std::format("Variable '{}' is not defined in the current scope", varExp->name.toBasicString())), varExp->getAAI());
             }
             case AstType::BinaryExpr: {
                 auto binExp = std::dynamic_pointer_cast<Ast::BinaryExprAst>(exp);
@@ -89,132 +202,54 @@ namespace Fig
                 return evalUnary(unExp);
             }
             case AstType::FunctionCall: {
-                // std::cerr << "Eval: function call...\n";
                 auto fnCall = std::dynamic_pointer_cast<Ast::FunctionCallExpr>(exp);
-                FString fnName = fnCall->name;
-                if (Builtins::isBuiltinFunction(fnName))
-                {
-                    std::vector<Value> callArgs;
-                    if (fnCall->arg.getLength() != Builtins::getBuiltinFunctionParamCount(fnName) and Builtins::getBuiltinFunctionParamCount(fnName) != -1) // -1 means variadic
-                    {
-                        static constexpr char BuiltinArgumentMismatchErrorName[] = "BuiltinArgumentMismatchError";
-                        throw EvaluatorError<BuiltinArgumentMismatchErrorName>(FStringView(std::format("Builtin function '{}' expects {} arguments, but {} were provided", fnName.toBasicString(), Builtins::getBuiltinFunctionParamCount(fnName), callArgs.size())), currentAddressInfo);
-                    }
-                    for (const auto &argExp : fnCall->arg.argv)
-                    {
-                        callArgs.push_back(eval(argExp));
-                    }
-                    return Builtins::getBuiltinFunction(fnName)(callArgs);
-                }
 
-                auto fnValOpt = currentContext->get(fnName);
-                if (!fnValOpt.has_value())
-                {
-                    static constexpr char FunctionNotFoundErrorName[] = "FunctionNotFoundError";
-                    throw EvaluatorError<FunctionNotFoundErrorName>(FStringView(std::format("Function '{}' not defined", fnName.toBasicString())), currentAddressInfo);
-                }
-                Value fnVal = fnValOpt.value();
-                if (!fnVal.is<Function>())
+                Value calleeVal = eval(fnCall->callee);
+
+                if (!calleeVal.is<Function>())
                 {
                     static constexpr char NotAFunctionErrorName[] = "NotAFunctionError";
-                    throw EvaluatorError<NotAFunctionErrorName>(FStringView(std::format("'{}' is not a function or callable", fnName.toBasicString())), currentAddressInfo);
-                }
-                FunctionStruct fnStruct = fnVal.as<Function>().getValue();
-                // check argument, all types of parameters
-                Ast::FunctionParameters fnParas = fnStruct.paras;
-                Ast::FunctionArguments fnArgs = fnCall->arg;
-                if (fnArgs.getLength() < fnParas.posParas.size() || fnArgs.getLength() > fnParas.size())
-                {
-                    static constexpr char ArgumentMismatchErrorName[] = "ArgumentMismatchError";
-                    throw EvaluatorError<ArgumentMismatchErrorName>(FStringView(std::format("Function '{}' expects {} to {} arguments, but {} were provided", fnName.toBasicString(), fnParas.posParas.size(), fnParas.size(), fnArgs.getLength())), currentAddressInfo);
+                    throw EvaluatorError<NotAFunctionErrorName>(
+                        FStringView(std::format(
+                            "'{}' is not a function or callable",
+                            calleeVal.toString().toBasicString())),
+                        currentAddressInfo);
                 }
 
-                Ast::FunctionCallArgs evaluatedArgs;
+                Function fn = calleeVal.as<Function>();
 
-                // positional parameters type check
-                size_t i;
-                for (i = 0; i < fnParas.posParas.size(); i++)
-                {
-                    TypeInfo expectedType(fnParas.posParas[i].second); // look up type info, if exists a type with the name, use it, else throw
-                    Value argVal = eval(fnArgs.argv[i]);
-                    TypeInfo actualType = argVal.getTypeInfo();
-                    if (expectedType != actualType and expectedType != ValueType::Any)
-                    {
-                        static constexpr char ArgumentTypeMismatchErrorName[] = "ArgumentTypeMismatchError";
-                        throw EvaluatorError<ArgumentTypeMismatchErrorName>(FStringView(std::format("In function '{}', argument '{}' expects type '{}', but got type '{}'", fnName.toBasicString(), fnParas.posParas[i].first.toBasicString(), expectedType.toString().toBasicString(), actualType.toString().toBasicString())), currentAddressInfo);
-                    }
-                    evaluatedArgs.argv.push_back(argVal);
-                }
-                // default parameters type check
-                for (; i < fnArgs.getLength(); i++)
-                {
-                    size_t defParamIndex = i - fnParas.posParas.size();
-                    TypeInfo expectedType = fnParas.defParas[defParamIndex].second.first;
+                FString fnName = u8"<anonymous>";
+                if (auto var = std::dynamic_pointer_cast<Ast::VarExprAst>(fnCall->callee))
+                    fnName = var->name; // try to get function name
 
-                    Value defaultVal = eval(fnParas.defParas[defParamIndex].second.second);
-                    if (expectedType != defaultVal.getTypeInfo() and expectedType != ValueType::Any)
-                    {
-                        static constexpr char DefaultParameterTypeErrorName[] = "DefaultParameterTypeError";
-                        throw EvaluatorError<DefaultParameterTypeErrorName>(FStringView(std::format("In function '{}', default parameter '{}' has type '{}', which does not match the expected type '{}'", fnName.toBasicString(), fnParas.defParas[defParamIndex].first.toBasicString(), defaultVal.getTypeInfo().toString().toBasicString(), expectedType.toString().toBasicString())), currentAddressInfo);
-                    }
+                return evalFunctionCall(fn, fnCall->arg, fnName);
+            }
 
-                    Value argVal = eval(fnArgs.argv[i]);
-                    TypeInfo actualType = argVal.getTypeInfo();
-                    if (expectedType != actualType and expectedType != ValueType::Any)
-                    {
-                        static constexpr char ArgumentTypeMismatchErrorName[] = "ArgumentTypeMismatchError";
-                        throw EvaluatorError<ArgumentTypeMismatchErrorName>(FStringView(std::format("In function '{}', argument '{}' expects type '{}', but got type '{}'", fnName.toBasicString(), fnParas.defParas[defParamIndex].first.toBasicString(), expectedType.toString().toBasicString(), actualType.toString().toBasicString())), currentAddressInfo);
-                    }
-                    evaluatedArgs.argv.push_back(argVal);
-                }
-                // default parameters filling
-                for (; i < fnParas.size(); i++)
+            case AstType::FunctionLiteralExpr: {
+                auto fn = std::dynamic_pointer_cast<Ast::FunctionLiteralExprAst>(exp);
+
+                if (fn->isExprMode())
                 {
-                    size_t defParamIndex = i - fnParas.posParas.size();
-                    Value defaultVal = eval(fnParas.defParas[defParamIndex].second.second);
-                    evaluatedArgs.argv.push_back(defaultVal);
+                    Ast::BlockStatement body = std::make_shared<Ast::BlockStatementAst>();
+                    body->setAAI(fn->getExprBody()->getAAI());
+                    Ast::Statement retSt = std::make_shared<Ast::ReturnSt>(fn->getExprBody());
+                    retSt->setAAI(fn->getExprBody()->getAAI());
+                    body->stmts.push_back(retSt);
+                    return Function(
+                        fn->paras,
+                        ValueType::Any,
+                        body
+                    );
                 }
-                // create new context for function call
-                auto newContext = std::make_shared<Context>(FString(std::format("<Function {}()>", fnName.toBasicString())), currentContext);
-                auto previousContext = currentContext;
-                currentContext = newContext;
-                // define parameters in new context
-                for (size_t j = 0; j < fnParas.size(); j++)
+                else
                 {
-                    FString paramName;
-                    TypeInfo paramType;
-                    if (j < fnParas.posParas.size())
-                    {
-                        paramName = fnParas.posParas[j].first;
-                        paramType = fnParas.posParas[j].second;
-                    }
-                    else
-                    {
-                        size_t defParamIndex = j - fnParas.posParas.size();
-                        paramName = fnParas.defParas[defParamIndex].first;
-                        paramType = fnParas.defParas[defParamIndex].second.first;
-                    }
-                    AccessModifier argAm = AccessModifier::Const;
-                    currentContext->def(paramName, paramType, argAm, evaluatedArgs.argv[j]);
+                    Ast::BlockStatement body = fn->getBlockBody();
+                    return Function(
+                        fn->paras,
+                        ValueType::Any,
+                        body
+                    );
                 }
-                // execute function body
-                Value retVal = Value::getNullInstance();
-                for (const auto &stmt : fnStruct.body->stmts)
-                {
-                    StatementResult sr = evalStatement(stmt);
-                    if (sr.shouldReturn())
-                    {
-                        retVal = sr.result;
-                        break;
-                    }
-                }
-                currentContext = previousContext;
-                if (fnStruct.retType != retVal.getTypeInfo() and fnStruct.retType != ValueType::Any)
-                {
-                    static constexpr char ReturnTypeMismatchErrorName[] = "ReturnTypeMismatchError";
-                    throw EvaluatorError<ReturnTypeMismatchErrorName>(FStringView(std::format("Function '{}' expects return type '{}', but got type '{}'", fnName.toBasicString(), fnStruct.retType.toString().toBasicString(), retVal.getTypeInfo().toString().toBasicString())), currentAddressInfo);
-                }
-                return retVal;
             }
             case AstType::ListExpr: {
                 auto listexpr = std::dynamic_pointer_cast<Ast::ListExprAst>(exp);

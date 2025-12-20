@@ -14,6 +14,8 @@ target("Fig")
     add_cxxflags("-stdlib=libc++")
 
     add_files("src/*.cpp")
+    add_files("src/Value/function.cpp")
+    
     add_includedirs("include")
     
     set_warnings("all")

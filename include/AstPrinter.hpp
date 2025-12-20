@@ -42,9 +42,6 @@ public:
             case AstType::IfSt:
                 printIfSt(std::static_pointer_cast<IfSt>(node), indent);
                 break;
-            case AstType::LambdaExpr:
-                printLambdaExpr(std::static_pointer_cast<LambdaExprAst>(node), indent);
-                break;
             case AstType::TernaryExpr:
                 printTernaryExpr(std::static_pointer_cast<TernaryExprAst>(node), indent);
                 break;
@@ -147,8 +144,6 @@ private:
         printIndent(indent);
         std::cout << "FunctionCall\n";
         printIndent(indent + 2);
-        std::cout << "FuncName: ";
-        printFString(node->name, 0);
         printIndent(indent + 2);
     }
 
@@ -172,14 +167,6 @@ private:
         printIndent(indent + 2);
         std::cout << "Condition:\n";
         print(node->condition, indent + 4);
-        printIndent(indent + 2);
-    }
-
-    void printLambdaExpr(const std::shared_ptr<LambdaExprAst> &node, int indent)
-    {
-        printIndent(indent);
-        std::cout << "LambdaExpr\n"
-                  << node->toString().toBasicString();
         printIndent(indent + 2);
     }
 

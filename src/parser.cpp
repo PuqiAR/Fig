@@ -361,20 +361,17 @@ namespace Fig
         {
             // stmt = __parseVarDef();
             // expect(TokenType::Semicolon);
-            // next();
-            if (isNext(TokenType::Variable) || isNext(TokenType::Const))
+            next(); // consume `public`
+            if (isThis(TokenType::Variable) || isThis(TokenType::Const))
             {
-                next(); // consume `public`
                 stmt = __parseVarDef(true);
             }
-            else if (isNext(TokenType::Function))
+            else if (isThis(TokenType::Function) and isNext(TokenType::Identifier))
             {
-                next(); // consume `public`
-                expectPeek(TokenType::Identifier);
                 next();
                 stmt = __parseFunctionDef(true);
             }
-            else if (isNext(TokenType::Struct))
+            else if (isThis(TokenType::Struct))
             {
                 stmt = __parseStructDef(true);
             }
@@ -387,9 +384,8 @@ namespace Fig
         {
             stmt = __parseVarDef(false);
         }
-        else if (isThis(TokenType::Function))
+        else if (isThis(TokenType::Function) and isNext(TokenType::Identifier))
         {
-            expectPeek(TokenType::Identifier, u8"function name");
             next();
             stmt = __parseFunctionDef(false);
         }
@@ -523,53 +519,9 @@ namespace Fig
         return makeAst<Ast::ReturnSt>(retValue);
     }
 
-    Ast::FunctionCall Parser::__parseFunctionCall(FString funcName)
-    {
-        // entry: current at '('
-        next(); // consume '('
-        std::vector<Ast::Expression> args;
-        if (!isThis(TokenType::RightParen))
-        {
-            while (true)
-            {
-                args.push_back(parseExpression(0, TokenType::Comma, TokenType::RightParen));
-                if (isThis(TokenType::Comma))
-                {
-                    next(); // consume ','
-                    continue;
-                }
-                break;
-            }
-        }
-        expect(TokenType::RightParen);
-        next(); // consume ')'
-        return makeAst<Ast::FunctionCallExpr>(funcName, Ast::FunctionArguments(args));
-    }
-
     Ast::VarExpr Parser::__parseVarExpr(FString name)
     {
         return makeAst<Ast::VarExprAst>(name);
-    }
-
-    Ast::LambdaExpr Parser::__parseLambdaExpr()
-    {
-        // entry: current tok Token::LeftParen and last is Token::Function
-        /*
-        Lambda in Fig like:
-            fun (params) -> <return type> {...}
-        */
-        Ast::FunctionParameters params = __parseFunctionParameters();
-        // if OK, the current token is `)` next one
-        FString tiName = ValueType::Any.name;
-        if (isThis(TokenType::RightArrow)) // ->
-        {
-            next();
-            expect(TokenType::Identifier);
-            tiName = currentToken().getValue();
-            next();
-        }
-        expect(TokenType::LeftBrace); // `{`
-        return makeAst<Ast::LambdaExprAst>(params, tiName, __parseBlockStatement());
     }
 
     Ast::UnaryExpr Parser::__parsePrefix(Ast::Operator op, Precedence bp)
@@ -579,6 +531,32 @@ namespace Fig
     Ast::BinaryExpr Parser::__parseInfix(Ast::Expression lhs, Ast::Operator op, Precedence bp)
     {
         return makeAst<Ast::BinaryExprAst>(lhs, op, parseExpression(bp));
+    }
+
+    Ast::Expression Parser::__parseCall(Ast::Expression callee)
+    {
+        next(); // consume '('
+        std::vector<Ast::Expression> args;
+
+        if (!isThis(TokenType::RightParen))
+        {
+            while (true)
+            {
+                args.push_back(parseExpression(0, TokenType::Comma, TokenType::RightParen));
+
+                if (isThis(TokenType::Comma))
+                {
+                    next();
+                    continue;
+                }
+                break;
+            }
+        }
+
+        expect(TokenType::RightParen);
+        next(); // consume ')'
+
+        return makeAst<Ast::FunctionCallExpr>(callee, Ast::FunctionArguments(args));
     }
 
     Ast::ListExpr Parser::__parseListExpr()
@@ -739,6 +717,27 @@ namespace Fig
         }
         return nullptr; // to suppress compiler warning
     }
+
+    Ast::FunctionLiteralExpr Parser::__parseFunctionLiteralExpr()
+    {
+        // entry: current is Token::LeftParen and last is Token::Function
+        /*
+        Function literal:
+            func (params){...}
+            or
+            func (params) => <expression>
+        */
+        Ast::FunctionParameters params = __parseFunctionParameters();
+        if (isThis(TokenType::DoubleArrow)) // =>
+        {
+            next();
+            Ast::Expression bodyExpr = parseExpression(0);
+            return makeAst<Ast::FunctionLiteralExprAst>(params, bodyExpr);
+        }
+        expect(TokenType::LeftBrace); // `{`
+        return makeAst<Ast::FunctionLiteralExprAst>(params, __parseBlockStatement());
+    }
+
     Ast::Expression Parser::parseExpression(Precedence bp, TokenType stop, TokenType stop2)
     {
         Ast::Expression lhs;
@@ -764,6 +763,17 @@ namespace Fig
         {
             lhs = __parseMapExpr(); // auto consume
         }
+        else if (tok.getType() == TokenType::Function)
+        {
+            next(); // consume `function`
+            if (currentToken().getType() == TokenType::Identifier)
+            {
+                // err
+                throwAddressableError<SyntaxError>(FStringView(u8"Function literal should not have a name"));
+            }
+            expect(TokenType::LeftParen);
+            lhs = __parseFunctionLiteralExpr();
+        }
         else if (tok.isLiteral())
         {
             lhs = __parseValueExpr();
@@ -773,11 +783,7 @@ namespace Fig
         {
             FString id = tok.getValue();
             next();
-            if (currentToken().getType() == TokenType::LeftParen)
-            {
-                lhs = __parseFunctionCall(id); // foo(...)
-            }
-            else if (currentToken().getType() == TokenType::LeftBrace)
+            if (currentToken().getType() == TokenType::LeftBrace)
             {
                 lhs = __parseInitExpr(id); // a_struct{init...}
             }
@@ -802,6 +808,12 @@ namespace Fig
         {
             tok = currentToken();
             if (tok.getType() == TokenType::Semicolon || tok == EOFTok) break;
+
+            if (tok.getType() == TokenType::LeftParen)
+            {
+                lhs = __parseCall(lhs);
+                continue;
+            }
 
             // ternary
             if (tok.getType() == TokenType::Question)

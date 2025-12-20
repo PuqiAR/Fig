@@ -174,12 +174,19 @@ namespace Fig
             return getBindingPower(op).second;
         }
 
+        // template <class _Tp, class... Args>
+        // std::shared_ptr<_Tp> makeAst(Args &&...args)
+        // {
+        //     _Tp node(std::forward<Args>(args)...);
+        //     node.setAAI(currentAAI);
+        //     return std::shared_ptr<_Tp>(new _Tp(node));
+        // }
         template <class _Tp, class... Args>
         std::shared_ptr<_Tp> makeAst(Args &&...args)
         {
-            _Tp node(args...);
-            node.setAAI(currentAAI);
-            return std::shared_ptr<_Tp>(new _Tp(node));
+            std::shared_ptr<_Tp> ptr = std::make_shared<_Tp>(std::forward<Args>(args)...);
+            ptr->setAAI(currentAAI);
+            return ptr;
         }
 
         void expectPeek(TokenType type)
@@ -236,7 +243,6 @@ namespace Fig
         Ast::VarDef __parseVarDef(bool); // entry: current is keyword `var` or `const` (isConst: Bool)
         Value __parseValue();
         Ast::ValueExpr __parseValueExpr();
-        Ast::FunctionCall __parseFunctionCall(FString);
         Ast::FunctionParameters __parseFunctionParameters(); // entry: current is Token::LeftParen
         Ast::Statement __parseStatement();                   // entry: (idk)
         Ast::BlockStatement __parseBlockStatement();         // entry: current is Token::LeftBrace
@@ -246,18 +252,20 @@ namespace Fig
         Ast::Return __parseReturn();                         // entry: current is Token::Return
 
         Ast::VarExpr __parseVarExpr(FString);
-        Ast::LambdaExpr __parseLambdaExpr();
         Ast::FunctionDef __parseFunctionDef(bool); // entry: current is Token::Identifier (isPublic: Bool)
         Ast::StructDef __parseStructDef(bool);     // entry: current is Token::Identifier (struct name) arg(isPublic: bool)
 
         Ast::BinaryExpr __parseInfix(Ast::Expression, Ast::Operator, Precedence);
         Ast::UnaryExpr __parsePrefix(Ast::Operator, Precedence);
-
+        Ast::Expression __parseCall(Ast::Expression);
+        
         Ast::ListExpr __parseListExpr(); // entry: current is `[`
-        Ast::Expression __parseTupleOrParenExpr(); // entry: current is `(`
-        Ast::MapExpr __parseMapExpr(); // entry: current is `{`
 
+        Ast::MapExpr __parseMapExpr(); // entry: current is `{`
         Ast::InitExpr __parseInitExpr(FString);  // entry: current is `{`, ahead is struct name. arg (struct name : FString)
+        Ast::Expression __parseTupleOrParenExpr();             // entry: current is `(`
+
+        Ast::FunctionLiteralExpr __parseFunctionLiteralExpr(); // entry: current is Token::LParen after Token::Function
 
         Ast::Expression parseExpression(Precedence, TokenType = TokenType::Semicolon, TokenType = TokenType::Semicolon);
         std::vector<Ast::AstBase> parseAll();

@@ -22,7 +22,7 @@ namespace Fig
         Or,        // or
         Not,       // not
         Import,    // import
-        Function,  // fun
+        Function,  // func
         Variable,  // var
         Const,     // const
         Final,     // final
@@ -85,7 +85,7 @@ namespace Fig
         RightBrace,   // }
         // LeftArrow,        // <-
         RightArrow,       // ->
-        // DoubleArrow,      // =>
+        DoubleArrow,      // =>
         Equal,           // ==
         NotEqual,        // !=
         LessEqual,       // <=
