@@ -1,4 +1,6 @@
-for (var i=0;i < 10;i = i + 1)
+const println := __fstdout_println;
+
+for var i=0;i<10;i=i+1
 {
-    __fstdout_println(i);
+    println("Loop ", i);
 }
