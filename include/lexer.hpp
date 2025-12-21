@@ -81,7 +81,6 @@ namespace Fig
         {
             return warnings;
         }
-
         Token nextToken();
 
         Token scanNumber();

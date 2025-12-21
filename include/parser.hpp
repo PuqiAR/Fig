@@ -29,6 +29,28 @@ namespace Fig
 
         std::stack<Ast::Expression> exprStack;
 
+        bool needSemicolon = true;
+
+        class SemicolonDisabler
+        {
+            Parser &p;
+            bool original;
+
+        public:
+            SemicolonDisabler(Parser &parser) :
+                p(parser), original(p.needSemicolon)
+            {
+                p.needSemicolon = false;
+            }
+            ~SemicolonDisabler()
+            {
+                p.needSemicolon = original;
+            }
+            // disable copy and assign
+            SemicolonDisabler(const SemicolonDisabler &) = delete;
+            SemicolonDisabler &operator=(const SemicolonDisabler &) = delete;
+        };
+
         void pushNode(const Ast::AstBase &_node)
         {
             Ast::AstBase node = _node;
@@ -109,7 +131,7 @@ namespace Fig
             return currentAAI;
         }
 
-        inline Token nextToken()
+        inline const Token &nextToken()
         {
             // 没有Rollback时, 存在 currentTokenIndex = tokenPruduced - 1
             next();
@@ -143,7 +165,7 @@ namespace Fig
             setCurrentAAI(Ast::AstAddressInfo{.line = tok.line, .column = tok.column});
             previousTokens.push_back(tok);
         }
-        inline Token currentToken()
+        inline const Token &currentToken()
         {
             if (tokenPruduced == 0) return nextToken();
             return previousTokens.at(currentTokenIndex);
@@ -229,6 +251,41 @@ namespace Fig
             }
         }
 
+        [[nodiscard]] SemicolonDisabler disableSemicolon()
+        {
+            return SemicolonDisabler(*this);
+        }
+
+        void expectSemicolon()
+        {
+            // if need semicolon and stream has `;`, consume it. if not need semicolon, do nothing
+
+            if (!needSemicolon)
+            {
+                // disabled semicolon check
+                if (currentToken().getType() == TokenType::Semicolon)
+                {
+                    next(); // consume `;`
+                }
+                return;
+            }
+
+            // normal semicolon check
+            expectConsume(TokenType::Semicolon);
+        }
+
+        void expectConsume(TokenType type, FString expected)
+        {
+            expect(type, expected);
+            next();
+        }
+
+        void expectConsume(TokenType type)
+        {
+            expect(type);
+            next();
+        }
+
         bool isNext(TokenType type)
         {
             return peekToken().getType() == type;
@@ -244,12 +301,15 @@ namespace Fig
         Value __parseValue();
         Ast::ValueExpr __parseValueExpr();
         Ast::FunctionParameters __parseFunctionParameters(); // entry: current is Token::LeftParen
-        Ast::Statement __parseStatement();                   // entry: (idk)
         Ast::BlockStatement __parseBlockStatement();         // entry: current is Token::LeftBrace
         Ast::VarAssign __parseVarAssign(FString);            // entry: current is Token::Assign, para1 is var name
         Ast::If __parseIf();                                 // entry: current is Token::If
         Ast::While __parseWhile();                           // entry: current is Token::While
+        Ast::Statement __parseIncrementStatement();          // only allowed in __parseFor function
+        Ast::For __parseFor();                               // entry: current is Token::For
         Ast::Return __parseReturn();                         // entry: current is Token::Return
+        Ast::Break __parseBreak();                           // entry: current is Token::Break
+        Ast::Continue __parseContinue();                     // entry: current is Token::Continue
 
         Ast::VarExpr __parseVarExpr(FString);
         Ast::FunctionDef __parseFunctionDef(bool); // entry: current is Token::Identifier (isPublic: Bool)
@@ -266,7 +326,8 @@ namespace Fig
         Ast::Expression __parseTupleOrParenExpr();             // entry: current is `(`
 
         Ast::FunctionLiteralExpr __parseFunctionLiteralExpr(); // entry: current is Token::LParen after Token::Function
-
+        
+        Ast::Statement __parseStatement();                     // entry: (idk)
         Ast::Expression parseExpression(Precedence, TokenType = TokenType::Semicolon, TokenType = TokenType::Semicolon);
         std::vector<Ast::AstBase> parseAll();
     };

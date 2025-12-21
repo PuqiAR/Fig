@@ -61,7 +61,7 @@ namespace Fig
         }
         if (isThis(TokenType::Semicolon))
         {
-            next();
+            next(); // consume `;`, no using expectConsume here cause we don't need to check again
             return makeAst<Ast::VarDefAst>(isPublic, isConst, name, tiName, nullptr);
         }
         if (!isThis(TokenType::Assign) and !isThis(TokenType::Walrus)) expect(TokenType::Assign, u8"assign or walrus");
@@ -72,8 +72,7 @@ namespace Fig
         }
         next();
         Ast::Expression exp = parseExpression(0);
-        expect(TokenType::Semicolon);
-        next();
+        expectSemicolon();
         return makeAst<Ast::VarDefAst>(isPublic, isConst, name, tiName, exp);
     }
 
@@ -276,8 +275,7 @@ namespace Fig
                 if (isEOF()) throwAddressableError<SyntaxError>(FStringView(u8"expect an expression"));
                 initExpr = parseExpression(0);
             }
-            expect(TokenType::Semicolon);
-            next(); // consume `;`
+            expectSemicolon();
             return Ast::StructDefField(am, fieldName, tiName, initExpr);
         };
         std::vector<Ast::Statement> stmts;
@@ -359,8 +357,6 @@ namespace Fig
         if (isThis(TokenType::EndOfFile)) { return makeAst<Ast::EofStmt>(); }
         if (isThis(TokenType::Public))
         {
-            // stmt = __parseVarDef();
-            // expect(TokenType::Semicolon);
             next(); // consume `public`
             if (isThis(TokenType::Variable) || isThis(TokenType::Const))
             {
@@ -417,16 +413,27 @@ namespace Fig
         {
             stmt = __parseWhile();
         }
+        else if (isThis(TokenType::For))
+        {
+            stmt = __parseFor();
+        }
         else if (isThis(TokenType::Return))
         {
             stmt = __parseReturn();
+        }
+        else if (isThis(TokenType::Break))
+        {
+            stmt = __parseBreak();
+        }
+        else if (isThis(TokenType::Continue))
+        {
+            stmt = __parseContinue();
         }
         else
         {
             // expression statement
             Ast::Expression exp = parseExpression(0);
-            expect(TokenType::Semicolon);
-            next();
+            expectSemicolon();
             stmt = makeAst<Ast::ExpressionStmtAst>(exp);
         }
         return stmt;
@@ -452,8 +459,7 @@ namespace Fig
         // entry: current is `=`
         next(); // consume `=`
         Ast::Expression exp = parseExpression(0);
-        expect(TokenType::Semicolon);
-        next(); // consume `;`
+        expectSemicolon();
         return makeAst<Ast::VarAssignSt>(varName, exp);
     }
 
@@ -462,14 +468,14 @@ namespace Fig
         // entry: current is `if`
         next(); // consume `if`
         Ast::Expression condition;
-        if (isThis( TokenType::LeftParen))
+        if (isThis(TokenType::LeftParen))
         {
             next(); // consume `(`
             condition = parseExpression(0, TokenType::RightParen);
             expect(TokenType::RightParen);
             next(); // consume `)`
         }
-        else 
+        else
         {
             condition = parseExpression(0);
         }
@@ -509,14 +515,72 @@ namespace Fig
         Ast::BlockStatement body = __parseBlockStatement();
         return makeAst<Ast::WhileSt>(condition, body);
     }
+    Ast::Statement Parser::__parseIncrementStatement()
+    {
+        // allowed：
+        // 1. assignment：i = 1, i += 1
+        // 2. expression stmt：i++, foo()
+        // ❌ not allowed：if/while/for/block stmt
+
+        if (isThis(TokenType::LeftBrace))
+        {
+            throwAddressableError<SyntaxError>(u8"BlockStatement cannot be used as for loop increment");
+        }
+
+        if (isThis(TokenType::If) || isThis(TokenType::While) || isThis(TokenType::For) || isThis(TokenType::Return) || isThis(TokenType::Break) || isThis(TokenType::Continue))
+        {
+            throwAddressableError<SyntaxError>(u8"Control flow statements cannot be used as for loop increment");
+        }
+
+        return __parseStatement();
+    }
+    Ast::For Parser::__parseFor()
+    {
+        // entry: current is `for`
+        // TODO: support enumeration
+        next(); // consume `for`
+        bool paren = isThis(TokenType::LeftParen);
+        if (paren)
+            next(); // consume `(`
+        // support 3-part for loop
+        // for init; condition; increment {}
+        Ast::Statement initStmt = __parseStatement(); // auto check ``
+        Ast::Expression condition = parseExpression(0);
+        expectSemicolon(); // auto consume `;`
+
+        Ast::Statement incrementStmt = nullptr;
+        if (!isThis(paren ? TokenType::RightParen : TokenType::LeftBrace)) // need parse increment?
+        {
+            auto guard = disableSemicolon();
+            incrementStmt = __parseIncrementStatement();
+        } // after parse increment, semicolon check state restored
+        if (paren)
+            expectConsume(TokenType::RightParen); // consume `)` if has `(`
+        expect(TokenType::LeftBrace);          // {
+        Ast::BlockStatement body = __parseBlockStatement(); // auto consume `}`
+        return makeAst<Ast::ForSt>(initStmt, condition, incrementStmt, body);
+    }
     Ast::Return Parser::__parseReturn()
     {
         // entry: current is `return`
         next(); // consume `return`
         Ast::Expression retValue = parseExpression(0);
-        expect(TokenType::Semicolon);
-        next(); // consume `;`
+        expectSemicolon();
         return makeAst<Ast::ReturnSt>(retValue);
+    }
+    Ast::Continue Parser::__parseContinue()
+    {
+        // entry: current is `continue`
+        next(); // consume `continue`
+        expectSemicolon();
+        return makeAst<Ast::ContinueSt>();
+    }
+    Ast::Break Parser::__parseBreak()
+    {
+        // entry: current is `break`
+        next(); // consume `break`
+        expectSemicolon();
+        return makeAst<Ast::BreakSt>();
     }
 
     Ast::VarExpr Parser::__parseVarExpr(FString name)

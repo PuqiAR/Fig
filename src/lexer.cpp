@@ -76,6 +76,8 @@ namespace Fig
         {FString(u8"implement"), TokenType::Implement},
         {FString(u8"public"), TokenType::Public},
         {FString(u8"return"), TokenType::Return},
+        {FString(u8"break"), TokenType::Break},
+        {FString(u8"continue"), TokenType::Continue},
 
 
         // {FString(u8"Null"), TokenType::TypeNull},

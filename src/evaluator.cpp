@@ -261,10 +261,34 @@ namespace Fig
                 return Value::getNullInstance();
         }
     }
-
+    StatementResult Evaluator::evalBlockStatement(const Ast::BlockStatement &blockSt, ContextPtr context)
+    {
+        auto previousContext = currentContext;
+        if (context)
+        {
+            currentContext = context;
+        }
+        else
+        {
+            currentContext = std::make_shared<Context>(FString(std::format("<Block {}:{}>", blockSt->getAAI().line, blockSt->getAAI().column)), currentContext);
+        }
+        StatementResult lstResult = StatementResult::normal();
+        for (const auto &s : blockSt->stmts)
+        {
+            StatementResult sr = evalStatement(s);
+            if (!sr.isNormal())
+            {
+                lstResult = sr;
+                break;
+            }
+        }
+        currentContext = previousContext;
+        return lstResult;
+    }
     StatementResult Evaluator::evalStatement(const Ast::Statement &stmt)
     {
         using Fig::Ast::AstType;
+        currentAddressInfo = stmt->getAAI();
         switch (stmt->getType())
         {
             case AstType::VarDefSt: {
@@ -312,21 +336,7 @@ namespace Fig
             };
             case AstType::BlockStatement: {
                 auto blockSt = std::dynamic_pointer_cast<Ast::BlockStatementAst>(stmt);
-                auto newContext = std::make_shared<Context>(FString(std::format("<Block {}:{}>", blockSt->getAAI().line, blockSt->getAAI().column)), currentContext);
-                auto previousContext = currentContext;
-                currentContext = newContext;
-                StatementResult lstResult = StatementResult::normal();
-                for (const auto &s : blockSt->stmts)
-                {
-                    StatementResult sr = evalStatement(s);
-                    if (!sr.isNormal())
-                    {
-                        lstResult = sr;
-                        break;
-                    }
-                }
-                currentContext = previousContext;
-                return lstResult;
+                return evalBlockStatement(blockSt); // auto create new context in block statement
             };
             case AstType::FunctionDefSt: {
                 auto fnDef = std::dynamic_pointer_cast<Ast::FunctionDefSt>(stmt);
@@ -412,7 +422,7 @@ namespace Fig
                 }
                 if (condVal.as<Bool>().getValue())
                 {
-                    return evalStatement(ifSt->body);
+                    return evalBlockStatement(ifSt->body);
                 }
                 // else
                 for (const auto &elif : ifSt->elifs)
@@ -425,12 +435,12 @@ namespace Fig
                     }
                     if (elifCondVal.as<Bool>().getValue())
                     {
-                        return evalStatement(elif->body);
+                        return evalBlockStatement(elif->body);
                     }
                 }
                 if (ifSt->els)
                 {
-                    return evalStatement(ifSt->els->body);
+                    return evalBlockStatement(ifSt->els->body);
                 }
                 return StatementResult::normal();
             };
@@ -442,13 +452,17 @@ namespace Fig
                     if (condVal.getTypeInfo() != ValueType::Bool)
                     {
                         static constexpr char ConditionTypeErrorName[] = "ConditionTypeError";
-                        throw EvaluatorError<ConditionTypeErrorName>(FStringView(u8"While condition must be boolean"), currentAddressInfo);
+                        throw EvaluatorError<ConditionTypeErrorName>(FStringView(u8"While condition must be boolean"), whileSt->condition->getAAI());
                     }
                     if (!condVal.as<Bool>().getValue())
                     {
                         break;
                     }
-                    StatementResult sr = evalStatement(whileSt->body);
+                    ContextPtr loopContext = std::make_shared<Context>(
+                        FString(std::format("<While {}:{}>",
+                                            whileSt->getAAI().line, whileSt->getAAI().column)),
+                        currentContext); // every loop has its own context
+                    StatementResult sr = evalBlockStatement(whileSt->body, loopContext);
                     if (sr.shouldReturn())
                     {
                         return sr;
@@ -464,28 +478,95 @@ namespace Fig
                 }
                 return StatementResult::normal();
             };
+            case AstType::ForSt: {
+                auto forSt = std::dynamic_pointer_cast<Ast::ForSt>(stmt);
+                ContextPtr loopContext = std::make_shared<Context>(
+                    FString(std::format("<For {}:{}>",
+                                        forSt->getAAI().line, forSt->getAAI().column)),
+                    currentContext); // for loop has its own context
+                ContextPtr previousContext = currentContext;
+                currentContext = loopContext;
+
+                evalStatement(forSt->initSt); // ignore init statement result
+                size_t iteration = 0;
+
+                while (true) // use while loop to simulate for loop, cause we need to check condition type every iteration
+                {
+                    Value condVal = eval(forSt->condition);
+                    if (condVal.getTypeInfo() != ValueType::Bool)
+                    {
+                        static constexpr char ConditionTypeErrorName[] = "ConditionTypeError";
+                        throw EvaluatorError<ConditionTypeErrorName>(FStringView(u8"For condition must be boolean"), forSt->condition->getAAI());
+                    }
+                    if (!condVal.as<Bool>().getValue())
+                    {
+                        break;
+                    }
+                    iteration++;
+                    ContextPtr iterationContext = std::make_shared<Context>(
+                        FString(std::format("<For {}:{}, Iteration {}>",
+                                            forSt->getAAI().line, forSt->getAAI().column, iteration)),
+                        loopContext); // every loop has its own context
+                    StatementResult sr = evalBlockStatement(forSt->body, iterationContext);
+                    if (sr.shouldReturn())
+                    {
+                        currentContext = previousContext; // restore context before return
+                        return sr;
+                    }
+                    if (sr.shouldBreak())
+                    {
+                        break;
+                    }
+                    if (sr.shouldContinue())
+                    {
+                        // continue to next iteration
+                        continue;
+                    }
+                    currentContext = loopContext; // let increment statement be in loop context
+                    evalStatement(forSt->incrementSt); // ignore increment statement result
+                }
+                currentContext = previousContext; // restore context
+                return StatementResult::normal();
+            }
             case AstType::ReturnSt: {
                 if (!currentContext->parent)
                 {
                     static constexpr char ReturnOutsideFunctionErrorName[] = "ReturnOutsideFunctionError";
                     throw EvaluatorError<ReturnOutsideFunctionErrorName>(FStringView(u8"'return' statement outside function"), currentAddressInfo);
                 }
-                std::shared_ptr<Context> fc = currentContext;
-                while (fc->parent)
-                {
-                    if (fc->getScopeName().find(u8"<Function ") == 0)
-                    {
-                        break;
-                    }
-                    fc = fc->parent;
-                }
-                if (fc->getScopeName().find(u8"<Function ") != 0)
+                if (!currentContext->isInFunctionContext())
                 {
                     static constexpr char ReturnOutsideFunctionErrorName[] = "ReturnOutsideFunctionError";
                     throw EvaluatorError<ReturnOutsideFunctionErrorName>(FStringView(u8"'return' statement outside function"), currentAddressInfo);
                 }
                 auto returnSt = std::dynamic_pointer_cast<Ast::ReturnSt>(stmt);
                 return StatementResult::returnFlow(eval(returnSt->retValue));
+            };
+            case AstType::BreakSt: {
+                if (!currentContext->parent)
+                {
+                    static constexpr char BreakOutsideLoopErrorName[] = "BreakOutsideLoopError";
+                    throw EvaluatorError<BreakOutsideLoopErrorName>(FStringView(u8"'break' statement outside loop"), currentAddressInfo);
+                }
+                if (!currentContext->isInLoopContext())
+                {
+                    static constexpr char BreakOutsideLoopErrorName[] = "BreakOutsideLoopError";
+                    throw EvaluatorError<BreakOutsideLoopErrorName>(FStringView(u8"'break' statement outside loop"), currentAddressInfo);
+                }
+                return StatementResult::breakFlow();
+            };
+            case AstType::ContinueSt: {
+                if (!currentContext->parent)
+                {
+                    static constexpr char ContinueOutsideLoopErrorName[] = "ContinueOutsideLoopError";
+                    throw EvaluatorError<ContinueOutsideLoopErrorName>(FStringView(u8"'continue' statement outside loop"), currentAddressInfo);
+                }
+                if (!currentContext->isInLoopContext())
+                {
+                    static constexpr char ContinueOutsideLoopErrorName[] = "ContinueOutsideLoopError";
+                    throw EvaluatorError<ContinueOutsideLoopErrorName>(FStringView(u8"'continue' statement outside loop"), currentAddressInfo);
+                }
+                return StatementResult::continueFlow();
             };
             default:
                 throw RuntimeError(FStringView(std::string("Unknown statement type:") + magic_enum::enum_name(stmt->getType()).data()));

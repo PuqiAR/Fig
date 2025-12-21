@@ -111,6 +111,7 @@ namespace Fig
         Value evalBinary(const Ast::BinaryExpr &);
         Value evalUnary(const Ast::UnaryExpr &);
 
+        StatementResult evalBlockStatement(const Ast::BlockStatement &, ContextPtr = nullptr);
         StatementResult evalStatement(const Ast::Statement &);
 
         Value evalFunctionCall(const Function &, const Ast::FunctionArguments &, FString fnName = u8"<anonymous>");

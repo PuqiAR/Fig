@@ -35,6 +35,8 @@ namespace Fig
         Implement, // implement
         Public,    // public
         Return,    // return
+        Break,     // break
+        Continue,  // continue
 
         // TypeNull,   // Null
         // TypeInt,    // Int
@@ -130,7 +132,7 @@ namespace Fig
             column = _column;
             return *this;
         }
-        FString getValue()
+        const FString& getValue() const
         {
             return value;
         }
@@ -151,7 +153,7 @@ namespace Fig
             return type == TokenType::LiteralNull || type == TokenType::LiteralBool || type == TokenType::LiteralNumber || type == TokenType::LiteralString;
         }
         
-        TokenType getType()
+        TokenType getType() const
         {
             return type;
         }

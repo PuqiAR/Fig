@@ -2,7 +2,7 @@
 
 #include <unordered_map>
 #include <iostream>
-#include <algorithm>
+#include <memory>
 
 #include <context_forward.hpp>
 #include <fig_string.hpp>
@@ -10,7 +10,7 @@
 
 namespace Fig
 {
-    struct Context
+    class Context : public std::enable_shared_from_this<Context>
     {
     private:
         FString scopeName;
@@ -144,6 +144,33 @@ namespace Fig
                 return parent->getTypeInfo(name);
             }
             throw RuntimeError(FStringView(std::format("Variable '{}' not defined", name.toBasicString())));
+        }
+        bool isInFunctionContext()
+        {
+            ContextPtr ctx = shared_from_this();
+            while (ctx)
+            {
+                if (ctx->getScopeName().find(u8"<Function ") == 0)
+                {
+                    return true;
+                }
+                ctx = ctx->parent;
+            }
+            return false;
+        }
+        bool isInLoopContext()
+        {
+            ContextPtr ctx = shared_from_this();
+            while (ctx)
+            {
+                if (ctx->getScopeName().find(u8"<While ") == 0 or
+                    ctx->getScopeName().find(u8"<For ") == 0)
+                {
+                    return true;
+                }
+                ctx = ctx->parent;
+            }
+            return false;
         }
         void printStackTrace(std::ostream &os = std::cerr, int indent = 0) const
         {

@@ -4,6 +4,6 @@
 
 namespace Fig
 {
-    struct Context;
+    class Context;
     using ContextPtr = std::shared_ptr<Context>;
 };

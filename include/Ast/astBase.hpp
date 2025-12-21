@@ -47,6 +47,7 @@ namespace Fig::Ast
 
         VarAssignSt,
         WhileSt,
+        ForSt,
         ReturnSt,
         BreakSt,
         ContinueSt,
