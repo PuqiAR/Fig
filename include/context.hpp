@@ -115,7 +115,7 @@ namespace Fig
                 throw RuntimeError(FStringView(std::format("Variable '{}' not defined", name.toBasicString())));
             }
         }
-        void def(const FString &name, const TypeInfo &ti, AccessModifier am, const Object &value = Any())
+        void def(const FString &name, const TypeInfo &ti, AccessModifier am, const Object &value = Object::getNullInstance())
         {
             if (containsInThisScope(name))
             {
