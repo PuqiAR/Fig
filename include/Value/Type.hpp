@@ -63,15 +63,5 @@ namespace Fig
         using BoolClass = bool;
         using NullClass = std::monostate;
         using StringClass = FString;
-
-        /* complex types */
-        struct FunctionStruct;
-        using FunctionClass = FunctionStruct;
-
-        struct StructT;
-        using StructTypeClass = StructT;
-
-        struct StructInstanceT;
-        using StructInstanceClass = StructInstanceT;
     }; // namespace ValueType
 }; // namespace Fig

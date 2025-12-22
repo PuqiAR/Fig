@@ -78,7 +78,7 @@ namespace Fig
         return makeAst<Ast::VarDefAst>(isPublic, isConst, name, tiName, exp);
     }
 
-    Value Parser::__parseValue()
+    Object Parser::__parseValue()
     {
         FString _val = currentToken().getValue();
         if (currentToken().getType() == TokenType::LiteralNumber)
@@ -95,7 +95,7 @@ namespace Fig
                 {
                     throwAddressableError<SyntaxError>(FStringView(u8"Illegal number literal"));
                 }
-                return Value(d);
+                return Object(d);
             }
             else
             {
@@ -109,20 +109,20 @@ namespace Fig
                 {
                     throwAddressableError<SyntaxError>(FStringView(u8"Illegal number literal"));
                 }
-                return Value(i);
+                return Object(i);
             }
         }
         else if (currentToken().getType() == TokenType::LiteralString)
         {
-            return Value(_val);
+            return Object(_val);
         }
         else if (currentToken().getType() == TokenType::LiteralBool)
         {
-            return Value((_val == u8"true" ? true : false));
+            return Object((_val == u8"true" ? true : false));
         }
         else if (currentToken().getType() == TokenType::LiteralNull)
         {
-            return Value::getNullInstance();
+            return Object::getNullInstance();
         }
         else
         {

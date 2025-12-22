@@ -15,10 +15,10 @@ namespace Fig
     private:
         FString scopeName;
         std::unordered_map<FString, TypeInfo> varTypes;
-        std::unordered_map<FString, Value> variables;
+        std::unordered_map<FString, Object> variables;
         std::unordered_map<FString, AccessModifier> ams;
 
-        std::unordered_map<std::size_t, FunctionStruct> functions;
+        std::unordered_map<std::size_t, Function> functions;
         std::unordered_map<std::size_t, FString> functionNames;
 
         std::unordered_map<std::size_t, FString> structTypeNames;
@@ -28,7 +28,7 @@ namespace Fig
         Context(const Context &) = default;
         Context(const FString &name, ContextPtr p = nullptr) :
             scopeName(name), parent(p) {}
-        Context(const FString &name, std::unordered_map<FString, TypeInfo> types, std::unordered_map<FString, Value> vars, std::unordered_map<FString, AccessModifier> _ams) :
+        Context(const FString &name, std::unordered_map<FString, TypeInfo> types, std::unordered_map<FString, Object> vars, std::unordered_map<FString, AccessModifier> _ams) :
             scopeName(std::move(name)), varTypes(std::move(types)), variables(std::move(vars)), ams(std::move(_ams)) {}
 
         void setParent(ContextPtr _parent)
@@ -46,7 +46,7 @@ namespace Fig
             return scopeName;
         }
 
-        std::optional<Value> get(const FString &name)
+        std::optional<Object> get(const FString &name)
         {
             auto it = variables.find(name);
             if (it != variables.end())
@@ -73,7 +73,7 @@ namespace Fig
         ContextPtr createCopyWithPublicVariables()
         {
             std::unordered_map<FString, TypeInfo> _varTypes;
-            std::unordered_map<FString, Value> _variables;
+            std::unordered_map<FString, Object> _variables;
             std::unordered_map<FString, AccessModifier> _ams;
             for (const auto &p : this->variables)
             {
@@ -96,7 +96,7 @@ namespace Fig
             AccessModifier am = getAccessModifier(name); // may throw
             return am == AccessModifier::Public or am == AccessModifier::PublicConst or am == AccessModifier::PublicFinal;
         }
-        void set(const FString &name, const Value &value)
+        void set(const FString &name, const Object &value)
         {
             if (variables.contains(name))
             {
@@ -115,7 +115,7 @@ namespace Fig
                 throw RuntimeError(FStringView(std::format("Variable '{}' not defined", name.toBasicString())));
             }
         }
-        void def(const FString &name, const TypeInfo &ti, AccessModifier am, const Value &value = Any())
+        void def(const FString &name, const TypeInfo &ti, AccessModifier am, const Object &value = Any())
         {
             if (containsInThisScope(name))
             {
@@ -127,17 +127,17 @@ namespace Fig
 
             if (ti == ValueType::Function and value.getTypeInfo() == ValueType::Function)
             {
-                auto &fn = value.as<Function>().getValue();
+                auto &fn = value.as<Function>();
                 functions[fn.id] = fn;
                 functionNames[fn.id] = name;
             }
             if (ti == ValueType::StructType)
             {
-                auto &st = value.as<StructType>().getValue();
+                auto &st = value.as<StructType>();
                 structTypeNames[st.id] = name;
             }
         }
-        std::optional<FunctionStruct> getFunction(std::size_t id)
+        std::optional<Function> getFunction(std::size_t id)
         {
             auto it = functions.find(id);
             if (it != functions.end())

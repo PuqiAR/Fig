@@ -9,13 +9,13 @@ namespace Fig::Ast
     class ValueExprAst final : public ExpressionAst
     {
     public:
-        Value val;
+        Object val;
 
         ValueExprAst()
         {
             type = AstType::ValueExpr;
         }
-        ValueExprAst(Value _val)
+        ValueExprAst(Object _val)
         {
             type = AstType::ValueExpr;
             val = std::move(_val);

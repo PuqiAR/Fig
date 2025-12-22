@@ -14,7 +14,7 @@ namespace Fig::Ast
 
     struct FunctionCallArgs final 
     {
-        std::vector<Value> argv;
+        std::vector<Object> argv;
         size_t getLength() const { return argv.size(); }
     };
 

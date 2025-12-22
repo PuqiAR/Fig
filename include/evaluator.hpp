@@ -30,7 +30,7 @@ namespace Fig
     };
     struct StatementResult
     {
-        Value result;
+        Object result;
         enum class Flow
         {
             Normal,
@@ -39,26 +39,26 @@ namespace Fig
             Continue
         } flow;
 
-        StatementResult(Value val, Flow f = Flow::Normal) :
+        StatementResult(Object val, Flow f = Flow::Normal) :
             result(val), flow(f)
         {
         }
 
-        static StatementResult normal(Value val = Value::getNullInstance())
+        static StatementResult normal(Object val = Object::getNullInstance())
         {
             return StatementResult(val, Flow::Normal);
         }
-        static StatementResult returnFlow(Value val)
+        static StatementResult returnFlow(Object val)
         {
             return StatementResult(val, Flow::Return);
         }
         static StatementResult breakFlow()
         {
-            return StatementResult(Value::getNullInstance(), Flow::Break);
+            return StatementResult(Object::getNullInstance(), Flow::Break);
         }
         static StatementResult continueFlow()
         {
-            return StatementResult(Value::getNullInstance(), Flow::Continue);
+            return StatementResult(Object::getNullInstance(), Flow::Continue);
         }
 
         bool isNormal() const { return flow == Flow::Normal; }
@@ -91,7 +91,7 @@ namespace Fig
                     name,
                     ValueType::Function,
                     AccessModifier::PublicConst,
-                    Value(f));
+                    Object(f));
             }
 
             for (auto &[name, val] : Builtins::builtinValues)
@@ -107,16 +107,16 @@ namespace Fig
         std::shared_ptr<Context> getCurrentContext() { return currentContext; }
         std::shared_ptr<Context> getGlobalContext() { return globalContext; }
 
-        Value __evalOp(Ast::Operator, const Value &, const Value & = Value::getNullInstance());
-        Value evalBinary(const Ast::BinaryExpr &);
-        Value evalUnary(const Ast::UnaryExpr &);
+        Object __evalOp(Ast::Operator, const Object &, const Object & = Object::getNullInstance());
+        Object evalBinary(const Ast::BinaryExpr &);
+        Object evalUnary(const Ast::UnaryExpr &);
 
         StatementResult evalBlockStatement(const Ast::BlockStatement &, ContextPtr = nullptr);
         StatementResult evalStatement(const Ast::Statement &);
 
-        Value evalFunctionCall(const Function &, const Ast::FunctionArguments &, FString fnName = u8"<anonymous>");
+        Object evalFunctionCall(const Function &, const Ast::FunctionArguments &, FString fnName = u8"<anonymous>");
 
-        Value eval(Ast::Expression);
+        Object eval(Ast::Expression);
         void run();
         void printStackTrace() const;
     };
