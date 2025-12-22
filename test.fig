@@ -1,16 +1,3 @@
-struct Person
-{
-    name: String;
-    age: Int;
-}
+var x := 3.141;
 
-var person := Person{"Fig", 1};
-
-const print := __fstdout_println;
-
-print(person.name, " ", person.age);
-
-person.name = "hello";
-person.age = 114514;
-
-print(person.name, " ", person.age);
+__fstdout_println(x);
