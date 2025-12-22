@@ -1,0 +1,15 @@
+func greeting(name:String) -> String
+{
+    return "Hello " + name + "!";
+}
+
+const print := __fstdout_println; // link to std out
+print(greeting("Fig"));
+
+func adder(x)
+{
+    return func (n) => x + n; // closure
+}
+
+const add2 = adder(2);
+print(add2(3));
