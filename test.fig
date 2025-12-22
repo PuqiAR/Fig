@@ -1,10 +1,14 @@
 struct test
 {
+    bar:String = "1233";
     func foo()
     {
-        __fstdout_println("666");
+        __fstdout_println(bar);
     }
 }
 
 var x := test{};
+x.foo();
+
+x.bar = "555";
 x.foo();

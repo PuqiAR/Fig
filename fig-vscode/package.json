@@ -3,12 +3,16 @@
   "displayName": "Fig Language",
   "description": "VSCode extension for Fig language with syntax highlighting",
   "version": "0.0.1",
+  "publisher": "PuqiAR",
   "engines": {
     "vscode": "^1.90.0"
   },
   "categories": [
     "Programming Languages"
   ],
+  "repository": {
+    "url":"https://github.com/PuqiAR/Fig"
+  },
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {

@@ -456,6 +456,12 @@ namespace Fig
                     }
                 }
                 instanceCtx->merge(*structT.defContext);
+                for (auto &[id, fn] : instanceCtx->getFunctions())
+                {
+                    instanceCtx->_update(*instanceCtx->getFunctionName(id), Object(
+                        Function(fn.paras, fn.retType, fn.body, instanceCtx) // change its closureContext to struct instance's context
+                    ));
+                }
                 return std::make_shared<Object>(StructInstance(structT.id, instanceCtx));
             }
             default:
@@ -542,7 +548,7 @@ namespace Fig
             };
             case AstType::FunctionDefSt: {
                 auto fnDef = std::dynamic_pointer_cast<Ast::FunctionDefSt>(stmt);
-                if (currentContext->contains(fnDef->name))
+                if (currentContext->containsInThisScope(fnDef->name))
                 {
                     static constexpr char RedeclarationErrorName[] = "RedeclarationError";
                     throw EvaluatorError<RedeclarationErrorName>(FStringView(std::format("Function '{}' already defined in this scope", fnDef->name.toBasicString())), currentAddressInfo);

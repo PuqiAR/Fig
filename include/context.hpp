@@ -56,6 +56,11 @@ namespace Fig
             structTypeNames.insert(c.structTypeNames.begin(), c.structTypeNames.end());
         }
 
+        std::unordered_map<size_t, Function> getFunctions() const
+        {
+            return functions;
+        }
+
         std::optional<ObjectPtr> get(const FString &name)
         {
             auto it = variables.find(name);
@@ -114,6 +119,21 @@ namespace Fig
                 {
                     throw RuntimeError(FStringView(std::format("Variable '{}' is immutable", name.toBasicString())));
                 }
+                variables[name] = std::make_shared<Object>(value);
+            }
+            else if (parent != nullptr)
+            {
+                parent->set(name, value);
+            }
+            else
+            {
+                throw RuntimeError(FStringView(std::format("Variable '{}' not defined", name.toBasicString())));
+            }
+        }
+        void _update(const FString &name, const Object &value)
+        {
+            if (variables.contains(name))
+            {
                 variables[name] = std::make_shared<Object>(value);
             }
             else if (parent != nullptr)
