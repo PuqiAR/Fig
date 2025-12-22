@@ -8,14 +8,14 @@ namespace Fig
 {
     struct StructInstanceT final
     {
-        FString structName; // 类的名字 (StructType), 非变量名。用于获取所属类
+        size_t parentId;
         ContextPtr localContext;
 
-        StructInstanceT(FString _structName, ContextPtr _localContext) :
-            structName(std::move(_structName)), localContext(std::move(_localContext)) {}
+        StructInstanceT(size_t _parentId, ContextPtr _localContext) :
+            parentId(std::move(_parentId)), localContext(std::move(_localContext)) {}
 
         StructInstanceT(const StructInstanceT &other) :
-            structName(other.structName), localContext(other.localContext) {}
+            parentId(other.parentId), localContext(other.localContext) {}
         StructInstanceT &operator=(const StructInstanceT &) = default;
         StructInstanceT(StructInstanceT &&) = default;
         StructInstanceT &operator=(StructInstanceT &&) = default;
@@ -31,10 +31,10 @@ namespace Fig
         {
             data = std::make_unique<StructInstanceT>(x);
         }
-        StructInstance(FString _structName, ContextPtr _localContext) :
+        StructInstance(size_t _parentId, ContextPtr _localContext) :
             __ValueWrapper(ValueType::StructInstance)
         {
-            data = std::make_unique<StructInstanceT>(std::move(_structName), std::move(_localContext));
+            data = std::make_unique<StructInstanceT>(std::move(_parentId), std::move(_localContext));
         }
 
         bool operator==(const StructInstance &other) const noexcept

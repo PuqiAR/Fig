@@ -34,8 +34,10 @@ namespace Fig
         {Ast::Operator::ShiftLeft, {15, 16}},
         {Ast::Operator::ShiftRight, {15, 16}},
 
+        {Ast::Operator::Assign, {2, 1}}, // 右结合
+
         // 海象运算符
-        {Ast::Operator::Walrus, {2, 1}}, // 右结合
+        // {Ast::Operator::Walrus, {2, 1}}, // 右结合
 
         // 点运算符
         {Ast::Operator::Dot, {40, 41}},
@@ -391,12 +393,6 @@ namespace Fig
             next();
             stmt = __parseStructDef(false);
         }
-        else if (isThis(TokenType::Identifier) and isNext(TokenType::Assign))
-        {
-            FString varName = currentToken().getValue();
-            next(); // consume identifier
-            stmt = __parseVarAssign(varName);
-        }
         else if (isThis(TokenType::If))
         {
             stmt = __parseIf();
@@ -454,15 +450,6 @@ namespace Fig
             stmts.push_back(__parseStatement());
         }
     }
-    Ast::VarAssign Parser::__parseVarAssign(FString varName)
-    {
-        // entry: current is `=`
-        next(); // consume `=`
-        Ast::Expression exp = parseExpression(0);
-        expectSemicolon();
-        return makeAst<Ast::VarAssignSt>(varName, exp);
-    }
-
     Ast::If Parser::__parseIf()
     {
         // entry: current is `if`
@@ -555,8 +542,8 @@ namespace Fig
             incrementStmt = __parseIncrementStatement();
         } // after parse increment, semicolon check state restored
         if (paren)
-            expectConsume(TokenType::RightParen); // consume `)` if has `(`
-        expect(TokenType::LeftBrace);          // {
+            expectConsume(TokenType::RightParen);           // consume `)` if has `(`
+        expect(TokenType::LeftBrace);                       // {
         Ast::BlockStatement body = __parseBlockStatement(); // auto consume `}`
         return makeAst<Ast::ForSt>(initStmt, condition, incrementStmt, body);
     }
@@ -678,7 +665,7 @@ namespace Fig
         .2 Person {name: "Fig", age: 1, sex: "IDK"}; // can be unordered
         .3 Person {name, age, sex};
         */
-        uint8_t mode = 0; // 0=undetermined, 1=positional, 2=named, 3=shorthand
+        uint8_t mode; // 0=undetermined, 1=positional, 2=named, 3=shorthand
 
         while (!isThis(TokenType::RightBrace))
         {
@@ -701,7 +688,7 @@ namespace Fig
             if (mode == 1)
             {
                 // 1 Person {"Fig", 1, "IDK"};
-                Ast::Expression expr = parseExpression(0);
+                Ast::Expression expr = parseExpression(0, TokenType::Comma, TokenType::RightBrace);
                 args.push_back({FString(), std::move(expr)});
             }
             else if (mode == 2)
@@ -712,7 +699,7 @@ namespace Fig
                 next(); // consume identifier
                 expect(TokenType::Colon);
                 next(); // consume colon
-                Ast::Expression expr = parseExpression(0);
+                Ast::Expression expr = parseExpression(0, TokenType::Comma, TokenType::RightBrace);
                 args.push_back({fieldName, std::move(expr)});
             }
             else if (mode == 3)
@@ -731,12 +718,17 @@ namespace Fig
             }
             else if (!isThis(TokenType::RightBrace))
             {
-                throwAddressableError<SyntaxError>(u8"Expected comma or right brace");
+                throwAddressableError<SyntaxError>(FStringView(
+                    std::format("Expect `,` or `}}` in struct initialization expression, got {}",
+                                currentToken().toString().toBasicString())
+                ));
             }
         }
         expect(TokenType::RightBrace);
         next(); // consume `}`
-        return makeAst<Ast::InitExprAst>(structName, args);
+        return makeAst<Ast::InitExprAst>(structName, args,
+                                         (mode == 1 ? Ast::InitExprAst::InitMode::Positional :
+                                                      (mode == 2 ? Ast::InitExprAst::InitMode::Named : Ast::InitExprAst::InitMode::Shorthand)));
     }
     Ast::Expression Parser::__parseTupleOrParenExpr()
     {

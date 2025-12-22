@@ -20,6 +20,8 @@ namespace Fig
 
         std::unordered_map<std::size_t, FunctionStruct> functions;
         std::unordered_map<std::size_t, FString> functionNames;
+
+        std::unordered_map<std::size_t, FString> structTypeNames;
     public:
         ContextPtr parent;
 
@@ -129,6 +131,11 @@ namespace Fig
                 functions[fn.id] = fn;
                 functionNames[fn.id] = name;
             }
+            if (ti == ValueType::StructType)
+            {
+                auto &st = value.as<StructType>().getValue();
+                structTypeNames[st.id] = name;
+            }
         }
         std::optional<FunctionStruct> getFunction(std::size_t id)
         {
@@ -150,6 +157,22 @@ namespace Fig
         {
             auto it = functionNames.find(id);
             if (it != functionNames.end())
+            {
+                return it->second;
+            }
+            else if (parent)
+            {
+                return parent->getFunctionName(id);
+            }
+            else
+            {
+                return std::nullopt;
+            }
+        }
+        std::optional<FString> getStructName(std::size_t id)
+        {
+            auto it = structTypeNames.find(id);
+            if (it != structTypeNames.end())
             {
                 return it->second;
             }

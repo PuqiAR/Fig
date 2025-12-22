@@ -302,7 +302,6 @@ namespace Fig
         Ast::ValueExpr __parseValueExpr();
         Ast::FunctionParameters __parseFunctionParameters(); // entry: current is Token::LeftParen
         Ast::BlockStatement __parseBlockStatement();         // entry: current is Token::LeftBrace
-        Ast::VarAssign __parseVarAssign(FString);            // entry: current is Token::Assign, para1 is var name
         Ast::If __parseIf();                                 // entry: current is Token::If
         Ast::While __parseWhile();                           // entry: current is Token::While
         Ast::Statement __parseIncrementStatement();          // only allowed in __parseFor function

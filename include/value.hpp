@@ -182,7 +182,7 @@ namespace Fig
             if (is<StructInstance>())
             {
                 return FString(std::format("<Struct Instance('{}') at {:p}",
-                                           as<StructInstance>().getValue().structName.toBasicString(),
+                                           as<StructInstance>().getValue().parentId,
                                            static_cast<const void *>(as<StructInstance>().data.get())));
             }
             return FString(u8"<error>");

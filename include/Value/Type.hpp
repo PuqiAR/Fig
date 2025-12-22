@@ -4,8 +4,6 @@
 
 #include <variant>
 #include <map>
-#include <vector>
-#include <list>
 
 namespace Fig
 {

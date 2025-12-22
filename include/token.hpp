@@ -126,11 +126,15 @@ namespace Fig
             line = _line;
             column = _column;
         }
-        Token setPos(size_t _line, size_t _column)
+        const Token& setPos(size_t _line, size_t _column)
         {
             line = _line;
             column = _column;
             return *this;
+        }
+        size_t getLength()
+        {
+            return value.length();
         }
         const FString& getValue() const
         {

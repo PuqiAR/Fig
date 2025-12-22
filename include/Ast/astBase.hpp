@@ -25,7 +25,6 @@ namespace Fig::Ast
         UnaryExpr,
         BinaryExpr,
         TernaryExpr,
-
         ListExpr, // []
         TupleExpr, // ()
         MapExpr,   // {}
@@ -215,7 +214,8 @@ namespace Fig::Ast
         ShiftRight, // >>
 
         // 赋值表达式
-        Walrus, // :=
+        Assign, // =
+        // Walrus, // :=
 
         // 点运算符 .
         Dot,
@@ -250,7 +250,7 @@ namespace Fig::Ast
         Operator::ShiftLeft,
         Operator::ShiftRight,
 
-        Operator::Walrus,
+        // Operator::Walrus,
         Operator::Dot};
     static const std::unordered_set<Operator> ternaryOps{Operator::TernaryCond};
 
@@ -290,7 +290,7 @@ namespace Fig::Ast
         {TokenType::ShiftRight, Operator::ShiftRight},
 
         // 赋值表达式
-        {TokenType::Walrus, Operator::Walrus},
+        // {TokenType::Walrus, Operator::Walrus}, 
         // 点运算符
         {TokenType::Dot, Operator::Dot},
     }; // :=

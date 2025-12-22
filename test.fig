@@ -1,9 +1,17 @@
-var call := 0;
-func t()
+struct Person
 {
-    call = call + 1;
-    __fstdout_println(call);
-    t();
+    name: String;
+    age: Int = 10;
+
+    public func getName()
+    {
+        return name;
+    }
 }
 
-t();
+var person = Person{"123"};
+
+const print := __fstdout_print;
+print(person.name);
+person.name = "sb";
+print(person.name);

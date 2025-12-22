@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Ast/astBase.hpp>
+
 #include <Ast/AccessModifier.hpp>
 #include <Ast/BinaryExpr.hpp>
 #include <Ast/ContainerInitExprs.hpp>
@@ -18,7 +19,6 @@
 #include <Ast/TernaryExpr.hpp>
 #include <Ast/UnaryExpr.hpp>
 #include <Ast/ValueExpr.hpp>
-#include <Ast/VarAssignSt.hpp>
 #include <Ast/VarDef.hpp>
 #include <Ast/VarExpr.hpp>
 #include <Ast/WhileSt.hpp>
