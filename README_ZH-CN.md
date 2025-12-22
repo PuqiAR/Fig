@@ -47,7 +47,7 @@
     │ ├── evaluator.hpp # 解释器和控制流
     │ ├── warning.hpp # 标准警告
     ├── ExampleCodes/ # 示例程序
-    ├── VscodeExtension/ # vscode代码插件
+    ├── fig-vscode/ # vscode代码插件
     ├── .clang-format # Clang 格式化风格
     ├── test.fig # 测试文件（开发用）
     ├── LICENSE # Fig 项目许可证

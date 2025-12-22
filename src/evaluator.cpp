@@ -33,9 +33,8 @@ namespace Fig
             case Operator::BitNot: return std::make_shared<Object>(bit_not(*lhs));
             case Operator::ShiftLeft: return std::make_shared<Object>(shift_left(*lhs, *rhs));
             case Operator::ShiftRight: return std::make_shared<Object>(shift_right(*lhs, *rhs));
-            
-            case Operator::Assign: 
-            {
+
+            case Operator::Assign: {
                 *lhs = *rhs;
                 return Object::getNullInstance();
             }
@@ -63,25 +62,64 @@ namespace Fig
             }
             const StructInstance &st = lhs->as<StructInstance>();
             Ast::VarExpr varExp;
-            if (!(varExp = std::dynamic_pointer_cast<Ast::VarExprAst>(binExp->rexp)))
+            Ast::FunctionCall fnCall;
+            if ((varExp = std::dynamic_pointer_cast<Ast::VarExprAst>(binExp->rexp)))
+            {
+                FString member = varExp->name;
+                auto structTypeNameOpt = currentContext->getStructName(st.parentId);
+                if (!structTypeNameOpt) throw RuntimeError(FStringView("Can't get struct type name"));
+                FString structTypeName = *structTypeNameOpt;
+                if (!st.localContext->containsInThisScope(member))
+                {
+                    static constexpr char NoAttributeError[] = "NoAttributeError";
+                    throw EvaluatorError<NoAttributeError>(FStringView(
+                                                               std::format("Struct `{}` has no attribute '{}'", structTypeName.toBasicString(), member.toBasicString())),
+                                                           binExp->rexp->getAAI());
+                }
+                return *st.localContext->get(member); // safe
+            }
+            else if ((fnCall = std::dynamic_pointer_cast<Ast::FunctionCallExpr>(binExp->rexp)))
+            {
+                auto structTypeNameOpt = currentContext->getStructName(st.parentId);
+                if (!structTypeNameOpt) throw RuntimeError(FStringView("Can't get struct type name"));
+                FString structTypeName = *structTypeNameOpt;
+
+
+                FString fnName = u8"<anonymous>";
+                if (auto var = std::dynamic_pointer_cast<Ast::VarExprAst>(fnCall->callee))
+                    fnName = var->name; // function in struct has its name, so we can get the name
+                if (!st.localContext->containsInThisScope(fnName))
+                {
+                    static constexpr char NoAttributeError[] = "NoAttributeError";
+                    throw EvaluatorError<NoAttributeError>(FStringView(
+                                                               std::format("Struct `{}` has no attribute '{}'", structTypeName.toBasicString(), fnName.toBasicString())),
+                                                           binExp->rexp->getAAI());
+                }
+                auto calleeValOpt = st.localContext->get(fnName);
+                ObjectPtr calleeVal = *calleeValOpt;
+
+                if (!calleeVal->is<Function>())
+                {
+                    static constexpr char NotAFunctionErrorName[] = "NotAFunctionError";
+                    throw EvaluatorError<NotAFunctionErrorName>(
+                        FStringView(std::format(
+                            "'{}' is not a function or callable",
+                            calleeVal->toString().toBasicString())),
+                        currentAddressInfo);
+                }
+
+                Function fn = calleeVal->as<Function>();
+
+                return evalFunctionCall(fn, fnCall->arg, fnName);
+            }
+            else
             {
                 static constexpr char AccessOpNotAFieldNameError[] = "AccessOpNotAFieldNameError";
                 throw EvaluatorError<AccessOpNotAFieldNameError>(FStringView(
-                                                                     std::format("{} is not a field name", binExp->rexp->toString().toBasicString())),
+                                                                     std::format("{} is not a field", binExp->rexp->toString().toBasicString())),
                                                                  binExp->rexp->getAAI());
             }
-            FString member = varExp->name;
-            auto structTypeNameOpt = currentContext->getStructName(st.parentId);
-            if (!structTypeNameOpt) throw RuntimeError(FStringView("Can't get struct type name"));
-            FString structTypeName = *structTypeNameOpt;
-            if (!st.localContext->containsInThisScope(member))
-            {
-                static constexpr char NoAttributeError[] = "NoAttributeError";
-                throw EvaluatorError<NoAttributeError>(FStringView(
-                                                           std::format("Struct `{}` has no attribute '{}'", structTypeName.toBasicString(), member.toBasicString())),
-                                                       binExp->rexp->getAAI());
-            }
-            return *st.localContext->get(member); // safe
+                
         }
         return __evalOp(binExp->op, eval(binExp->lexp), eval(binExp->rexp));
     }
@@ -417,6 +455,7 @@ namespace Fig
                         }
                     }
                 }
+                instanceCtx->merge(*structT.defContext);
                 return std::make_shared<Object>(StructInstance(structT.id, instanceCtx));
             }
             default:
@@ -538,7 +577,29 @@ namespace Fig
                     }
                     fields.push_back(Field(field.am, field.fieldName, TypeInfo(field.tiName), field.defaultValueExpr));
                 }
-                ContextPtr defContext(currentContext);
+                ContextPtr defContext = std::make_shared<Context>(FString(std::format("<Struct {} at {}:{}>",
+                                                                                      stDef->name.toBasicString(),
+                                                                                      stDef->getAAI().line,
+                                                                                      stDef->getAAI().column)),
+                                                                  currentContext);
+                ContextPtr previousContext = currentContext;
+                currentContext = defContext;
+
+                const Ast::BlockStatement &body = stDef->body;
+                for (auto &st : body->stmts)
+                {
+                    if (st->getType() != Ast::AstType::FunctionDefSt)
+                    {
+                        static constexpr char UnexpectedStatementInStructError[] = "UnexpectedStatementInStructError";
+                        throw EvaluatorError<UnexpectedStatementInStructError>(FStringView(
+                                                                                   std::format("Unexpected statement `{}` in struct declaration",
+                                                                                               st->toString().toBasicString())),
+                                                                               st->getAAI());
+                    }
+                    evalStatement(st); // function def st
+                }
+                currentContext = previousContext;
+
                 AccessModifier am = (stDef->isPublic ? AccessModifier::PublicConst : AccessModifier::Const);
                 TypeInfo _(stDef->name, true); // register type name
                 currentContext->def(

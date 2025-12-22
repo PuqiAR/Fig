@@ -15,6 +15,7 @@ namespace Fig
     class EvaluatorError final : public AddressableError
     {
     public:
+        const char* errorName = errName;
         virtual FString toString() const override
         {
             std::string msg = std::format("[Eve: {}] {} in [{}] {}", errName, std::string(this->message.begin(), this->message.end()), this->src_loc.file_name(), this->src_loc.function_name());
@@ -26,6 +27,11 @@ namespace Fig
                                 std::source_location loc = std::source_location::current()) :
             AddressableError(_msg, aai.line, aai.column, loc)
         {
+        }
+
+        virtual FString getErrorType() const override
+        {
+            return FString("[Eval]" + std::string(errorName));
         }
     };
     struct StatementResult

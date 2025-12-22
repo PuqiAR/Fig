@@ -1,3 +1,10 @@
-var x := 3.141;
+struct test
+{
+    func foo()
+    {
+        __fstdout_println("666");
+    }
+}
 
-__fstdout_println(x);
+var x := test{};
+x.foo();

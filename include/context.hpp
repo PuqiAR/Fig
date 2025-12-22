@@ -46,6 +46,16 @@ namespace Fig
             return scopeName;
         }
 
+        void merge(const Context& c)
+        {
+            varTypes.insert(c.varTypes.begin(), c.varTypes.end());
+            variables.insert(c.variables.begin(), c.variables.end());
+            ams.insert(c.ams.begin(), c.ams.end());
+            functions.insert(c.functions.begin(), c.functions.end());
+            functionNames.insert(c.functionNames.begin(), c.functionNames.end());
+            structTypeNames.insert(c.structTypeNames.begin(), c.structTypeNames.end());
+        }
+
         std::optional<ObjectPtr> get(const FString &name)
         {
             auto it = variables.find(name);

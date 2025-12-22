@@ -47,7 +47,7 @@
         │ ├── evaluator.hpp         # Interpreter and Control flows
         │ ├── warning.hpp           # STD-Warnings
         ├── ExampleCodes/           # Sample programs
-        ├── VscodeExtension/        # vscode extension
+        ├── fig-vscode/        # vscode extension
         ├── .clang-format           # Clang format styles
         ├── test.fig                # Test file (dev)
         ├── LICENSE                 # Fig project license
