@@ -76,6 +76,15 @@ namespace Fig
                                                                std::format("Struct `{}` has no attribute '{}'", structTypeName.toBasicString(), member.toBasicString())),
                                                            binExp->rexp->getAAI());
                 }
+                if (!st.localContext->isVariablePublic(member))
+                {
+                    static constexpr char AttributeIsPrivateError[] = "AttributeIsPrivateError";
+                    throw EvaluatorError<AttributeIsPrivateError>(FStringView(
+                                                                      std::format("Attribute '{}' of class `{}` is private",
+                                                                                  structTypeName.toBasicString(),
+                                                                                  member.toBasicString())),
+                                                                  binExp->rexp->getAAI());
+                }
                 return *st.localContext->get(member); // safe
             }
             else if ((fnCall = std::dynamic_pointer_cast<Ast::FunctionCallExpr>(binExp->rexp)))
@@ -83,7 +92,6 @@ namespace Fig
                 auto structTypeNameOpt = currentContext->getStructName(st.parentId);
                 if (!structTypeNameOpt) throw RuntimeError(FStringView("Can't get struct type name"));
                 FString structTypeName = *structTypeNameOpt;
-
 
                 FString fnName = u8"<anonymous>";
                 if (auto var = std::dynamic_pointer_cast<Ast::VarExprAst>(fnCall->callee))
@@ -94,6 +102,15 @@ namespace Fig
                     throw EvaluatorError<NoAttributeError>(FStringView(
                                                                std::format("Struct `{}` has no attribute '{}'", structTypeName.toBasicString(), fnName.toBasicString())),
                                                            binExp->rexp->getAAI());
+                }
+                if (!st.localContext->isVariablePublic(fnName))
+                {
+                    static constexpr char AttributeIsPrivateError[] = "AttributeIsPrivateError";
+                    throw EvaluatorError<AttributeIsPrivateError>(FStringView(
+                                                                      std::format("Attribute '{}' of class `{}` is private",
+                                                                                  structTypeName.toBasicString(),
+                                                                                  fnName.toBasicString())),
+                                                                  binExp->rexp->getAAI());
                 }
                 auto calleeValOpt = st.localContext->get(fnName);
                 ObjectPtr calleeVal = *calleeValOpt;
@@ -119,7 +136,6 @@ namespace Fig
                                                                      std::format("{} is not a field", binExp->rexp->toString().toBasicString())),
                                                                  binExp->rexp->getAAI());
             }
-                
         }
         return __evalOp(binExp->op, eval(binExp->lexp), eval(binExp->rexp));
     }
@@ -459,8 +475,8 @@ namespace Fig
                 for (auto &[id, fn] : instanceCtx->getFunctions())
                 {
                     instanceCtx->_update(*instanceCtx->getFunctionName(id), Object(
-                        Function(fn.paras, fn.retType, fn.body, instanceCtx) // change its closureContext to struct instance's context
-                    ));
+                                                                                Function(fn.paras, fn.retType, fn.body, instanceCtx) // change its closureContext to struct instance's context
+                                                                                ));
                 }
                 return std::make_shared<Object>(StructInstance(structT.id, instanceCtx));
             }
