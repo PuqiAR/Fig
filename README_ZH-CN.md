@@ -20,39 +20,34 @@
 - **干净的 C++ 实现** - 现代 C++23，使用 RAII 和智能指针
 
 ### 📁 项目结构
-    Fig/
-    ├── src/
-    │ ├── lexer.cpp # 词法分析
-    │ ├── parser.cpp # 语法分析
-    │ ├── evaluator.cpp # 解释器/执行引擎
-    │ └── value.cpp # 类型系统实现
-    ├── include/
-    │ ├── argparse
-    │ ├── magic_enum
-    │ ├── Ast # 抽象语法树定义
-    │ ├── value.hpp # 类型系统头文件
-    │ ├── Value/ # 类型系统定义
-    │ │ ├── ...
-    │ ├── AstPrinter.hpp # AST 打印器
-    │ ├── context(_forward).hpp # 环境/上下文系统
-    │ ├── core.hpp # 核心信息
-    │ ├── error.hpp # 异常系统
-    │ ├── errorLog.hpp # 彩色打印错误日志
-    │ ├── fig_string.hpp # Fig UTF-8 字符串
-    │ ├── module.hpp # 包/模块系统
-    │ ├── utils.hpp
-    │ ├── token.hpp # Token 定义
-    │ ├── lexer.hpp # 词法分析
-    │ ├── parser.hpp # 语法分析和 AST
-    │ ├── evaluator.hpp # 解释器和控制流
-    │ ├── warning.hpp # 标准警告
-    ├── ExampleCodes/ # 示例程序
-    ├── fig-vscode/ # vscode代码插件
-    ├── .clang-format # Clang 格式化风格
-    ├── test.fig # 测试文件（开发用）
-    ├── LICENSE # Fig 项目许可证
-    ├── xmake.lua # XMake 配置
-    └── Logo/ # Fig 的 Logo
+.
+├── ExampleCodes                # 示例代码与性能测试样例
+│   └── SpeedTest               # 性能相关测试示例
+├── LICENSE                     # 项目开源协议
+├── Logo                        # 项目标识资源
+├── README.md                   # 英文 README
+├── README_ZH-CN.md             # 中文 README
+├── compile_flags.txt           # C/C++ 编译器参数提示
+├── fig-vscode                  # VSCode 插件项目
+│   ├── node_modules            # VSCode 插件依赖
+│   ├── out                     # 构建产物
+│   ├── src                     # VSCode 插件源码
+│   └── syntaxes                # 语法高亮定义
+├── src                         # Fig 语言核心源码
+│   ├── Ast                     # 抽象语法树节点
+│   ├── Context                 # 运行上下文
+│   ├── Core                    # 核心基础设施（字符串/UTF8 等）
+│   ├── Error                   # 错误系统
+│   ├── Evaluator               # 解释执行器
+│   ├── Lexer                   # 词法分析器
+│   ├── Module                  # 模块与内置库
+│   ├── Parser                  # 语法解析器
+│   ├── Token                   # Token 定义
+│   ├── Utils                   # 实用工具与第三方 header
+│   └── Value                   # 运行时类型系统与值表示
+├── test.fig                    # 测试脚本
+└── xmake.lua                   # Xmake 构建脚本
+
 
 ## 语言设计哲学
 Fig 围绕几个核心原则设计：

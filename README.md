@@ -20,39 +20,33 @@
 - **Clean C++ implementation** - Modern C++23 with RAII and smart pointers
 
 ### 📁 Project Structure
-    Fig/
-        ├── src/
-        │ ├── lexer.cpp             # Lexical analysis
-        │ ├── parser.cpp            # Syntax analysis
-        │ ├── evaluator.cpp         # Interpreter/execution engine
-        │ └── value.cpp             # Type system implementation        
-        ├── include/
-        │ ├── argparse
-        │ ├── magic_enum 
-        │ ├── Ast                   # Abstract syntax tree definitions
-        │ ├── value.hpp             # Type system header
-        │ ├── Value/                # Type system definitions
-        │       ├── ...
-        │ ├── AstPrinter.hpp        # Ast printer
-        │ ├── context(_forward).hpp # Environment/Context system
-        │ ├── core.hpp              # Core informations
-        │ ├── error.hpp             # Exception system
-        │ ├── errorLog.hpp          # Colored-Print error log
-        │ ├── fig_string.hpp        # Fig UTF-8 string
-        │ ├── module.hpp            # Package/Module system
-        │ ├── utils.hpp
-        │ ├── token.hpp             # Token definitions
-        │ ├── lexer.hpp             # Lexical analysis
-        │ ├── parser.hpp            # Syntax analysis and AST
-        │ ├── evaluator.hpp         # Interpreter and Control flows
-        │ ├── warning.hpp           # STD-Warnings
-        ├── ExampleCodes/           # Sample programs
-        ├── fig-vscode/        # vscode extension
-        ├── .clang-format           # Clang format styles
-        ├── test.fig                # Test file (dev)
-        ├── LICENSE                 # Fig project license
-        ├── xmake.lua               # XMake configurations
-        └── Logo/                   # Fig's Logo
+.
+├── ExampleCodes                # Example programs & performance tests
+│   └── SpeedTest               # Performance benchmark samples
+├── LICENSE                     # Project license
+├── Logo                        # Project logo assets
+├── README.md                   # English README
+├── README_ZH-CN.md             # Chinese README
+├── compile_flags.txt           # Compiler flags helper
+├── fig-vscode                  # VSCode extension project
+│   ├── node_modules            # Extension dependencies
+│   ├── out                     # Built extension output
+│   ├── src                     # Extension source code
+│   └── syntaxes                # Syntax highlighting definition
+├── src                         # Core Fig language source
+│   ├── Ast                     # AST definitions
+│   ├── Context                 # Runtime context
+│   ├── Core                    # Core utilities (UTF8/string/etc.)
+│   ├── Error                   # Error handling system
+│   ├── Evaluator               # Interpreter / evaluator
+│   ├── Lexer                   # Lexical analyzer
+│   ├── Module                  # Modules and builtins
+│   ├── Parser                  # Parser
+│   ├── Token                   # Token definitions
+│   ├── Utils                   # Utilities & helper headers
+│   └── Value                   # Runtime type/value system
+├── test.fig                    # Test script
+└── xmake.lua                   # Xmake build config
 
 ## Language Philosophy
     Fig is designed around several core principles:
