@@ -81,27 +81,38 @@ namespace Fig
                 {ValueType::Function, {}},
                 {ValueType::StructType, {}},
                 {ValueType::StructInstance, {}},
-                {ValueType::List, {{u8"length", [this](std::vector<ObjectPtr> args) -> ObjectPtr {
-                                        if (args.size() != 0)
-                                            throw RuntimeError(FString(
-                                                std::format("`length` expects 0 arguments, {} got", args.size())));
-                                        const List &list = as<List>();
-                                        return std::make_shared<Object>(static_cast<ValueType::IntClass>(list.size()));
-                                    }},
-                                   {u8"get", [this](std::vector<ObjectPtr> args) -> ObjectPtr {
-                                        if (args.size() != 1)
-                                            throw RuntimeError(FString(
-                                                std::format("`get` expects 1 arguments, {} got", args.size())));
-                                        ObjectPtr arg = args[0];
-                                        if (arg->getTypeInfo() != ValueType::Int)
-                                            throw RuntimeError(FString(
-                                                std::format("`get` argument 1 expects Int, {} got", arg->getTypeInfo().toString().toBasicString())));
-                                        ValueType::IntClass i = arg->as<ValueType::IntClass>();
-                                        const List &list = as<List>();
-                                        if (i >= list.size())
-                                            return Object::getNullInstance();
-                                        return list[i];
-                                    }}}},
+                {ValueType::List, {
+                                      {u8"length", [this](std::vector<ObjectPtr> args) -> ObjectPtr {
+                                           if (args.size() != 0)
+                                               throw RuntimeError(FString(
+                                                   std::format("`length` expects 0 arguments, {} got", args.size())));
+                                           const List &list = as<List>();
+                                           return std::make_shared<Object>(static_cast<ValueType::IntClass>(list.size()));
+                                       }},
+                                      {u8"get", [this](std::vector<ObjectPtr> args) -> ObjectPtr {
+                                           if (args.size() != 1)
+                                               throw RuntimeError(FString(
+                                                   std::format("`get` expects 1 arguments, {} got", args.size())));
+                                           ObjectPtr arg = args[0];
+                                           if (arg->getTypeInfo() != ValueType::Int)
+                                               throw RuntimeError(FString(
+                                                   std::format("`get` argument 1 expects Int, {} got", arg->getTypeInfo().toString().toBasicString())));
+                                           ValueType::IntClass i = arg->as<ValueType::IntClass>();
+                                           const List &list = as<List>();
+                                           if (i >= list.size())
+                                               return Object::getNullInstance();
+                                           return list[i];
+                                       }},
+                                      {u8"push", [this](std::vector<ObjectPtr> args) -> ObjectPtr {
+                                           if (args.size() != 1)
+                                               throw RuntimeError(FString(
+                                                   std::format("`push` expects 1 arguments, {} got", args.size())));
+                                           ObjectPtr arg = args[0];
+                                           List &list = as<List>();
+                                           list.push_back(arg);
+                                           return Object::getNullInstance();
+                                       }},
+                                  }},
                 {ValueType::Map, {
                                      {u8"get", [this](std::vector<ObjectPtr> args) -> ObjectPtr {
                                           if (args.size() != 1)
@@ -135,7 +146,7 @@ namespace Fig
             {ValueType::Function, {}},
             {ValueType::StructType, {}},
             {ValueType::StructInstance, {}},
-            {ValueType::List, {{u8"length", 0}, {u8"get", 1}}},
+            {ValueType::List, {{u8"length", 0}, {u8"get", 1}, {u8"push", 1}}},
             {ValueType::Map, {
                                  {u8"get", 1},
                                  {u8"contains", 1},
