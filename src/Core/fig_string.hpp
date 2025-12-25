@@ -15,7 +15,7 @@ namespace Fig
         
         static FStringView fromBasicStringView(std::string_view sv)
         {
-            return FStringView(reinterpret_cast<const char8_t*>(sv.data()), sv.size());
+            return FStringView(reinterpret_cast<const char8_t*>(sv.data()));
         }
 
         explicit FStringView(std::string_view sv)
@@ -28,12 +28,22 @@ namespace Fig
             *this = fromBasicStringView(std::string_view(""));
         }
 
+        std::string_view toBasicStringView() const
+        {
+            return std::string_view(reinterpret_cast<const char *>(data()), size());
+        }
     };
 
     class FString : public std::u8string
     {
     public:
         using std::u8string::u8string;
+
+        FString operator+(const FString& x)
+        {
+            return FString(toBasicString() + x.toBasicString());
+        }
+
         explicit FString(const std::u8string &str)
         {
             *this = fromU8String(str);
@@ -70,7 +80,7 @@ namespace Fig
             return FString(str.begin(), str.end());
         }
 
-        size_t length()
+        size_t length() const
         {
             // get UTF8-String real length
             size_t len = 0;

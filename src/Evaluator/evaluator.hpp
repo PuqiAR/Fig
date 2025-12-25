@@ -3,6 +3,7 @@
 #include <Context/context.hpp>
 #include <Error/error.hpp>
 #include <Module/builtins.hpp>
+#include <Value/LvObject.hpp>
 
 
 namespace Fig

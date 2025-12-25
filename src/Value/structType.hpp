@@ -29,7 +29,6 @@ namespace Fig
         {
             return am == AccessModifier::Const || am == AccessModifier::PublicConst;
         }
-
     };
 
     struct StructType
@@ -65,3 +64,15 @@ namespace Fig
         }
     };
 } // namespace Fig
+
+namespace std
+{
+    template <>
+    struct hash<Fig::Field>
+    {
+        size_t operator()(const Fig::Field &f)
+        {
+            return std::hash<Fig::FString>{}(f.name);
+        }
+    };
+}; // namespace std

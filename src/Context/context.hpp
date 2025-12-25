@@ -7,6 +7,7 @@
 #include <Context/context_forward.hpp>
 #include <Core/fig_string.hpp>
 #include <Value/value.hpp>
+#include <Value/VariableSlot.hpp>
 
 namespace Fig
 {
@@ -65,7 +66,7 @@ namespace Fig
                 return it->second;
             if (parent)
                 return parent->get(name);
-            throw RuntimeError(FStringView(std::format("Variable '{}' not defined", name.toBasicString())));
+            throw RuntimeError(FString(std::format("Variable '{}' not defined", name.toBasicString())));
         }
         AccessModifier getAccessModifier(const FString &name)
         {
@@ -79,7 +80,7 @@ namespace Fig
             }
             else
             {
-                throw RuntimeError(FStringView(std::format("Variable '{}' not defined", name.toBasicString())));
+                throw RuntimeError(FString(std::format("Variable '{}' not defined", name.toBasicString())));
             }
         }
         bool isVariableMutable(const FString &name)
@@ -98,7 +99,7 @@ namespace Fig
             {
                 if (!isVariableMutable(name))
                 {
-                    throw RuntimeError(FStringView(std::format("Variable '{}' is immutable", name.toBasicString())));
+                    throw RuntimeError(FString(std::format("Variable '{}' is immutable", name.toBasicString())));
                 }
                 variables[name]->value = value;
             }
@@ -108,7 +109,7 @@ namespace Fig
             }
             else
             {
-                throw RuntimeError(FStringView(std::format("Variable '{}' not defined", name.toBasicString())));
+                throw RuntimeError(FString(std::format("Variable '{}' not defined", name.toBasicString())));
             }
         }
         void _update(const FString &name, ObjectPtr value)
@@ -123,14 +124,14 @@ namespace Fig
             }
             else
             {
-                throw RuntimeError(FStringView(std::format("Variable '{}' not defined", name.toBasicString())));
+                throw RuntimeError(FString(std::format("Variable '{}' not defined", name.toBasicString())));
             }
         }
         void def(const FString &name, const TypeInfo &ti, AccessModifier am, const ObjectPtr &value = Object::getNullInstance())
         {
             if (containsInThisScope(name))
             {
-                throw RuntimeError(FStringView(std::format("Variable '{}' already defined in this scope", name.toBasicString())));
+                throw RuntimeError(FString(std::format("Variable '{}' already defined in this scope", name.toBasicString())));
             }
             variables[name] = std::make_shared<VariableSlot>(
                 name,

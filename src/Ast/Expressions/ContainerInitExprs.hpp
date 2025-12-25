@@ -48,14 +48,14 @@ namespace Fig::Ast
     class MapExprAst final : public ExpressionAst
     {
     public:
-        std::map<FString, Expression> val;
+        std::map<Expression, Expression> val;
 
         MapExprAst()
         {
             type = AstType::MapExpr;
         }
 
-        MapExprAst(std::map<FString, Expression> _val) :
+        MapExprAst(std::map<Expression, Expression> _val) :
             val(std::move(_val))
         {
             type = AstType::MapExpr;

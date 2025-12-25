@@ -12,7 +12,7 @@ namespace Fig
         using AddressableError::AddressableError;
         EvaluatorError(FString _typeName, FString msg, Ast::AstBase ast, std::source_location loc = std::source_location::current())
         {
-            message = FStringView::fromBasicStringView(msg.toBasicString());
+            message = msg;
             line = ast->getAAI().line;
             column = ast->getAAI().column;
 
@@ -23,7 +23,7 @@ namespace Fig
         }
         EvaluatorError(FString _typeName, std::string_view msg, Ast::AstBase ast, std::source_location loc = std::source_location::current())
         {
-            message = FStringView::fromBasicStringView(msg);
+            message = FString::fromBasicString(std::string(msg.data()));
             line = ast->getAAI().line;
             column = ast->getAAI().column;
 

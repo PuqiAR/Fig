@@ -22,13 +22,25 @@ namespace Fig
         LvObject base = evalLv(me->base, ctx);
         RvObject baseVal = base.get();
         const FString &member = me->member;
-        if (baseVal->getTypeInfo() != ValueType::StructInstance)
+        if (baseVal->hasMemberFunction(member))
+        {
+            return LvObject(std::make_shared<VariableSlot>(
+                member,
+                std::make_shared<Object>(
+                    Function(
+                        baseVal->getMemberFunction(member),
+                        baseVal->getMemberFunctionParaCount(member))),
+                ValueType::Function,
+                AccessModifier::PublicConst)); // fake l-value
+        }
+        if (baseVal->getTypeInfo() != ValueType::StructInstance) // and not member function found
         {
             throw EvaluatorError(
-                u8"TypeError",
+                u8"NoAttributeError",
                 std::format(
-                    "`{}` isn't a struct",
-                    base.name().toBasicString()),
+                    "`{}` has not attribute '{}'",
+                    baseVal->toString().toBasicString(),
+                    member.toBasicString()),
                 me->base);
         }
         const StructInstance &si = baseVal->as<StructInstance>();
@@ -49,11 +61,48 @@ namespace Fig
         LvObject base = evalLv(ie->base, ctx);
         RvObject index = eval(ie->index, ctx);
 
-        const TypeInfo &type = base.declaredType();
+        const TypeInfo &type = base.get()->getTypeInfo();
 
-        if (type != ValueType::List
-            && type != ValueType::Tuple
-            && type != ValueType::Map)
+        if (type == ValueType::List)
+        {
+            if (index->getTypeInfo() != ValueType::Int)
+            {
+                throw EvaluatorError(
+                    u8"TypeError",
+                    std::format(
+                        "Type `List` indices must be `Int`, got '{}'",
+                        index->getTypeInfo().toString().toBasicString()
+                    ),
+                    ie->index
+                );
+            }
+            List &list = base.get()->as<List>();
+            ValueType::IntClass indexVal = index->as<ValueType::IntClass>();
+            if (indexVal >= list.size())
+            {
+                throw EvaluatorError(
+                    u8"IndexOutOfRangeError",
+                    std::format(
+                        "Index {} out of list `{}` range",
+                        indexVal,
+                        base.get()->toString().toBasicString()
+                    ),
+                    ie->index
+                );
+            }
+            return LvObject(
+                base.get(),
+                indexVal
+            );
+        }
+        else if (type == ValueType::Map)
+        {
+            return LvObject(
+                base.get(),
+                index
+            );
+        }
+        else
         {
             throw EvaluatorError(
                 u8"NoSubscriptableError",
@@ -62,8 +111,7 @@ namespace Fig
                     base.declaredType().toString().toBasicString()),
                 ie->base);
         }
-        // TODO
-        return LvObject();
+        
     }
     LvObject Evaluator::evalLv(Ast::Expression exp, ContextPtr ctx)
     {
@@ -651,6 +699,30 @@ namespace Fig
                 return std::make_shared<Object>(StructInstance(structT.id, instanceCtx));
             }
 
+            case AstType::ListExpr: {
+                auto lstExpr = std::dynamic_pointer_cast<Ast::ListExprAst>(exp);
+                assert(lstExpr != nullptr);
+
+                List list;
+                for (auto &exp : lstExpr->val)
+                {
+                    list.push_back(eval(exp, ctx));
+                }
+                return std::make_shared<Object>(std::move(list));
+            }
+
+            case AstType::MapExpr: {
+                auto mapExpr = std::dynamic_pointer_cast<Ast::MapExprAst>(exp);
+                assert(mapExpr != nullptr);
+
+                Map map;
+                for (auto &[key, value] : mapExpr->val)
+                {
+                    map[eval(key, ctx)] = eval(value, ctx);
+                }
+                return std::make_shared<Object>(std::move(map));
+            }
+            
             default:
                 assert(false);
         }
@@ -990,7 +1062,7 @@ namespace Fig
             }
 
             default:
-                throw RuntimeError(FStringView(
+                throw RuntimeError(FString(
                     std::format("Feature stmt {} unsupported yet",
                                 magic_enum::enum_name(stmt->getType()))));
         }

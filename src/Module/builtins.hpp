@@ -36,16 +36,24 @@ namespace Fig
 
         const std::unordered_map<FString, BuiltinFunction> builtinFunctions{
             {u8"__fstdout_print", [](const std::vector<ObjectPtr> &args) -> ObjectPtr {
+                 bool first_flag = true;
                  for (auto arg : args)
                  {
-                     std::print("{}", arg->toString().toBasicString());
+                     if (!first_flag)
+                         std::print(" ");
+                     std::print("{}", arg->toStringIO().toBasicString());
+                     first_flag = false;
                  }
                  return std::make_shared<Object>(ValueType::IntClass(args.size()));
              }},
             {u8"__fstdout_println", [](const std::vector<ObjectPtr> &args) -> ObjectPtr {
+                 bool first_flag = true;
                  for (auto arg : args)
                  {
-                     std::print("{}", arg->toString().toBasicString());
+                     if (!first_flag)
+                         std::print(" ");
+                     std::print("{}", arg->toStringIO().toBasicString());
+                     first_flag = false;
                  }
                  std::print("\n");
                  return std::make_shared<Object>(ValueType::IntClass(args.size()));
@@ -72,7 +80,7 @@ namespace Fig
                  }
                  catch (...)
                  {
-                     throw RuntimeError(FStringView(std::format("Invalid int string for parsing", str.toBasicString())));
+                     throw RuntimeError(FString(std::format("Invalid int string for parsing", str.toBasicString())));
                  }
              }},
             {u8"__fvalue_int_from", [](const std::vector<ObjectPtr> &args) -> ObjectPtr {
@@ -87,7 +95,7 @@ namespace Fig
                  }
                  else
                  {
-                     throw RuntimeError(FStringView(std::format("Type '{}' cannot be converted to int", val->getTypeInfo().toString().toBasicString())));
+                     throw RuntimeError(FString(std::format("Type '{}' cannot be converted to int", val->getTypeInfo().toString().toBasicString())));
                  }
              }},
             {u8"__fvalue_double_parse", [](const std::vector<ObjectPtr> &args) -> ObjectPtr {
@@ -99,7 +107,7 @@ namespace Fig
                  }
                  catch (...)
                  {
-                     throw RuntimeError(FStringView(std::format("Invalid double string for parsing", str.toBasicString())));
+                     throw RuntimeError(FString(std::format("Invalid double string for parsing", str.toBasicString())));
                  }
              }},
             {u8"__fvalue_double_from", [](const std::vector<ObjectPtr> &args) -> ObjectPtr {
@@ -114,7 +122,7 @@ namespace Fig
                  }
                  else
                  {
-                     throw RuntimeError(FStringView(std::format("Type '{}' cannot be converted to double", val->getTypeInfo().toString().toBasicString())));
+                     throw RuntimeError(FString(std::format("Type '{}' cannot be converted to double", val->getTypeInfo().toString().toBasicString())));
                  }
              }},
             {u8"__fvalue_string_from", [](const std::vector<ObjectPtr> &args) -> ObjectPtr {
@@ -134,7 +142,7 @@ namespace Fig
             auto it = builtinFunctions.find(name);
             if (it == builtinFunctions.end())
             {
-                throw RuntimeError(FStringView(std::format("Builtin function '{}' not found", name.toBasicString())));
+                throw RuntimeError(FString(std::format("Builtin function '{}' not found", name.toBasicString())));
             }
             return it->second;
         }
@@ -144,7 +152,7 @@ namespace Fig
             auto it = builtinFunctionArgCounts.find(name);
             if (it == builtinFunctionArgCounts.end())
             {
-                throw RuntimeError(FStringView(std::format("Builtin function '{}' not found", name.toBasicString())));
+                throw RuntimeError(FString(std::format("Builtin function '{}' not found", name.toBasicString())));
             }
             return it->second;
         }

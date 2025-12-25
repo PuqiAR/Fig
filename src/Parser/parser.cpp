@@ -69,7 +69,7 @@ namespace Fig
         if (!isThis(TokenType::Assign) and !isThis(TokenType::Walrus)) expect(TokenType::Assign, u8"assign or walrus");
         if (isThis(TokenType::Walrus))
         {
-            if (hasSpecificType) throwAddressableError<SyntaxError>(FStringView(u8""));
+            if (hasSpecificType) throwAddressableError<SyntaxError>(FString(u8""));
             tiName = Parser::varDefTypeFollowed;
         }
         next();
@@ -93,7 +93,7 @@ namespace Fig
                 }
                 catch (...)
                 {
-                    throwAddressableError<SyntaxError>(FStringView(u8"Illegal number literal"));
+                    throwAddressableError<SyntaxError>(FString(u8"Illegal number literal"));
                 }
                 return std::make_shared<Object>(d);
             }
@@ -107,7 +107,7 @@ namespace Fig
                 }
                 catch (...)
                 {
-                    throwAddressableError<SyntaxError>(FStringView(u8"Illegal number literal"));
+                    throwAddressableError<SyntaxError>(FString(u8"Illegal number literal"));
                 }
                 return std::make_shared<Object>(i);
             }
@@ -253,7 +253,7 @@ namespace Fig
             }
             else
             {
-                throwAddressableError<SyntaxError>(FStringView(std::format("expect field name or field attribute")));
+                throwAddressableError<SyntaxError>(FString(std::format("expect field name or field attribute")));
             }
             FString tiName = ValueType::Any.name;
             if (isThis(TokenType::Colon))
@@ -267,7 +267,7 @@ namespace Fig
             if (isThis(TokenType::Assign))
             {
                 next();
-                if (isEOF()) throwAddressableError<SyntaxError>(FStringView(u8"expect an expression"));
+                if (isEOF()) throwAddressableError<SyntaxError>(FString(u8"expect an expression"));
                 initExpr = parseExpression(0);
             }
             expectSemicolon();
@@ -314,7 +314,7 @@ namespace Fig
                 }
                 else
                 {
-                    throwAddressableError<SyntaxError>(FStringView("Invalid syntax"));
+                    throwAddressableError<SyntaxError>(FString("Invalid syntax"));
                 }
             }
             else if (isThis(TokenType::Function))
@@ -333,16 +333,16 @@ namespace Fig
             }
             else if (isThis(TokenType::Variable))
             {
-                throwAddressableError<SyntaxError>(FStringView("Variables are not allowed to be defined within a structure."));
+                throwAddressableError<SyntaxError>(FString("Variables are not allowed to be defined within a structure."));
             }
             else
             {
-                throwAddressableError<SyntaxError>(FStringView("Invalid syntax"));
+                throwAddressableError<SyntaxError>(FString("Invalid syntax"));
             }
         }
         if (!braceClosed)
         {
-            throwAddressableError<SyntaxError>(FStringView("braces are not closed"));
+            throwAddressableError<SyntaxError>(FString("braces are not closed"));
         }
         return makeAst<Ast::StructDefSt>(isPublic, structName, fields, makeAst<Ast::BlockStatementAst>(stmts));
     }
@@ -368,7 +368,7 @@ namespace Fig
             }
             else
             {
-                throwAddressableError<SyntaxError>(FStringView(u8"Expected `var`, `const`, `function` or `struct` after `public`"));
+                throwAddressableError<SyntaxError>(FString(u8"Expected `var`, `const`, `function` or `struct` after `public`"));
             }
         }
         else if (isThis(TokenType::Variable) || isThis(TokenType::Const))
@@ -392,7 +392,7 @@ namespace Fig
         }
         else if (isThis(TokenType::Else))
         {
-            throwAddressableError<SyntaxError>(FStringView(u8"`else` without matching `if`"));
+            throwAddressableError<SyntaxError>(FString(u8"`else` without matching `if`"));
         }
         else if (isThis(TokenType::LeftBrace))
         {
@@ -625,15 +625,10 @@ namespace Fig
     {
         // entry: current is `{`
         next(); // consume `{`
-        std::map<FString, Ast::Expression> val;
+        std::map<Ast::Expression, Ast::Expression> val;
         while (!isThis(TokenType::RightBrace))
         {
-            expect(TokenType::Identifier, FString(u8"key (identifier)"));
-            FString key = currentToken().getValue();
-            if (val.contains(key)) throwAddressableError<SyntaxError>(FStringView(std::format(
-                "Redefinition of immutable key {} in mapping literal",
-                key.toBasicString())));
-            next(); // consume key
+            Ast::Expression key = parseExpression(0, TokenType::Colon);
             expect(TokenType::Colon);
             next(); // consume `:`
             val[key] = parseExpression(0, TokenType::RightBrace, TokenType::Comma);
@@ -711,7 +706,7 @@ namespace Fig
             }
             else if (!isThis(TokenType::RightBrace))
             {
-                throwAddressableError<SyntaxError>(FStringView(
+                throwAddressableError<SyntaxError>(FString(
                     std::format("Expect `,` or `}}` in struct initialization expression, got {}",
                                 currentToken().toString().toBasicString())
                 ));
@@ -762,7 +757,7 @@ namespace Fig
         }
         else
         {
-            throwAddressableError<SyntaxError>(FStringView(u8"Expect ')' or ',' after expression in parentheses"));
+            throwAddressableError<SyntaxError>(FString(u8"Expect ')' or ',' after expression in parentheses"));
         }
         return nullptr; // to suppress compiler warning
     }
@@ -794,10 +789,10 @@ namespace Fig
 
         Token tok = currentToken();
         if (tok == EOFTok)
-            throwAddressableError<SyntaxError>(FStringView(u8"Unexpected end of expression"));
+            throwAddressableError<SyntaxError>(FString(u8"Unexpected end of expression"));
         if (tok.getType() == stop || tok.getType() == stop2)
         {
-            if (lhs == nullptr) throwAddressableError<SyntaxError>(FStringView(u8"Expected expression"));
+            if (lhs == nullptr) throwAddressableError<SyntaxError>(FString(u8"Expected expression"));
             return lhs;
         }
         if (tok.getType() == TokenType::LeftBracket)
@@ -818,7 +813,7 @@ namespace Fig
             if (currentToken().getType() == TokenType::Identifier)
             {
                 // err
-                throwAddressableError<SyntaxError>(FStringView(u8"Function literal should not have a name"));
+                throwAddressableError<SyntaxError>(FString(u8"Function literal should not have a name"));
             }
             expect(TokenType::LeftParen);
             lhs = __parseFunctionLiteralExpr();
@@ -849,7 +844,7 @@ namespace Fig
         }
         else
         {
-            throwAddressableError<SyntaxError>(FStringView(u8"Unexpected token in expression"));
+            throwAddressableError<SyntaxError>(FString(u8"Unexpected token in expression"));
         }
 
         // infix / (postfix) ?
@@ -872,7 +867,7 @@ namespace Fig
                 next(); // consume '.'
                 Token idTok = currentToken();
                 if (!idTok.isIdentifier())
-                    throwAddressableError<SyntaxError>(FStringView(u8"Expected identifier after '.'"));
+                    throwAddressableError<SyntaxError>(FString(u8"Expected identifier after '.'"));
 
                 FString member = idTok.getValue();
                 next(); // consume identifier

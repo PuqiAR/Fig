@@ -92,7 +92,7 @@ namespace Fig
         }
 
         template <class _ErrT, typename = AddressableError>
-        void throwAddressableError(FStringView msg, size_t line, size_t column, std::source_location loc = std::source_location::current())
+        void throwAddressableError(FString msg, size_t line, size_t column, std::source_location loc = std::source_location::current())
         {
             static_assert(std::is_base_of_v<AddressableError, _ErrT>,
                           "_ErrT must derive from AddressableError");
@@ -101,7 +101,7 @@ namespace Fig
             throw spError;
         }
         template <class _ErrT, typename = AddressableError>
-        void throwAddressableError(FStringView msg, std::source_location loc = std::source_location::current())
+        void throwAddressableError(FString msg, std::source_location loc = std::source_location::current())
         {
             static_assert(std::is_base_of_v<AddressableError, _ErrT>,
                           "_ErrT must derive from AddressableError");
@@ -112,7 +112,7 @@ namespace Fig
         }
 
         template <class _ErrT, typename = UnaddressableError>
-        void throwUnaddressableError(FStringView msg, std::source_location loc = std::source_location::current())
+        void throwUnaddressableError(FString msg, std::source_location loc = std::source_location::current())
         {
             static_assert(std::is_base_of_v<AddressableError, _ErrT>,
                           "_ErrT must derive from AddressableError");
@@ -215,7 +215,7 @@ namespace Fig
         {
             if (peekToken().getType() != type)
             {
-                throwAddressableError<SyntaxError>(FStringView(std::format("Expected `{}`, but got `{}`",
+                throwAddressableError<SyntaxError>(FString(std::format("Expected `{}`, but got `{}`",
                                                                            magic_enum::enum_name(type),
                                                                            magic_enum::enum_name(peekToken().getType()))));
             }
@@ -225,7 +225,7 @@ namespace Fig
         {
             if (currentToken().getType() != type)
             {
-                throwAddressableError<SyntaxError>(FStringView(std::format("Expected `{}`, but got `{}`",
+                throwAddressableError<SyntaxError>(FString(std::format("Expected `{}`, but got `{}`",
                                                                            magic_enum::enum_name(type),
                                                                            magic_enum::enum_name(currentToken().getType()))));
             }
@@ -235,7 +235,7 @@ namespace Fig
         {
             if (peekToken().getType() != type)
             {
-                throwAddressableError<SyntaxError>(FStringView(std::format("Expected `{}`, but got `{}`",
+                throwAddressableError<SyntaxError>(FString(std::format("Expected `{}`, but got `{}`",
                                                                            expected.toBasicString(),
                                                                            magic_enum::enum_name(peekToken().getType()))));
             }
@@ -245,7 +245,7 @@ namespace Fig
         {
             if (currentToken().getType() != type)
             {
-                throwAddressableError<SyntaxError>(FStringView(std::format("Expected `{}`, but got `{}`",
+                throwAddressableError<SyntaxError>(FString(std::format("Expected `{}`, but got `{}`",
                                                                            expected.toBasicString(),
                                                                            magic_enum::enum_name(currentToken().getType()))));
             }
@@ -319,8 +319,8 @@ namespace Fig
         Ast::Expression __parseCall(Ast::Expression);
         
         Ast::ListExpr __parseListExpr(); // entry: current is `[`
-
         Ast::MapExpr __parseMapExpr(); // entry: current is `{`
+
         Ast::InitExpr __parseInitExpr(FString);  // entry: current is `{`, ahead is struct name. arg (struct name : FString)
         Ast::Expression __parseTupleOrParenExpr();             // entry: current is `(`
 

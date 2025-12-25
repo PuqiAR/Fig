@@ -190,7 +190,7 @@ namespace Fig
                 }
                 else
                 {
-                    error = SyntaxError(FStringView(
+                    error = SyntaxError(FString(
                                             std::format(
                                                 "Unsupported escape character: {}",
                                                 FString(ec.getString()).toBasicString())),
@@ -307,7 +307,7 @@ namespace Fig
                 }
                 else
                 {
-                    error = SyntaxError(FStringView(
+                    error = SyntaxError(FString(
                                             std::format(
                                                 "Unsupported escape character: {}",
                                                 FString(ec.getString()).toBasicString())),
@@ -369,7 +369,7 @@ namespace Fig
         // checking legality
         if ((*numStr.end()) == u'e') // e 后面必须跟整数表示科学计数
         {
-            error = SyntaxError(FStringView(
+            error = SyntaxError(FString(
                                     std::format("Ellegal number literal: {}", numStr.toBasicString())),
                                 this->line, it.column());
             return IllegalTok;
@@ -396,7 +396,7 @@ namespace Fig
             else if (!this->symbol_map.contains(sym))
             {
                 // check legality
-                error = SyntaxError(FStringView(
+                error = SyntaxError(FString(
                                         std::format("No such a operator: {}", sym.toBasicString())),
                                     this->line, it.column());
             }
@@ -455,7 +455,7 @@ namespace Fig
 
             if (!terminated)
             {
-                error = SyntaxError(FStringView(u8"Unterminated multiline comment"), this->line, it.column());
+                error = SyntaxError(FString(u8"Unterminated multiline comment"), this->line, it.column());
                 next();
                 return IllegalTok;
             }
@@ -526,7 +526,7 @@ namespace Fig
         }
         else
         {
-            error = SyntaxError(FStringView(
+            error = SyntaxError(FString(
                                     std::format("Cannot tokenize char: '{}'", FString(ch.getString()).toBasicString())),
                                 this->line, it.column());
             if (hasNext())

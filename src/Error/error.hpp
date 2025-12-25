@@ -13,7 +13,7 @@ namespace Fig
     {
     public:
         explicit AddressableError() {}
-        explicit AddressableError(FStringView _msg,
+        explicit AddressableError(FString _msg,
                                   size_t _line,
                                   size_t _column,
                                   std::source_location loc = std::source_location::current()) :
@@ -35,7 +35,7 @@ namespace Fig
 
         size_t getLine() const { return line; }
         size_t getColumn() const { return column; }
-        FStringView getMessage() const { return message; }
+        FString getMessage() const { return message; }
 
         virtual FString getErrorType() const
         {
@@ -44,14 +44,14 @@ namespace Fig
 
     protected:
         size_t line, column;
-        FStringView message;
+        FString message;
     };
 
     class UnaddressableError : public std::exception
     {
     public:
         explicit UnaddressableError() {}
-        explicit UnaddressableError(FStringView _msg,
+        explicit UnaddressableError(FString _msg,
                                     std::source_location loc = std::source_location::current()) :
             src_loc(loc)
         {
@@ -59,7 +59,7 @@ namespace Fig
         }
         virtual FString toString() const
         {
-            std::string msg = std::format("[UnaddressableError] {} in [{}] {}", std::string(this->message.begin(), this->message.end()),  this->src_loc.file_name(), this->src_loc.function_name());
+            std::string msg = std::format("[UnaddressableError] {} in [{}] {}", this->message.toBasicString(),  this->src_loc.file_name(), this->src_loc.function_name());
             return FString(msg);
         }
         const char *what() const noexcept override
@@ -68,7 +68,7 @@ namespace Fig
             return msg.c_str();
         }
         std::source_location src_loc;
-        FStringView getMessage() const { return message; }
+        FString getMessage() const { return message; }
 
         virtual FString getErrorType() const
         {
@@ -76,7 +76,7 @@ namespace Fig
         }
 
     protected:
-        FStringView message;
+        FString message;
     };
 
     class SyntaxError : public AddressableError
@@ -84,7 +84,7 @@ namespace Fig
     public:
         using AddressableError::AddressableError;
 
-        explicit SyntaxError(FStringView _msg,
+        explicit SyntaxError(FString _msg,
                              size_t _line,
                              size_t _column,
                              std::source_location loc = std::source_location::current()) :
@@ -94,7 +94,7 @@ namespace Fig
 
         virtual FString toString() const override
         {
-            std::string msg = std::format("[SyntaxError] {} in [{}] {}", std::string(this->message.begin(), this->message.end()), this->src_loc.file_name(), this->src_loc.function_name());
+            std::string msg = std::format("[SyntaxError] {} in [{}] {}", this->message.toBasicString(), this->src_loc.file_name(), this->src_loc.function_name());
             return FString(msg);
         }
 
@@ -108,14 +108,14 @@ namespace Fig
     {
     public:
         using UnaddressableError::UnaddressableError;
-        explicit RuntimeError(FStringView _msg,
+        explicit RuntimeError(FString _msg,
                              std::source_location loc = std::source_location::current()) :
             UnaddressableError(_msg, loc)
         {
         }
         virtual FString toString() const override
         {
-            std::string msg = std::format("[RuntimeError] {} in [{}] {}", std::string(this->message.begin(), this->message.end()), this->src_loc.file_name(), this->src_loc.function_name());
+            std::string msg = std::format("[RuntimeError] {} in [{}] {}", this->message.toBasicString(), this->src_loc.file_name(), this->src_loc.function_name());
             return FString(msg);
         }
 

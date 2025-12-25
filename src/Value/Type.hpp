@@ -14,6 +14,8 @@ namespace Fig
         size_t id;
 
     public:
+        friend class TypeInfoHash;
+
         FString name;
 
         FString toString() const
@@ -27,7 +29,7 @@ namespace Fig
         {
             return typeMap.at(_name);
         }
-        size_t getInstanceID(FString _name) const
+        size_t getInstanceID() const
         {
             return id;
         }
@@ -39,6 +41,15 @@ namespace Fig
         bool operator==(const TypeInfo &other) const
         {
             return id == other.id;
+        }
+    };
+
+    class TypeInfoHash
+    {
+    public:
+        std::size_t operator()(const TypeInfo &ti) const
+        {
+            return ti.id;
         }
     };
 
@@ -56,7 +67,7 @@ namespace Fig
         extern const TypeInfo StructInstance;
         extern const TypeInfo List;
         extern const TypeInfo Map;
-        extern const TypeInfo Tuple;
+        // extern const TypeInfo Tuple;
 
         using IntClass = int64_t;
         using DoubleClass = double;
