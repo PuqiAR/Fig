@@ -31,10 +31,10 @@ namespace Fig
             if (mod.ctx->contains(member) && mod.ctx->isVariablePublic(member))
             {
                 return LvObject(
-                    mod.ctx->get(member) 
-                );
+                    mod.ctx->get(member));
             }
-            else {
+            else
+            {
                 throw EvaluatorError(
                     u8"VariableNotFoundError",
                     std::format(
@@ -146,8 +146,7 @@ namespace Fig
             return LvObject(
                 base.get(),
                 indexVal,
-                LvObject::Kind::StringElement
-            );
+                LvObject::Kind::StringElement);
         }
         else
         {
@@ -366,6 +365,17 @@ namespace Fig
 
         // check argument, all types of parameters
         Ast::FunctionParameters fnParas = fnStruct.paras;
+
+        // create new context for function call
+        auto newContext = std::make_shared<Context>(FString(std::format("<Function {}()>", fnName.toBasicString())),
+                                                    fnStruct.closureContext);
+
+        if (fnParas.variadic)
+            goto VariadicFilling;
+        else
+            goto NormalFilling;
+
+    NormalFilling: {
         if (fnArgs.getLength() < fnParas.posParas.size() || fnArgs.getLength() > fnParas.size())
         {
             throw RuntimeError(FString(
@@ -437,9 +447,7 @@ namespace Fig
             ObjectPtr defaultVal = eval(fnParas.defParas[defParamIndex].second.second, ctx);
             evaluatedArgs.argv.push_back(defaultVal);
         }
-        // create new context for function call
-        auto newContext = std::make_shared<Context>(FString(std::format("<Function {}()>", fnName.toBasicString())),
-                                                    fnStruct.closureContext);
+
         // define parameters in new context
         for (size_t j = 0; j < fnParas.size(); j++)
         {
@@ -459,6 +467,25 @@ namespace Fig
             AccessModifier argAm = AccessModifier::Const;
             newContext->def(paramName, paramType, argAm, evaluatedArgs.argv[j]);
         }
+        goto ExecuteBody;
+    }
+
+    VariadicFilling: {
+        List list;
+        for (auto &exp : fnArgs.argv)
+        {
+            list.push_back(eval(exp, ctx)); // eval arguments in current scope
+        }
+        newContext->def(
+            fnParas.variadicPara,
+            ValueType::List,
+            AccessModifier::Const,
+            std::make_shared<Object>(
+                list));
+        goto ExecuteBody;
+    }
+
+    ExecuteBody: {
         // execute function body
         ObjectPtr retVal = Object::getNullInstance();
         for (const auto &stmt : fnStruct.body->stmts)
@@ -481,6 +508,7 @@ namespace Fig
                 fnStruct.body);
         }
         return retVal;
+    }
     }
 
     RvObject Evaluator::eval(Ast::Expression exp, ContextPtr ctx)

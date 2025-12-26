@@ -144,6 +144,7 @@ namespace Fig
 
         Ast::FunctionParameters::PosParasType pp;
         Ast::FunctionParameters::DefParasType dp;
+        FString variaPara;
         while (true)
         {
             if (isThis(TokenType::RightParen))
@@ -153,7 +154,7 @@ namespace Fig
             }
             expect(TokenType::Identifier, FString(u8"Identifier or `)`")); // check current
             FString pname = currentToken().getValue();
-            next();                        // skip pname
+            next();                                    // skip pname
             if (isThis(TokenType::Assign)) // =
             {
                 next();
@@ -186,6 +187,19 @@ namespace Fig
                         next(); // only skip `,` when it's there
                     }
                 }
+            }
+            else if (isThis(TokenType::TripleDot))
+            {
+                variaPara = pname;
+                next(); // skip `...`
+                if (!isThis(TokenType::RightParen))
+                    throw SyntaxError(
+                        u8"Expects right paren, variable parameter function can only have one parameter",
+                        currentAAI.line,
+                        currentAAI.column
+                    );
+                next(); // skip `)`
+                return Ast::FunctionParameters(variaPara);
             }
             else
             {

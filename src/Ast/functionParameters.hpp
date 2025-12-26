@@ -21,6 +21,9 @@ namespace Fig::Ast
         PosParasType posParas;
         DefParasType defParas; // default parameters
 
+        FString variadicPara;
+        bool variadic = false;
+
         FunctionParameters()
         {
             
@@ -29,6 +32,11 @@ namespace Fig::Ast
         {
             posParas = std::move(_posParas);
             defParas = std::move(_defParas);
+        }
+        FunctionParameters(FString _variadicPara)
+        {
+            variadicPara = std::move(_variadicPara);
+            variadic = true;
         }
 
         size_t size() const

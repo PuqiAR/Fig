@@ -10,6 +10,8 @@ namespace Fig
 {
 
     const std::unordered_map<FString, TokenType> Lexer::symbol_map{
+        // 三字符
+        {FString(u8"..."), TokenType::TripleDot},
         // 双字符
         {FString(u8"=="), TokenType::Equal},
         {FString(u8"!="), TokenType::NotEqual},
@@ -380,30 +382,59 @@ namespace Fig
     {
         FString sym;
         UTF8Char ch = *it;
-
         sym += ch.getString();
-        UTF8Char peek = UTF8Char(u8"");
-        if (hasNext() and (peek = it.peek()).isPunct()) // 窥探下一个操作符
-        {
-            FString symd = FString(sym + peek.getString());
-            if (this->symbol_map.contains(symd))
+
+        auto startsWith = [&](const FString &prefix) -> bool {
+            for (const auto &p : symbol_map)
             {
-                // Operator length is 2
-                next();
-                sym = symd;
+                const FString &op = p.first;
+                if (op.starts_with(prefix))
+                    return true;
             }
-            // Operator length is 1
-            else if (!this->symbol_map.contains(sym))
+            return false;
+        };
+
+        if (!startsWith(sym))
+        {
+            error = SyntaxError(
+                FString(std::format("No such operator: {}", sym.toBasicString())),
+                this->line, it.column());
+            next();
+            return IllegalTok;
+        }
+
+        while (hasNext())
+        {
+            UTF8Char peek = it.peek();
+            if (!peek.isPunct())
+                break;
+
+            FString candidate = sym + FString(peek.getString());
+
+            if (startsWith(candidate))
             {
-                // check legality
-                error = SyntaxError(FString(
-                                        std::format("No such a operator: {}", sym.toBasicString())),
-                                    this->line, it.column());
+                next();
+                sym = candidate;
+            }
+            else
+            {
+                break;
             }
         }
+
+        if (!symbol_map.contains(sym))
+        {
+            error = SyntaxError(
+                FString(std::format("No such operator: {}", sym.toBasicString())),
+                this->line, it.column());
+            next();
+            return IllegalTok;
+        }
+
         next();
-        return Token(sym, this->symbol_map.at(sym)); // const object 'symbol_map', operator[] call is invalid
+        return Token(sym, symbol_map.at(sym));
     }
+
     Token Lexer::scanComments()
     {
         // entry: when iterator current char is '/' and peek is '/' or '*'

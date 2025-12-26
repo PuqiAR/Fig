@@ -105,6 +105,8 @@ namespace Fig
         DoublePipe,      // ||
         Walrus,          // :=
         Power,           // **
+
+        TripleDot,       // ... for variadic parameter
     };
 
     class Token final
