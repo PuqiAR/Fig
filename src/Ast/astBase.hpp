@@ -50,12 +50,15 @@ namespace Fig::Ast
         ElseSt,
         ElseIfSt,
 
-        VarAssignSt,
+        // VarAssignSt,
         WhileSt,
         ForSt,
         ReturnSt,
         BreakSt,
         ContinueSt,
+
+        PackageSt,
+        ImportSt,
     };
 
     // static const std::unordered_map<AstType, FString> astTypeToString{

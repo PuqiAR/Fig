@@ -36,36 +36,12 @@ This software is licensed under the MIT License. See LICENSE.txt for details.
 #include <Parser/parser.hpp>
 #include <Evaluator/evaluator.hpp>
 #include <Utils/AstPrinter.hpp>
+#include <Utils/utils.hpp>
 #include <Error/errorLog.hpp>
 
 static size_t addressableErrorCount = 0;
 static size_t unaddressableErrorCount = 0;
 
-std::vector<FString> splitSource(FString source)
-{
-    UTF8Iterator it(source);
-    std::vector<FString> lines;
-    FString currentLine;
-    while (!it.isEnd())
-    {
-        UTF8Char c = *it;
-        if (c == U'\n')
-        {
-            lines.push_back(currentLine);
-            currentLine = FString(u8"");
-        }
-        else
-        {
-            currentLine += c.getString();
-        }
-        ++it;
-    }
-    if (!currentLine.empty())
-    {
-        lines.push_back(currentLine);
-    }
-    return lines;
-}
 
 int main(int argc, char **argv)
 {
@@ -119,7 +95,7 @@ int main(int argc, char **argv)
     Fig::Parser parser(lexer);
     std::vector<Fig::Ast::AstBase> asts;
 
-    std::vector<FString> sourceLines = splitSource(Fig::FString(source));
+    std::vector<FString> sourceLines = Fig::Utils::splitSource(Fig::FString(source));
 
     try
     {
@@ -151,8 +127,11 @@ int main(int argc, char **argv)
     // }
 
     Fig::Evaluator evaluator;
+
+    evaluator.SetSourcePath(sourcePath);
     evaluator.CreateGlobalContext();
     evaluator.RegisterBuiltins();
+
     try
     {
         evaluator.Run(asts);

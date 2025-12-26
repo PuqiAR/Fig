@@ -12,12 +12,13 @@ namespace Fig
         {
             Variable,
             ListElement,
-            MapElement
+            MapElement,
+            StringElement,
         } kind;
         std::shared_ptr<VariableSlot> slot;
 
-        ObjectPtr listOrMap = nullptr;
-        size_t listIndex;
+        ObjectPtr value = nullptr;
+        size_t numIndex;
 
         ObjectPtr mapIndex;
 
@@ -26,20 +27,18 @@ namespace Fig
         {
             kind = Kind::Variable;
         }
-        LvObject(ObjectPtr _v, size_t _index) :
-            listOrMap(_v), listIndex(_index)
+        LvObject(ObjectPtr _v, size_t _index, Kind _kind) :
+            value(_v), numIndex(_index)
         {
-            assert(_v->getTypeInfo() == ValueType::List);
-            kind = Kind::ListElement;
+            kind = _kind;
         }
-        LvObject(ObjectPtr _v, ObjectPtr _index) :
-            listOrMap(_v), mapIndex(_index)
+        LvObject(ObjectPtr _v, ObjectPtr _index, Kind _kind) :
+            value(_v), mapIndex(_index)
         {
-            assert(_v->getTypeInfo() == ValueType::Map);
-            kind = Kind::MapElement;
+            kind = _kind;
         }
 
-        const ObjectPtr &get() const
+        ObjectPtr get() const
         {
             if (kind == Kind::Variable)
             {
@@ -48,19 +47,29 @@ namespace Fig
             }
             else if (kind == Kind::ListElement)
             {
-                List &list = listOrMap->as<List>();
-                if (listIndex >= list.size())
+                List &list = value->as<List>();
+                if (numIndex >= list.size())
                     throw RuntimeError(FString(
-                        std::format("Index {} out of range", listIndex)));
-                return list.at(listIndex);
+                        std::format("Index {} out of range {}", numIndex, value->toString().toBasicString())));
+                return list.at(numIndex);
             }
-            else // map
+            else if (kind == Kind::MapElement) // map
             {
-                Map &map = listOrMap->as<Map>();
+                Map &map = value->as<Map>();
                 if (!map.contains(mapIndex))
                     throw RuntimeError(FString(
                         std::format("Key {} not found", mapIndex->toString().toBasicString())));
                 return map.at(mapIndex);
+            }
+            else
+            {
+                // string
+                FString &string = value->as<ValueType::StringClass>();
+                if (numIndex >= string.length())
+                    throw RuntimeError(FString(
+                        std::format("Index {} out of range {}", numIndex, value->toString().toBasicString())));
+
+                return std::make_shared<Object>(string.getRealChar(numIndex));
             }
         }
 
@@ -87,16 +96,34 @@ namespace Fig
             }
             else if (kind == Kind::ListElement)
             {
-                List &list = listOrMap->as<List>();
-                if (listIndex >= list.size())
+                List &list = value->as<List>();
+                if (numIndex >= list.size())
                     throw RuntimeError(FString(
-                        std::format("Index {} out of range", listIndex)));
-                list[listIndex] = v;
+                        std::format("Index {} out of range", numIndex)));
+                list[numIndex] = v;
             }
-            else // map
+            else if (kind == Kind::MapElement) // map
             {
-                Map &map = listOrMap->as<Map>();
+                Map &map = value->as<Map>();
                 map[mapIndex] = v;
+            }
+            else if (kind == Kind::StringElement)
+            {
+                FString &string = value->as<ValueType::StringClass>();
+                if (numIndex >= string.length())
+                    throw RuntimeError(FString(
+                        std::format("Index {} out of range {}", numIndex, value->toString().toBasicString())));
+                
+                if (v->getTypeInfo() != ValueType::String)
+                    throw RuntimeError(FString(
+                        std::format("Could not assign {} to sub string", v->toString().toBasicString())
+                    ));
+                const FString &strReplace = v->as<ValueType::StringClass>();
+                if (strReplace.length() > 1)
+                    throw RuntimeError(FString(
+                        std::format("Could not assign {} to sub string, expects length 1", v->toString().toBasicString())
+                ));
+                string.realReplace(numIndex, strReplace);
             }
         }
 
@@ -111,4 +138,4 @@ namespace Fig
             return s;
         }
     };
-}
+} // namespace Fig

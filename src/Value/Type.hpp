@@ -67,6 +67,7 @@ namespace Fig
         extern const TypeInfo StructInstance;
         extern const TypeInfo List;
         extern const TypeInfo Map;
+        extern const TypeInfo Module;
         // extern const TypeInfo Tuple;
 
         using IntClass = int64_t;

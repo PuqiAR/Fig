@@ -2,7 +2,6 @@
 #include <string>
 #include <string_view>
 
-
 namespace Fig
 {
     // using String = std::u8string;
@@ -12,10 +11,10 @@ namespace Fig
     {
     public:
         using std::u8string_view::u8string_view;
-        
+
         static FStringView fromBasicStringView(std::string_view sv)
         {
-            return FStringView(reinterpret_cast<const char8_t*>(sv.data()));
+            return FStringView(reinterpret_cast<const char8_t *>(sv.data()));
         }
 
         explicit FStringView(std::string_view sv)
@@ -39,7 +38,7 @@ namespace Fig
     public:
         using std::u8string::u8string;
 
-        FString operator+(const FString& x)
+        FString operator+(const FString &x)
         {
             return FString(toBasicString() + x.toBasicString());
         }
@@ -72,7 +71,7 @@ namespace Fig
 
         static FString fromStringView(FStringView sv)
         {
-            return FString(reinterpret_cast<const char*> (sv.data()));
+            return FString(reinterpret_cast<const char *>(sv.data()));
         }
 
         static FString fromU8String(const std::u8string &str)
@@ -93,6 +92,60 @@ namespace Fig
             }
             return len;
         }
+
+        FString getRealChar(size_t index)
+        {
+            FString ch;
+            size_t cnt = 0;
+            for (size_t i = 0; i < size();)
+            {
+                uint8_t cplen = 1;
+                if ((at(i) & 0xf8) == 0xf0)
+                    cplen = 4;
+                else if ((at(i) & 0xf0) == 0xe0)
+                    cplen = 3;
+                else if ((at(i) & 0xe0) == 0xc0)
+                    cplen = 2;
+                if (i + cplen > size())
+                    cplen = 1;
+
+                if (cnt == index)
+                {
+                    ch += substr(i, cplen);
+                }
+
+                i += cplen;
+                ++ cnt;
+            }
+
+            return ch;
+        }
+
+        void realReplace(size_t index, const FString &src)
+        {
+            size_t cnt = 0;
+            for (size_t i = 0; i < size();)
+            {
+                uint8_t cplen = 1;
+                if ((at(i) & 0xf8) == 0xf0)
+                    cplen = 4;
+                else if ((at(i) & 0xf0) == 0xe0)
+                    cplen = 3;
+                else if ((at(i) & 0xe0) == 0xc0)
+                    cplen = 2;
+                if (i + cplen > size())
+                    cplen = 1;
+
+                if (cnt == index)
+                {
+                    *this = FString(substr(0, i)) + src + 
+                            FString(substr(i + cplen));
+                }
+
+                i += cplen;
+                ++cnt;
+            }
+        }
     };
 
 }; // namespace Fig
@@ -107,4 +160,4 @@ namespace std
             return std::hash<std::u8string>{}(static_cast<const std::u8string &>(s));
         }
     };
-}
+} // namespace std

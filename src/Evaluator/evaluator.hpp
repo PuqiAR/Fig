@@ -4,6 +4,7 @@
 #include <Error/error.hpp>
 #include <Module/builtins.hpp>
 #include <Value/LvObject.hpp>
+#include <filesystem>
 
 
 namespace Fig
@@ -52,6 +53,12 @@ namespace Fig
     private:
         ContextPtr global;
     public:
+        FString sourcePath;
+
+        void SetSourcePath(const FString &sp)
+        {
+            sourcePath = sp;
+        }
 
         void SetGlobalContext(ContextPtr ctx)
         {
@@ -110,8 +117,13 @@ namespace Fig
         StatementResult evalBlockStatement(Ast::BlockStatement, ContextPtr); // block
         StatementResult evalStatement(Ast::Statement, ContextPtr);  // statement
 
+        std::filesystem::path resolveModulePath(const std::vector<FString> &);
+        ContextPtr loadModule(const std::filesystem::path &);
+
+        StatementResult evalImportSt(Ast::Import, ContextPtr);
+
         StatementResult Run(std::vector<Ast::AstBase>); // Entry
-        
+
         void printStackTrace();
     };
 }; // namespace Fig

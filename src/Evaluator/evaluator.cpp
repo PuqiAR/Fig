@@ -1,10 +1,13 @@
+#include <Error/errorLog.hpp>
 #include <Evaluator/evaluator.hpp>
 #include <Evaluator/evaluator_error.hpp>
 #include <Module/builtins.hpp>
 #include <Context/context.hpp>
 #include <Utils/utils.hpp>
-
 #include <Parser/parser.hpp>
+
+#include <filesystem>
+#include <fstream>
 
 namespace Fig
 {
@@ -22,6 +25,25 @@ namespace Fig
         LvObject base = evalLv(me->base, ctx);
         RvObject baseVal = base.get();
         const FString &member = me->member;
+        if (baseVal->getTypeInfo() == ValueType::Module)
+        {
+            const Module &mod = baseVal->as<Module>();
+            if (mod.ctx->contains(member) && mod.ctx->isVariablePublic(member))
+            {
+                return LvObject(
+                    mod.ctx->get(member) 
+                );
+            }
+            else {
+                throw EvaluatorError(
+                    u8"VariableNotFoundError",
+                    std::format(
+                        "`{}` has not variable '{}', check if it is public",
+                        baseVal->toString().toBasicString(),
+                        member.toBasicString()),
+                    me->base);
+            }
+        }
         if (baseVal->hasMemberFunction(member))
         {
             return LvObject(std::make_shared<VariableSlot>(
@@ -71,10 +93,8 @@ namespace Fig
                     u8"TypeError",
                     std::format(
                         "Type `List` indices must be `Int`, got '{}'",
-                        index->getTypeInfo().toString().toBasicString()
-                    ),
-                    ie->index
-                );
+                        index->getTypeInfo().toString().toBasicString()),
+                    ie->index);
             }
             List &list = base.get()->as<List>();
             ValueType::IntClass indexVal = index->as<ValueType::IntClass>();
@@ -85,21 +105,48 @@ namespace Fig
                     std::format(
                         "Index {} out of list `{}` range",
                         indexVal,
-                        base.get()->toString().toBasicString()
-                    ),
-                    ie->index
-                );
+                        base.get()->toString().toBasicString()),
+                    ie->index);
             }
             return LvObject(
                 base.get(),
-                indexVal
-            );
+                indexVal,
+                LvObject::Kind::ListElement);
         }
         else if (type == ValueType::Map)
         {
             return LvObject(
                 base.get(),
-                index
+                index,
+                LvObject::Kind::MapElement);
+        }
+        else if (type == ValueType::String)
+        {
+            if (index->getTypeInfo() != ValueType::Int)
+            {
+                throw EvaluatorError(
+                    u8"TypeError",
+                    std::format(
+                        "Type `String` indices must be `Int`, got '{}'",
+                        index->getTypeInfo().toString().toBasicString()),
+                    ie->index);
+            }
+            FString &string = base.get()->as<ValueType::StringClass>();
+            ValueType::IntClass indexVal = index->as<ValueType::IntClass>();
+            if (indexVal >= string.length())
+            {
+                throw EvaluatorError(
+                    u8"IndexOutOfRangeError",
+                    std::format(
+                        "Index {} out of string `{}` range",
+                        indexVal,
+                        base.get()->toString().toBasicString()),
+                    ie->index);
+            }
+            return LvObject(
+                base.get(),
+                indexVal,
+                LvObject::Kind::StringElement
             );
         }
         else
@@ -111,7 +158,6 @@ namespace Fig
                     base.declaredType().toString().toBasicString()),
                 ie->base);
         }
-        
     }
     LvObject Evaluator::evalLv(Ast::Expression exp, ContextPtr ctx)
     {
@@ -322,9 +368,13 @@ namespace Fig
         Ast::FunctionParameters fnParas = fnStruct.paras;
         if (fnArgs.getLength() < fnParas.posParas.size() || fnArgs.getLength() > fnParas.size())
         {
-            throw EvaluatorError(
-                u8"ArgumentMismatchError",
-                std::format("Function '{}' expects {} to {} arguments, but {} were provided", fnName.toBasicString(), fnParas.posParas.size(), fnParas.size(), fnArgs.getLength()), fnArgs.argv.back());
+            throw RuntimeError(FString(
+                std::format(
+                    "Function '{}' expects {} to {} arguments, but {} were provided",
+                    fnName.toBasicString(),
+                    fnParas.posParas.size(),
+                    fnParas.size(),
+                    fnArgs.getLength())));
         }
 
         // positional parameters type check
@@ -484,8 +534,15 @@ namespace Fig
                 }
                 const Function &fn = fnObj->as<Function>();
                 size_t fnId = fn.id;
-                const auto &fnNameOpt = ctx->getFunctionName(fnId);
+                // const auto &fnNameOpt = ctx->getFunctionName(fnId);
+                // const FString &fnName = (fnNameOpt ? *fnNameOpt : u8"<anonymous>");
+
+                auto fnNameOpt = ctx->getFunctionName(fnId);
+                if (!fnNameOpt && fn.closureContext)
+                    fnNameOpt = fn.closureContext->getFunctionName(fnId);
+
                 const FString &fnName = (fnNameOpt ? *fnNameOpt : u8"<anonymous>");
+
                 return evalFunctionCall(fn, fnCall->arg, fnName, ctx);
             }
             case AstType::FunctionLiteralExpr: {
@@ -722,7 +779,7 @@ namespace Fig
                 }
                 return std::make_shared<Object>(std::move(map));
             }
-            
+
             default:
                 assert(false);
         }
@@ -745,6 +802,11 @@ namespace Fig
         using enum Ast::AstType;
         switch (stmt->getType())
         {
+            case ImportSt: {
+                auto i = std::dynamic_pointer_cast<Ast::ImportSt>(stmt);
+                assert(i != nullptr);
+                return evalImportSt(i, ctx);
+            }
             case VarDefSt: {
                 auto varDef = std::dynamic_pointer_cast<Ast::VarDefAst>(stmt);
                 assert(varDef != nullptr);
@@ -1067,6 +1129,189 @@ namespace Fig
                                 magic_enum::enum_name(stmt->getType()))));
         }
     }
+
+    std::filesystem::path Evaluator::resolveModulePath(const std::vector<FString> &pathVec)
+    {
+        namespace fs = std::filesystem;
+
+        static const std::vector<fs::path> defaultLibraryPath{
+            "Library",
+            "Library/fpm"};
+
+        std::vector<fs::path> pathToFind(defaultLibraryPath);
+        pathToFind.insert(
+            pathToFind.begin(),
+            fs::path(
+                this->sourcePath.toBasicString())
+                .parent_path()); // first search module at the source file path
+
+        fs::path path;
+
+        /*
+        Example:
+            import comp.config;
+        */
+
+        const FString &modPathStrTop = pathVec.at(0);
+        fs::path modPath;
+
+        bool found = false;
+        for (auto &parentFolder : pathToFind)
+        {
+            modPath = parentFolder / FString(modPathStrTop + u8".fig").toBasicString();
+            if (fs::exists(modPath))
+            {
+                path = modPath;
+                found = true;
+                break;
+            }
+            else
+            {
+                modPath = parentFolder / modPathStrTop.toBasicString();
+                if (fs::is_directory(modPath)) // comp is a directory
+                {
+                    modPath = modPath / FString(modPathStrTop + u8".fig").toBasicString();
+                    /*
+                        if module name is a directory, we require [module name].fig at the directory
+                    */
+                    if (!fs::exists(modPath))
+                    {
+                        throw RuntimeError(FString(
+                            std::format(
+                                "requires module file, {}\\{}",
+                                modPathStrTop.toBasicString(),
+                                FString(modPathStrTop + u8".fig").toBasicString())));
+                    }
+                    found = true;
+                    path = modPath;
+                    break;
+                }
+            }
+        }
+
+        if (!found)
+            throw RuntimeError(
+                FString(std::format(
+                    "Could not find module `{}`",
+                    modPathStrTop.toBasicString())));
+
+        bool found2 = false;
+
+        for (size_t i = 1; i < pathVec.size(); ++i) // has next module
+        {
+            const FString &next = pathVec.at(i);
+            modPath = modPath.parent_path(); // get the folder
+            modPath = modPath / FString(next + u8".fig").toBasicString();
+            if (fs::exists(modPath))
+            {
+                if (i != pathVec.size() - 1)
+                    throw RuntimeError(FString(
+                        std::format(
+                            "expects {} as parent directory and find next module, but got a file",
+                            next.toBasicString())));
+                // it's the last module
+                found2 = true;
+                path = modPath;
+                break;
+            }
+            // `next` is a folder
+            modPath = modPath.parent_path() / next.toBasicString();
+            if (!fs::exists(modPath))
+                throw RuntimeError(FString(
+                    std::format("Could not find module `{}`", next.toBasicString())));
+        }
+
+        if (!found2 && !fs::exists(modPath))
+            throw RuntimeError(FString(
+                std::format("Could not find module `{}`", pathVec.end()->toBasicString())));
+
+        return path;
+    }
+
+    ContextPtr Evaluator::loadModule(const std::filesystem::path &path)
+    {
+        std::ifstream file(path);
+        assert(file.is_open());
+
+        std::string source((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        file.close();
+
+        Lexer lexer((FString(source)));
+        Parser parser(lexer);
+        std::vector<Ast::AstBase> asts;
+
+        std::vector<FString> sourceLines = Utils::splitSource(FString(source));
+
+        try
+        {
+            asts = parser.parseAll();
+        }
+        catch (const AddressableError &e)
+        {
+            ErrorLog::logAddressableError(e, sourcePath, sourceLines);
+        }
+        catch (const UnaddressableError &e)
+        {
+            ErrorLog::logUnaddressableError(e);
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << "uncaught exception of: " << e.what() << '\n';
+        }
+
+        Evaluator evaluator;
+        evaluator.SetSourcePath(FString(path.string()));
+
+        ContextPtr modctx = std::make_shared<Context>(
+            FString(std::format("<Module at {}>", path.string())),
+            nullptr);
+
+        evaluator.SetGlobalContext(modctx);
+        evaluator.RegisterBuiltins();
+
+        try
+        {
+            evaluator.Run(asts);
+        }
+        catch (std::exception &e)
+        {
+            std::cerr << "load module failed" << '\n';
+            throw e;
+        }
+
+        return evaluator.global;
+    }
+
+    StatementResult Evaluator::evalImportSt(Ast::Import i, ContextPtr ctx)
+    {
+        const std::vector<FString> &pathVec = i->path;
+        auto path = resolveModulePath(pathVec);
+        ContextPtr modCtx = loadModule(path);
+
+        const FString &modName = pathVec.at(pathVec.size() - 1);
+
+        // std::cerr << modName.toBasicString() << '\n'; DEBUG
+
+        if (ctx->containsInThisScope(modName))
+        {
+            throw EvaluatorError(
+                u8"RedeclarationError",
+                std::format(
+                    "{} has already been declared.",
+                    modName.toBasicString()),
+                i);
+        }
+        ctx->def(
+            modName,
+            ValueType::Module,
+            AccessModifier::PublicConst,
+            std::make_shared<Object>(
+                Module(
+                    modName,
+                    modCtx)));
+        return StatementResult::normal();
+    }
+
     StatementResult Evaluator::Run(std::vector<Ast::AstBase> asts)
     {
         using Ast::AstType;

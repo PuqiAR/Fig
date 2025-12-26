@@ -1,0 +1,6 @@
+/*
+Official Module `std`
+Library/std/std.fig
+*/
+
+import io; // link std io

@@ -80,5 +80,5 @@ namespace Fig
     const TypeInfo ValueType::StructInstance(FString(u8"StructInstance"), true); // id: 9
     const TypeInfo ValueType::List(FString(u8"List"), true); // id: 10
     const TypeInfo ValueType::Map(FString(u8"Map"), true); // id: 11
-    // const TypeInfo ValueType::Tuple(FString(u8"Tuple"), true); // id: 12
+    const TypeInfo ValueType::Module(FString(u8"Module"), true); // id: 12
 } // namespace Fig

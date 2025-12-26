@@ -1,5 +1,6 @@
 #pragma once
-#pragma once
+
+#include <Lexer/lexer.hpp>
 #include <Core/fig_string.hpp>
 #include <string>
 #include <locale>
@@ -9,6 +10,32 @@
 
 namespace Fig::Utils
 {
+
+    inline std::vector<FString> splitSource(FString source)
+    {
+        UTF8Iterator it(source);
+        std::vector<FString> lines;
+        FString currentLine;
+        while (!it.isEnd())
+        {
+            UTF8Char c = *it;
+            if (c == U'\n')
+            {
+                lines.push_back(currentLine);
+                currentLine = FString(u8"");
+            }
+            else
+            {
+                currentLine += c.getString();
+            }
+            ++it;
+        }
+        if (!currentLine.empty())
+        {
+            lines.push_back(currentLine);
+        }
+        return lines;
+    }
     inline std::u32string utf8ToUtf32(const FString &s)
     {
         std::u32string result;

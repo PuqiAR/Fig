@@ -1,0 +1,9 @@
+/*
+Official Module `std.io`
+Library/std/io/io.fig
+*/
+
+public func print(value) -> Null
+{
+    __fstdout_print(value);
+}

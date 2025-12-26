@@ -325,6 +325,8 @@ namespace Fig
         Ast::Expression __parseTupleOrParenExpr();             // entry: current is `(`
 
         Ast::FunctionLiteralExpr __parseFunctionLiteralExpr(); // entry: current is Token::LParen after Token::Function
+
+        Ast::Import __parseImport();                           // entry: current is Token::Import
         
         Ast::Statement __parseStatement();                     // entry: (idk)
         Ast::Expression parseExpression(Precedence, TokenType = TokenType::Semicolon, TokenType = TokenType::Semicolon);

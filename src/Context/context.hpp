@@ -28,9 +28,7 @@ namespace Fig
         Context(const Context &) = default;
         Context(const FString &name, ContextPtr p = nullptr) :
             scopeName(name), parent(p) {}
-        Context(const FString &name, std::unordered_map<FString, TypeInfo> types, std::unordered_map<FString, std::shared_ptr<VariableSlot>> vars, std::unordered_map<FString, AccessModifier> _ams) :
-            scopeName(std::move(name)), variables(std::move(vars)) {}
-
+            
         void setParent(ContextPtr _parent)
         {
             parent = _parent;
@@ -120,7 +118,7 @@ namespace Fig
             }
             else if (parent != nullptr)
             {
-                parent->set(name, value);
+                parent->_update(name, value);
             }
             else
             {
@@ -191,7 +189,7 @@ namespace Fig
             }
             else if (parent)
             {
-                return parent->getFunctionName(id);
+                return parent->getStructName(id);
             }
             else
             {

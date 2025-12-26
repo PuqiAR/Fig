@@ -18,6 +18,7 @@ namespace Fig
         Identifier,
 
         /* Keywords */
+        Package,   // package
         And,       // and
         Or,        // or
         Not,       // not
@@ -48,7 +49,7 @@ namespace Fig
         LiteralNumber, // number (int,float...)
         LiteralString, // FString
         LiteralBool,   // bool (true/false)
-        LiteralNull,   // null (Null的唯一实例)
+        LiteralNull,   // null (Null unique instance)
 
         /* Punct */
         Plus,       // +

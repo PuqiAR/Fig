@@ -8,6 +8,22 @@
 // fuck
 // generate by Qwen3-Coder:
 
+// 2025-12-26
+/*
+again: C++ fuck you
+fuck you
+fuck you!
+
+fuck
+
+C++ IS A PIECE OF SHIT
+STOP USING C++
+
+unicodeString = "some unicode points";
+unicodeString[0] ---> ?????
+FUCK YOU C++
+*/
+
 namespace Fig
 {
     class UTF8Char

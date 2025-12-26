@@ -4,6 +4,7 @@
 #include <Value/structInstance.hpp>
 #include <Value/Type.hpp>
 #include <Value/valueError.hpp>
+#include <Value/module.hpp>
 
 #include <variant>
 #include <cmath>
@@ -58,7 +59,8 @@ namespace Fig
             StructType,
             StructInstance,
             List,
-            Map>;
+            Map,
+            Module>;
 
         std::unordered_map<TypeInfo,
                            std::unordered_map<FString,
@@ -134,6 +136,7 @@ namespace Fig
                                               map.contains(index));
                                       }},
                                  }},
+                {ValueType::Module, {}}
             };
         std::unordered_map<TypeInfo, std::unordered_map<FString, int>, TypeInfoHash> memberTypeFunctionsParas{
             {ValueType::Null, {}},
@@ -151,6 +154,7 @@ namespace Fig
                                  {u8"get", 1},
                                  {u8"contains", 1},
                              }},
+            {ValueType::Module, {}}
 
         };
         bool hasMemberFunction(const FString &name) const
@@ -189,6 +193,8 @@ namespace Fig
         Object(const List &l) :
             data(l) {}
         Object(const Map &m) :
+            data(m) {}
+        Object(const Module &m) :
             data(m) {}
 
         Object(const Object &) = default;
@@ -283,6 +289,9 @@ namespace Fig
                 else if constexpr (std::is_same_v<T, Map>)
                     return ValueType::Map;
 
+                else if constexpr (std::is_same_v<T, Module>)
+                    return ValueType::Module;
+
                 else
                     return ValueType::Any;
             },
@@ -356,6 +365,12 @@ namespace Fig
                 }
                 output += u8"}";
                 return output;
+            }
+            if (is<Module>())
+            {
+                return FString(std::format(
+                    "<Module at {:p}>",
+                    static_cast<const void *>(&as<Module>())));
             }
             return FString(u8"<error>");
         }
@@ -575,7 +590,6 @@ namespace Fig
 
     using ObjectPtr = std::shared_ptr<Object>;
     using RvObject = ObjectPtr;
-
 
     inline bool operator==(const ValueKey &l, const ValueKey &r)
     {

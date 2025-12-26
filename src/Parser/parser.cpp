@@ -132,7 +132,7 @@ namespace Fig
 
     Ast::ValueExpr Parser::__parseValueExpr()
     {
-        return makeAst<Ast::ValueExprAst> (__parseValue());
+        return makeAst<Ast::ValueExprAst>(__parseValue());
     }
     Ast::FunctionParameters Parser::__parseFunctionParameters()
     {
@@ -350,7 +350,11 @@ namespace Fig
     {
         Ast::Statement stmt;
         if (isThis(TokenType::EndOfFile)) { return makeAst<Ast::EofStmt>(); }
-        if (isThis(TokenType::Public))
+        else if (isThis(TokenType::Import))
+        {
+            stmt = __parseImport();
+        }
+        else if (isThis(TokenType::Public))
         {
             next(); // consume `public`
             if (isThis(TokenType::Variable) || isThis(TokenType::Const))
@@ -708,8 +712,7 @@ namespace Fig
             {
                 throwAddressableError<SyntaxError>(FString(
                     std::format("Expect `,` or `}}` in struct initialization expression, got {}",
-                                currentToken().toString().toBasicString())
-                ));
+                                currentToken().toString().toBasicString())));
             }
         }
         expect(TokenType::RightBrace);
@@ -780,6 +783,33 @@ namespace Fig
         }
         expect(TokenType::LeftBrace); // `{`
         return makeAst<Ast::FunctionLiteralExprAst>(params, __parseBlockStatement());
+    }
+
+    Ast::Import Parser::__parseImport()
+    {
+        next(); // consume `import`
+        std::vector<FString> path;
+        while (true)
+        {
+            expect(TokenType::Identifier, u8"package name");
+            path.push_back(currentToken().getValue());
+            next(); // consume package name
+            if (isThis(TokenType::Semicolon))
+            {
+                break;
+            }
+            else if (isThis(TokenType::Dot))
+            {
+                next(); // consume `.`
+            }
+            else
+            {
+                throw SyntaxError();
+            }
+        }
+        expect(TokenType::Semicolon);
+        next(); // consume `;`
+        return makeAst<Ast::ImportSt>(path);
     }
 
     Ast::Expression Parser::parseExpression(Precedence bp, TokenType stop, TokenType stop2)
@@ -921,10 +951,17 @@ namespace Fig
             return output;
         }
 
-        // TODO: Package/Module Import Support
         while (!isEOF())
         {
-            pushNode(__parseStatement());
+            auto stmt = __parseStatement();
+            if (!output.empty() && stmt->getType() == Ast::AstType::PackageSt)
+            {
+                throw SyntaxError(
+                    u8"Package must be at the beginning of the file",
+                    currentAAI.line,
+                    currentAAI.column);
+            }
+            pushNode(stmt);
         }
         return output;
     }
