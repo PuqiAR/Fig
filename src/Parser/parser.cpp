@@ -35,6 +35,12 @@ namespace Fig
         {Ast::Operator::ShiftRight, {15, 16}},
 
         {Ast::Operator::Assign, {2, 1}}, // 右结合
+        {Ast::Operator::PlusAssign, {2, 1}},
+        {Ast::Operator::MinusAssign, {2, 1}},
+        {Ast::Operator::SlashAssign, {2, 1}},
+        {Ast::Operator::AsteriskAssign, {2, 1}},
+        {Ast::Operator::PercentAssign, {2, 1}},
+        {Ast::Operator::CaretAssign, {2, 1}},
 
         // 海象运算符
         // {Ast::Operator::Walrus, {2, 1}}, // 右结合

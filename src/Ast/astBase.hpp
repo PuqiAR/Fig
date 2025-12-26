@@ -222,7 +222,13 @@ namespace Fig::Ast
         ShiftRight, // >>
 
         // 赋值表达式
-        Assign, // =
+        Assign,         // =
+        PlusAssign,     // +=
+        MinusAssign,    // -=
+        AsteriskAssign, // *=
+        SlashAssign,    // /=
+        PercentAssign,  // %=
+        CaretAssign,    // ^=
         // Walrus, // :=
     };
 
@@ -254,6 +260,13 @@ namespace Fig::Ast
         Operator::BitNot,
         Operator::ShiftLeft,
         Operator::ShiftRight,
+
+        Operator::Assign,
+        Operator::PlusAssign,
+        Operator::MinusAssign,
+        Operator::AsteriskAssign,
+        Operator::SlashAssign,
+        Operator::CaretAssign
 
         // Operator::Walrus,
         // Operator::Dot
@@ -297,6 +310,12 @@ namespace Fig::Ast
 
         // 赋值表达式
         {TokenType::Assign, Operator::Assign},
+        {TokenType::PlusEqual, Operator::PlusAssign},
+        {TokenType::MinusEqual, Operator::MinusAssign},
+        {TokenType::AsteriskEqual, Operator::AsteriskAssign},
+        {TokenType::SlashEqual, Operator::SlashAssign},
+        {TokenType::PercentEqual, Operator::PercentAssign},
+        {TokenType::CaretEqual, Operator::CaretAssign},
         // {TokenType::Walrus, Operator::Walrus},
     }; // :=
 

@@ -289,12 +289,55 @@ namespace Fig
                 ObjectPtr rhs = eval(rexp, ctx);
                 return std::make_shared<Object>(shift_right(*lhs, *rhs));
             }
+
             case Operator::Assign: {
                 LvObject lv = evalLv(lexp, ctx);
                 ObjectPtr rhs = eval(rexp, ctx);
                 lv.set(rhs);
                 return rhs;
             }
+            case Operator::PlusAssign: {
+                LvObject lv = evalLv(lexp, ctx);
+                ObjectPtr rhs = eval(rexp, ctx);
+                lv.set(std::make_shared<Object>(
+                    *(lv.get()) + *rhs
+                ));
+                return rhs;
+            }
+            case Operator::MinusAssign: {
+                LvObject lv = evalLv(lexp, ctx);
+                ObjectPtr rhs = eval(rexp, ctx);
+                lv.set(std::make_shared<Object>(
+                    *(lv.get()) - *rhs));
+                return rhs;
+            }
+            case Operator::AsteriskAssign: {
+                LvObject lv = evalLv(lexp, ctx);
+                ObjectPtr rhs = eval(rexp, ctx);
+                lv.set(std::make_shared<Object>(
+                    *(lv.get()) * (*rhs)));
+                return rhs;
+            }
+            case Operator::SlashAssign: {
+                LvObject lv = evalLv(lexp, ctx);
+                ObjectPtr rhs = eval(rexp, ctx);
+                lv.set(std::make_shared<Object>(
+                    *(lv.get()) / *rhs));
+                return rhs;
+            }
+            case Operator::PercentAssign: {
+                LvObject lv = evalLv(lexp, ctx);
+                ObjectPtr rhs = eval(rexp, ctx);
+                lv.set(std::make_shared<Object>(
+                    *(lv.get()) / *rhs));
+                return rhs;
+            }
+            // case Operator::CaretAssign: {
+            //     LvObject lv = evalLv(lexp, ctx);
+            //     ObjectPtr rhs = eval(rexp, ctx);
+            //     lv.set(std::make_shared<Object>(
+            //         *(lv.get()) ^ *rhs));
+            // }
             default:
                 throw EvaluatorError(u8"UnsupportedOp", std::format("Unsupport operator '{}' for binary", magic_enum::enum_name(op)), bin);
         }
