@@ -10,9 +10,9 @@ namespace Fig::Ast
     {
         /*
             Positional Parameters:
-                fun test(pp1, pp2: Int)
+                func test(pp1, pp2: Int)
             Default Parameters:
-                fun test2(dp1 = 10, dp2:String = "default parameter 2")
+                func test2(dp1 = 10, dp2:String = "default parameter 2")
         */
 
         using PosParasType = std::vector<std::pair<FString, FString>>;

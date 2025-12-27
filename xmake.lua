@@ -5,7 +5,7 @@ set_policy("run.autobuild", false)
 
 target("Fig")
     set_kind("binary")
-    set_languages("c++2b") 
+    set_languages("c++23") 
     
     set_plat("mingw")
 
