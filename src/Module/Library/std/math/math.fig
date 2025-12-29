@@ -4,7 +4,7 @@
 */
 
 import _builtins; // load __fmath functions
-import std.value; // `type` function
+// import std.value; // `type` function
 
 /* call native c mathematical functions */
 
