@@ -78,7 +78,76 @@ namespace Fig
                                              const FString &str = as<ValueType::StringClass>();
                                              return std::make_shared<Object>(static_cast<ValueType::IntClass>(str.length()));
                                          }},
-
+                                        {u8"replace", [this](std::vector<ObjectPtr> args) -> ObjectPtr {
+                                             if (args.size() != 2)
+                                                 throw RuntimeError(FString(
+                                                     std::format("`replace` expects 2 arguments, {} got", args.size())));
+                                             FString &str = as<ValueType::StringClass>();
+                                             ObjectPtr arg1 = args[0];
+                                             ObjectPtr arg2 = args[1];
+                                             if (!arg1->is<ValueType::IntClass>())
+                                             {
+                                                 throw RuntimeError(FString(
+                                                     "`replace` arg 1 expects type Int"));
+                                             }
+                                             if (!arg2->is<ValueType::StringClass>())
+                                             {
+                                                 throw RuntimeError(FString(
+                                                     "`replace` arg 2 expects type String"));
+                                             }
+                                             str.realReplace(arg1->as<ValueType::IntClass>(), arg2->as<ValueType::StringClass>());
+                                             return Object::getNullInstance();
+                                         }},
+                                        {u8"erase", [this](std::vector<ObjectPtr> args) -> ObjectPtr {
+                                             if (args.size() != 2)
+                                                 throw RuntimeError(FString(
+                                                     std::format("`erase` expects 2 arguments, {} got", args.size())));
+                                             FString &str = as<ValueType::StringClass>();
+                                             ObjectPtr arg1 = args[0];
+                                             ObjectPtr arg2 = args[1];
+                                             if (!arg1->is<ValueType::IntClass>())
+                                             {
+                                                 throw RuntimeError(FString(
+                                                     "`erase` arg 1 expects type Int"));
+                                             }
+                                             if (!arg2->is<ValueType::IntClass>())
+                                             {
+                                                 throw RuntimeError(FString(
+                                                     "`erase` arg 2 expects type Int"));
+                                             }
+                                             ValueType::IntClass index = arg1->as<ValueType::IntClass>();
+                                             ValueType::IntClass n = arg2->as<ValueType::IntClass>();
+                                             if (index < 0 || n < 0)
+                                             {
+                                                 throw RuntimeError(FString("`erase`: index and n must greater or equal to 0"));
+                                             }
+                                             if (index + n > str.length())
+                                             {
+                                                 throw RuntimeError(FString("`erase`: length is not long enough to erase"));
+                                             }
+                                             str.realErase(arg1->as<ValueType::IntClass>(), arg2->as<ValueType::IntClass>());
+                                             return Object::getNullInstance();
+                                         }},
+                                        {u8"insert", [this](std::vector<ObjectPtr> args) -> ObjectPtr {
+                                             if (args.size() != 2)
+                                                 throw RuntimeError(FString(
+                                                     std::format("`insert` expects 2 arguments, {} got", args.size())));
+                                             FString &str = as<ValueType::StringClass>();
+                                             ObjectPtr arg1 = args[0];
+                                             ObjectPtr arg2 = args[1];
+                                             if (!arg1->is<ValueType::IntClass>())
+                                             {
+                                                 throw RuntimeError(FString(
+                                                     "`insert` arg 1 expects type Int"));
+                                             }
+                                             if (!arg2->is<ValueType::StringClass>())
+                                             {
+                                                 throw RuntimeError(FString(
+                                                     "`insert` arg 2 expects type String"));
+                                             }
+                                             str.realInsert(arg1->as<ValueType::IntClass>(), arg2->as<ValueType::StringClass>());
+                                             return Object::getNullInstance();
+                                         }},
                                     }},
                 {ValueType::Function, {}},
                 {ValueType::StructType, {}},
@@ -136,15 +205,16 @@ namespace Fig
                                               map.contains(index));
                                       }},
                                  }},
-                {ValueType::Module, {}}
-            };
+                {ValueType::Module, {}}};
         std::unordered_map<TypeInfo, std::unordered_map<FString, int>, TypeInfoHash> memberTypeFunctionsParas{
             {ValueType::Null, {}},
             {ValueType::Int, {}},
             {ValueType::Double, {}},
             {ValueType::String, {
                                     {u8"length", 0},
-
+                                    {u8"replace", 2},
+                                    {u8"erase", 2},
+                                    {u8"insert", 2},
                                 }},
             {ValueType::Function, {}},
             {ValueType::StructType, {}},

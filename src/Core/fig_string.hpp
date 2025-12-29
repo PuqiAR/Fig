@@ -115,7 +115,7 @@ namespace Fig
                 }
 
                 i += cplen;
-                ++ cnt;
+                ++cnt;
             }
 
             return ch;
@@ -138,8 +138,71 @@ namespace Fig
 
                 if (cnt == index)
                 {
-                    *this = FString(substr(0, i)) + src + 
-                            FString(substr(i + cplen));
+                    *this = FString(substr(0, i)) + src + FString(substr(i + cplen));
+                }
+
+                i += cplen;
+                ++cnt;
+            }
+        }
+        void realErase(size_t index, size_t n)
+        {
+            size_t cnt = 0;
+            size_t eraseStart = 0;
+            size_t eraseCplens = 0;
+            for (size_t i = 0; i < size();)
+            {
+                uint8_t cplen = 1;
+                if ((at(i) & 0xf8) == 0xf0)
+                    cplen = 4;
+                else if ((at(i) & 0xf0) == 0xe0)
+                    cplen = 3;
+                else if ((at(i) & 0xe0) == 0xc0)
+                    cplen = 2;
+                if (i + cplen > size())
+                    cplen = 1;
+
+                i += cplen;
+                ++cnt;
+
+                if (cnt == index)
+                {
+                    eraseStart = i;
+                }
+                if (cnt < index + n)
+                {
+                    eraseCplens += cplen;
+                }
+            }
+            erase(eraseStart, eraseCplens);
+        }
+
+        void realInsert(size_t index, const FString &src)
+        {
+            if (index == length())
+            {
+                for (auto &c : src)
+                {
+                    push_back(c);
+                }
+                return;
+            }
+            size_t cnt = 0;
+            for (size_t i = 0; i < size();)
+            {
+                uint8_t cplen = 1;
+                if ((at(i) & 0xf8) == 0xf0)
+                    cplen = 4;
+                else if ((at(i) & 0xf0) == 0xe0)
+                    cplen = 3;
+                else if ((at(i) & 0xe0) == 0xc0)
+                    cplen = 2;
+                if (i + cplen > size())
+                    cplen = 1;
+
+                if (cnt == index)
+                {
+                    insert(i, src);
                 }
 
                 i += cplen;

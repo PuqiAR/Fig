@@ -1037,12 +1037,15 @@ namespace Fig
                 for (const auto &elif : ifSt->elifs)
                 {
                     ObjectPtr elifCondVal = eval(elif->condition, ctx);
-                    throw EvaluatorError(
-                        u8"TypeError",
-                        std::format(
-                            "Condition must be boolean, but got '{}'",
-                            condVal->getTypeInfo().toString().toBasicString()),
-                        ifSt->condition);
+                    if (elifCondVal->getTypeInfo() != ValueType::Bool)
+                    {
+                        throw EvaluatorError(
+                            u8"TypeError",
+                            std::format(
+                                "Condition must be boolean, but got '{}'",
+                                condVal->getTypeInfo().toString().toBasicString()),
+                            ifSt->condition);
+                    }
                     if (elifCondVal->as<ValueType::BoolClass>())
                     {
                         return evalBlockStatement(elif->body, ctx);

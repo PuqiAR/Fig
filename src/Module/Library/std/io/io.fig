@@ -6,6 +6,8 @@
 import _builtins;
 import noSpace; // sub module `no space print`
 
+import std.formater; // format
+
 // outputs
 
 public func print(objects...) -> Int
@@ -35,6 +37,11 @@ public func println(objects...) -> Int
     }
     __fstdout_print("\n");
     return length + 1;
+}
+
+public func printf(objects...) -> Any
+{
+    __fstdout_print(formater.formatByListArgs(objects));
 }
 
 // inputs

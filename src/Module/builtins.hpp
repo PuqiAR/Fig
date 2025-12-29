@@ -151,7 +151,7 @@ namespace Fig
              }},
             {u8"__fvalue_string_from", [](const std::vector<ObjectPtr> &args) -> ObjectPtr {
                  ObjectPtr val = args[0];
-                 return std::make_shared<Object>(val->toString());
+                 return std::make_shared<Object>(val->toStringIO());
              }},
              /* math start */
             {u8"__fmath_acos", [](const std::vector<ObjectPtr> &args) -> ObjectPtr {
