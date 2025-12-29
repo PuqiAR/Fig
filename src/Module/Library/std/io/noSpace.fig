@@ -1,6 +1,6 @@
 /*
-Official Module `std.io`
-Library/std/io/noSpaces.fig
+    Official Module `std.io`
+    Library/std/io/noSpaces.fig
 */
 
 import _builtins;

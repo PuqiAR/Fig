@@ -1,6 +1,6 @@
 /*
-Official Module `std.value`
-Library/std/value/value.fig
+    Official Module `std.value`
+    Library/std/value/value.fig
 */
 
 import _builtins;

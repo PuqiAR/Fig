@@ -1,0 +1,155 @@
+/*
+    Official Module `math`
+    Library/math/math.fig
+*/
+
+import _builtins; // load __fmath functions
+import std.value; // `type` function
+
+/* call native c mathematical functions */
+
+public func acos(x)
+{
+    return __fmath_acos(x);
+}
+
+public func acosh(x)
+{
+    return __fmath_acosh(x);
+}
+
+public func asin(x)
+{
+    return __fmath_asin(x);
+}
+
+public func asinh(x)
+{
+    return __fmath_asinh(x);
+}
+
+public func atan(x)
+{
+    return __fmath_atan(x);
+}
+
+public func atan2(x, y)
+{
+    return __fmath_atan(x, y);
+}
+
+public func atanh(x)
+{
+    return __fmath_atanh(x);
+}
+
+public func ceil(x)
+{
+    return __fmath_ceil(x);
+}
+
+public func cos(x)
+{
+    return __fmath_cos(x);
+}
+
+public func cosh(x)
+{
+    return __fmath_cosh(x);
+}
+
+public func exp(x)
+{
+    return __fmath_exp(x);
+}
+
+public func expm1(x)
+{
+    return __fmath_expm1(x);
+}
+
+public func fabs(x)
+{
+    return __fmath_fabs(x);
+}
+
+public func floor(x)
+{
+    return __fmath_floor(x);
+}
+
+public func fmod(x, y)
+{
+    return __fmath_fmod(x, y);
+}
+
+public func frexp(x) -> List
+{
+    // return List {mantissa, exponent
+    return __fmath_frexp(x);
+}
+
+public func gcd(x: Int, y: Int)
+{
+    return __fmath_gcd(x, y);
+}
+
+public func hypot(x, y)
+{
+    return __fmath_hypot(x, y);
+}
+
+public func isequal(x, y)
+{
+    return __fmath_isequal(x, y);
+}
+
+public func log(x)
+{
+    return __fmath_log(x);
+}
+
+public func log10(x)
+{
+    return __fmath_log10(x);
+}
+
+public func log1p(x)
+{
+    return __fmath_log1p(x);
+}
+
+public func log2(x)
+{
+    return __fmath_log2(x);
+}
+
+public func sin(x)
+{
+    return __fmath_sin(x);
+}
+
+public func sinh(x)
+{
+    return __fmath_sinh(x);
+}
+
+public func sqrt(x)
+{
+    return __fmath_sqrt(x);
+}
+
+public func tan(x)
+{
+    return __fmath_tan(x);
+}
+
+public func tanh(x)
+{
+    return __fmath_tanh(x);
+}
+
+public func trunc(x)
+{
+    return __fmath_trunc(x);
+}

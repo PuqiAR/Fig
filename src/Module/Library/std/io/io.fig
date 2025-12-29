@@ -1,6 +1,6 @@
 /*
-Official Module `std.io`
-Library/std/io/io.fig
+    Official Module `std.io`
+    Library/std/io/io.fig
 */
 
 import _builtins;

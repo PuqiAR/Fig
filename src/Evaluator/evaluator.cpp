@@ -1290,6 +1290,20 @@ namespace Fig
             if (!fs::exists(modPath))
                 throw RuntimeError(FString(
                     std::format("Could not find module `{}`", next.toBasicString())));
+            if (i == pathVec.size() - 1)
+            {
+                // `next` is the last module
+                modPath = modPath / FString(next + u8".fig").toBasicString();
+                if (!fs::exists(modPath))
+                {
+                    throw RuntimeError(FString(
+                        std::format(
+                            "expects {} as parent directory and find next module, but got a file",
+                            next.toBasicString())));
+                }
+                found2 = true;
+                path = modPath;
+            }
         }
 
         if (!found2 && !fs::exists(modPath))
