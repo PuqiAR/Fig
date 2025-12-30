@@ -49,7 +49,7 @@ namespace Fig
     public:
         std::size_t operator()(const TypeInfo &ti) const
         {
-            return ti.id;
+            return std::hash<size_t>{}(ti.id);
         }
     };
 

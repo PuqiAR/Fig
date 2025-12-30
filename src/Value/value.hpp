@@ -461,7 +461,7 @@ namespace Fig
             if (is<InterfaceType>())
             {
                 return FString(std::format(
-                    "<InterfaceType '{}' at {:p}",
+                    "<InterfaceType '{}' at {:p}>",
                     as<InterfaceType>().type.toString().toBasicString(),
                     static_cast<const void *>(&as<InterfaceType>())));
             }
