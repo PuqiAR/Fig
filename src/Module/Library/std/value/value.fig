@@ -38,6 +38,7 @@ public func double_parse(number: String) -> Double
 
 public func double_from(number: Any) -> Any
 {
+    var ntype := type(number);
     if ntype == "Int" or ntype == "Bool"
     {
         return __fvalue_double_from(number);
