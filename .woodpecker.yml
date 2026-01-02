@@ -1,41 +1,52 @@
 when:
-  event: tag
+  event:
+    include: [ tag ]
 
 steps:
 
-  linux-build:
-    when:
-      platform: linux
+  setup:
     image: debian:stable
-    environment:
-      VERSION: ${CI_COMMIT_TAG}
     commands:
-      - apt update
-      - apt install -y git build-essential curl xz-utils
-      - curl -fsSL https://xmake.io/shget.text | bash
-      - export PATH=$PATH:/root/.xmake
+      - apt-get update
+      - apt-get install -y xmake mingw-w64 zip git
       - xmake --version
-      - xmake f -m release
+
+  # =========================
+  # Linux Build
+  # =========================
+  linux-build:
+    image: debian:stable
+    commands:
+      - xmake f -p linux -m release
       - xmake
       - mkdir -p dist/linux
-      - cp build/linux/x64/release/Fig dist/linux/
+      - cp build/linux/x86_64/release/Fig dist/linux/Fig
       - cp -r src/Module/Library dist/linux/Library
-      - cd dist
-      - tar -czf Fig-${VERSION}-linux.tar.gz linux
+      - cd dist && zip -r fig-linux-${CI_COMMIT_TAG}.zip linux
 
+  # =========================
+  # Windows (Mingw) Build
+  # =========================
   windows-build:
-    when:
-      platform: windows
-    environment:
-      VERSION: ${CI_COMMIT_TAG}
+    image: debian:stable
     commands:
-      - choco install -y git
-      - choco install -y xmake
-      - refreshenv
-      - xmake f -m release
+      - xmake f -p mingw -m release
       - xmake
-      - mkdir dist
-      - mkdir dist/windows
-      - copy build\windows\x64\release\Fig.exe dist\windows\
-      - xcopy src\Module\Library dist\windows\Library /E /I
-      - powershell Compress-Archive dist/windows Fig-%VERSION%-windows.zip
+      - mkdir -p dist/windows
+      - cp build/mingw/x86_64/release/Fig.exe dist/windows/Fig.exe
+      - cp -r src/Module/Library dist/windows/Library
+      - cd dist && zip -r fig-windows-${CI_COMMIT_TAG}.zip windows
+
+  # =========================
+  # Upload to Gitea Release
+  # =========================
+  release:
+    image: woodpeckerci/plugin-gitea-release
+    settings:
+      api_key:
+        from_secret: GITEA_TOKEN
+      base_url: https://git.fig-lang.cn
+      files:
+        - dist/fig-linux-${CI_COMMIT_TAG}.zip
+        - dist/fig-windows-${CI_COMMIT_TAG}.zip
+      note: "Automated build for ${CI_COMMIT_TAG}"
