@@ -22,7 +22,7 @@
    |   / | '.    | '.                                | |         \'. __//                \ \._,\ '/|  |   |  | \'. __// '   .'|  '/\ \._,\ '/\'. __//
    `'-'  '---'   '---'                               |_|          `'---'                  `--'  `" '--'   '--'  `'---'   `-'  `--'  `--'  `"  `'---'
 
-Copyright (C) 2020-2025 PuqiAR
+Copyright (C) 2020-2026 PuqiAR
 
 This software is licensed under the MIT License. See LICENSE.txt for details.
 */
