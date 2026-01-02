@@ -1,54 +1,41 @@
-pipeline:
+when:
+  event: tag
+
+steps:
+
   linux-build:
-    image: ubuntu:22.04
+    when:
+      platform: linux
+    image: debian:stable
     environment:
       VERSION: ${CI_COMMIT_TAG}
     commands:
       - apt update
-      - apt install -y git build-essential wget unzip
-      - wget https://xmake.io/shget.text -O - | bash
-      - export PATH=~/.local/bin:$PATH
+      - apt install -y git build-essential curl xz-utils
+      - curl -fsSL https://xmake.io/shget.text | bash
+      - export PATH=$PATH:/root/.xmake
       - xmake --version
-
-      # 构建
       - xmake f -m release
       - xmake
-
-      # 输出目录
-      - mkdir -p dist/Linux
-      - cp build/linux/x86_64/release/Fig dist/Linux/Fig
-      - cp -r src/Module/Library dist/Linux/Library
-
-      # 打包
+      - mkdir -p dist/linux
+      - cp build/linux/x64/release/Fig dist/linux/
+      - cp -r src/Module/Library dist/linux/Library
       - cd dist
-      - tar -czf Fig-${VERSION}-linux-x86_64.tar.gz Linux
-
-    when:
-      event: tag
+      - tar -czf Fig-${VERSION}-linux.tar.gz linux
 
   windows-build:
-    image: mcr.microsoft.com/windows/servercore:ltsc2022
-    platform: windows
+    when:
+      platform: windows
     environment:
       VERSION: ${CI_COMMIT_TAG}
     commands:
       - choco install -y git
       - choco install -y xmake
       - refreshenv
-      - xmake --version
-
-      # 构建
       - xmake f -m release
       - xmake
-
-      # 输出
       - mkdir dist
-      - mkdir dist\\Windows
-      - copy build\\windows\\x86_64\\release\\Fig.exe dist\\Windows\\Fig.exe
-      - xcopy src\\Module\\Library dist\\Windows\\Library /E /I
-
-      # 打包
-      - powershell -command "Compress-Archive dist\\Windows Fig-$env:VERSION-windows-x86_64.zip"
-
-    when:
-      event: tag
+      - mkdir dist/windows
+      - copy build\windows\x64\release\Fig.exe dist\windows\
+      - xcopy src\Module\Library dist\windows\Library /E /I
+      - powershell Compress-Archive dist/windows Fig-%VERSION%-windows.zip
