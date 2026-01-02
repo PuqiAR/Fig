@@ -1,75 +1,48 @@
-# Woodpecker CI for Fig project
-# WSL2 Docker Runner, Linux + Windows cross compile
-# 国内源 + apt cache
-
-volumes:
-  - type: cache
-    name: apt-cache
-    path: /var/cache/apt
-
 steps:
   - name: build-cross
     image: "ubuntu:24.04"
+    environment:
+      # 如果你想加任何环境变量可以在这里，不留空
+      SHELL: "/bin/bash"
     volumes:
-      - type: cache
-        name: apt-cache
-        path: /var/cache/apt
+      - "/var/cache/apt:/var/cache/apt"
     commands:
-      # 使用国内源加速
-      - cp /etc/apt/sources.list /etc/apt/sources.list.bak
+      - cp /etc/apt/sources.list /etc/apt/sources.list.backup
       - |
-        cat << EOF > /etc/apt/sources.list
+        cat <<EOF > /etc/apt/sources.list
         deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs) main restricted universe multiverse
         deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-updates main restricted universe multiverse
         deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-security main restricted universe multiverse
         deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-backports main restricted universe multiverse
         EOF
-
       - apt-get update -y
       - apt-get install -y curl git build-essential clang llvm mingw-w64 ninja-build jq
-
-      # 安装 xmake
       - curl -fsSL https://xmake.io/shget.text | bash
       - export PATH=$PATH:/root/.xmake/bin
-
-      # 构建 Linux release
+      # Linux build
       - xmake f -m release
       - xmake -v
       - mkdir -p dist
       - cp `xmake u -o`/Fig dist/Fig-linux
-
-      # 构建 Windows release
+      # Windows cross-build
       - xmake f -m release --plat=windows --arch=x86_64 --cc=x86_64-w64-mingw32-g++ --cxx=x86_64-w64-mingw32-g++
       - xmake -v
       - cp `xmake u -o`/Fig.exe dist/Fig-windows.exe
 
-  - name: gitea-release
+  - name: upload-release
     image: "ubuntu:24.04"
-    volumes:
-      - type: cache
-        name: apt-cache
-        path: /var/cache/apt
-    when:
-      event: tag
     environment:
       GITEA_TOKEN:
         from_secret: GITEA_TOKEN
-      GITEA_REPO: "PuqiAR/Fig"
-      GITEA_URL: "https://git.fig-lang.cn"
+    when:
+      event: tag
     commands:
-      - TAG_NAME=${DRONE_TAG}
-      - echo "Uploading Fig binaries for tag $TAG_NAME to Gitea"
-      # Linux binary
+      - TAG=${DRONE_TAG}
       - |
-        curl -X POST -H "Authorization: token $GITEA_TOKEN" \
-        -F "name=Fig-linux" \
-        -F "label=Fig Linux binary" \
-        -F "file=@dist/Fig-linux" \
-        "$GITEA_URL/api/v1/repos/$GITEA_REPO/releases/$TAG_NAME/assets"
-      # Windows binary
+        curl -X POST -H "Authorization: token ${GITEA_TOKEN}" \
+        -F "name=Fig-linux" -F "file=@dist/Fig-linux" \
+        "https://git.fig-lang.cn/api/v1/repos/PuqiAR/Fig/releases/${TAG}/assets"
       - |
-        curl -X POST -H "Authorization: token $GITEA_TOKEN" \
-        -F "name=Fig-windows.exe" \
-        -F "label=Fig Windows binary" \
-        -F "file=@dist/Fig-windows.exe" \
-        "$GITEA_URL/api/v1/repos/$GITEA_REPO/releases/$TAG_NAME/assets"
+        curl -X POST -H "Authorization: token ${GITEA_TOKEN}" \
+        -F "name=Fig-windows.exe" -F "file=@dist/Fig-windows.exe" \
+        "https://git.fig-lang.cn/api/v1/repos/PuqiAR/Fig/releases/${TAG}/assets"
