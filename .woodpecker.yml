@@ -1,11 +1,12 @@
 steps:
   - name: build-cross
     image: "ubuntu:24.04"
+    when:
+      event:
+        - push
+        - tag
     environment:
-      # 如果你想加任何环境变量可以在这里，不留空
       SHELL: "/bin/bash"
-    volumes:
-      - "/var/cache/apt:/var/cache/apt"
     commands:
       - cp /etc/apt/sources.list /etc/apt/sources.list.backup
       - |
@@ -19,25 +20,25 @@ steps:
       - apt-get install -y curl git build-essential clang llvm mingw-w64 ninja-build jq
       - curl -fsSL https://xmake.io/shget.text | bash
       - export PATH=$PATH:/root/.xmake/bin
-      # Linux build
       - xmake f -m release
       - xmake -v
       - mkdir -p dist
       - cp `xmake u -o`/Fig dist/Fig-linux
-      # Windows cross-build
       - xmake f -m release --plat=windows --arch=x86_64 --cc=x86_64-w64-mingw32-g++ --cxx=x86_64-w64-mingw32-g++
       - xmake -v
       - cp `xmake u -o`/Fig.exe dist/Fig-windows.exe
 
-  - name: upload-release
+  - name: gitea-release
     image: "ubuntu:24.04"
+    when:
+      event:
+        - tag
     environment:
       GITEA_TOKEN:
         from_secret: GITEA_TOKEN
-    when:
-      event: tag
     commands:
       - TAG=${DRONE_TAG}
+      - echo "Uploading Fig binaries for tag $TAG to Gitea"
       - |
         curl -X POST -H "Authorization: token ${GITEA_TOKEN}" \
         -F "name=Fig-linux" -F "file=@dist/Fig-linux" \
