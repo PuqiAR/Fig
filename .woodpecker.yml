@@ -3,7 +3,8 @@
 # 国内源 + apt cache
 
 volumes:
-  - name: apt-cache
+  - type: cache
+    name: apt-cache
     path: /var/cache/apt
 
 steps:
@@ -24,7 +25,6 @@ steps:
         deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-backports main restricted universe multiverse
         EOF
 
-      # 安装依赖
       - apt-get update -y
       - apt-get install -y curl git build-essential clang llvm mingw-w64 ninja-build jq
 
@@ -38,7 +38,7 @@ steps:
       - mkdir -p dist
       - cp `xmake u -o`/Fig dist/Fig-linux
 
-      # 构建 Windows release (cross compile)
+      # 构建 Windows release
       - xmake f -m release --plat=windows --arch=x86_64 --cc=x86_64-w64-mingw32-g++ --cxx=x86_64-w64-mingw32-g++
       - xmake -v
       - cp `xmake u -o`/Fig.exe dist/Fig-windows.exe
