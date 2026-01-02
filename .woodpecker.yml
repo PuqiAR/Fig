@@ -1,5 +1,6 @@
 pipeline:
-  test:
+  build:
     image: alpine
     commands:
-      - echo "Fig Build OK!"
+      - echo "Fig CI Test!"
+      - uname -a
