@@ -1,0 +1,333 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # 允许手动触发
+
+env:
+  PROJECT_NAME: "myapp"
+  
+jobs:
+  version-info:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      git_commit: ${{ steps.get_git_info.outputs.commit }}
+      git_tag: ${{ steps.get_git_info.outputs.tag }}
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # 获取完整的git历史，用于标签检测
+        
+    - name: Get Git info
+      id: get_git_info
+      run: |
+        echo "commit=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        if git describe --tags --exact-match HEAD 2>/dev/null; then
+          TAG=$(git describe --tags --exact-match HEAD)
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+        else
+          echo "tag=unknown" >> $GITHUB_OUTPUT
+          echo "version=0.0.0-dev+$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Display version info
+      run: |
+        echo "Version: ${{ steps.get_git_info.outputs.version }}"
+        echo "Git Commit: ${{ steps.get_git_info.outputs.commit }}"
+        echo "Git Tag: ${{ steps.get_git_info.outputs.tag }}"
+
+  build-linux:
+    needs: version-info
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+        build_type: [release, debug]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install xmake
+      run: |
+        curl -fsSL https://xmake.io/shget.text | bash
+        echo "$HOME/.xmake/bin" >> $GITHUB_PATH
+        
+    - name: Build for Linux
+      run: |
+        # 更新版本号
+        if [[ "${{ needs.version-info.outputs.version }}" != "0.0.0-dev"* ]]; then
+          sed -i "s/set_version(\"[^\"]*\")/set_version(\"${{ needs.version-info.outputs.version }}\")/" xmake.lua
+        fi
+        
+        # 配置并构建
+        xmake f -p linux -a ${{ matrix.arch }} --mode=${{ matrix.build_type }}
+        xmake build -v
+        
+        # 显示构建信息
+        xmake show
+      
+    - name: Run tests (if any)
+      run: |
+        if xmake -q test 2>/dev/null; then
+          xmake test
+        fi
+        
+    - name: Package Linux binaries
+      run: |
+        mkdir -p artifacts/linux-${{ matrix.arch }}
+        
+        # 复制可执行文件
+        cp -r build/linux/${{ matrix.arch }}/${{ matrix.build_type }}/* artifacts/linux-${{ matrix.arch }}/ 2>/dev/null || true
+        
+        # 压缩
+        cd artifacts
+        tar -czf linux-${{ matrix.arch }}-${{ matrix.build_type }}.tar.gz linux-${{ matrix.arch }}/
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: linux-${{ matrix.arch }}-${{ matrix.build_type }}
+        path: artifacts/linux-${{ matrix.arch }}-${{ matrix.build_type }}.tar.gz
+
+  build-windows:
+    needs: version-info
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: [x64, x86]
+        build_type: [release, debug]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install xmake
+      run: |
+        Invoke-WebRequest https://xmake.io/psget.text -UseBasicParsing | Invoke-Expression
+        echo "$env:USERPROFILE\.xmake\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+        
+    - name: Build for Windows
+      run: |
+        # 更新版本号
+        if ("${{ needs.version-info.outputs.version }}" -notmatch "^0\.0\.0-dev") {
+          $content = Get-Content xmake.lua -Raw
+          $content = $content -replace 'set_version\("[^"]*"\)', "set_version(`"${{ needs.version-info.outputs.version }}`")"
+          $content | Set-Content xmake.lua
+        }
+        
+        # 配置并构建
+        xmake f -p windows -a ${{ matrix.arch }} --mode=${{ matrix.build_type }}
+        xmake build -v
+        
+    - name: Package Windows binaries
+      run: |
+        New-Item -ItemType Directory -Force -Path artifacts\windows-${{ matrix.arch }}
+        
+        # 复制可执行文件
+        Copy-Item -Path "build\windows\${{ matrix.arch }}\${{ matrix.build_type }}\*.exe" -Destination "artifacts\windows-${{ matrix.arch }}\" -ErrorAction SilentlyContinue
+        Copy-Item -Path "build\windows\${{ matrix.arch }}\${{ matrix.build_type }}\*.dll" -Destination "artifacts\windows-${{ matrix.arch }}\" -ErrorAction SilentlyContinue
+        
+        # 压缩
+        Compress-Archive -Path "artifacts\windows-${{ matrix.arch }}\*" -DestinationPath "artifacts\windows-${{ matrix.arch }}-${{ matrix.build_type }}.zip"
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: windows-${{ matrix.arch }}-${{ matrix.build_type }}
+        path: artifacts/windows-${{ matrix.arch }}-${{ matrix.build_type }}.zip
+
+  build-macos:
+    needs: version-info
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x86_64, arm64]
+        build_type: [release, debug]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install xmake
+      run: |
+        curl -fsSL https://xmake.io/shget.text | bash
+        echo "$HOME/.xmake/bin" >> $GITHUB_PATH
+        
+    - name: Build for macOS
+      run: |
+        # 更新版本号
+        if [[ "${{ needs.version-info.outputs.version }}" != "0.0.0-dev"* ]]; then
+          sed -i "s/set_version(\"[^\"]*\")/set_version(\"${{ needs.version-info.outputs.version }}\")/" xmake.lua
+        fi
+        
+        # 配置并构建
+        xmake f -p macosx -a ${{ matrix.arch }} --mode=${{ matrix.build_type }}
+        xmake build -v
+        
+    - name: Package macOS binaries
+      run: |
+        mkdir -p artifacts/macos-${{ matrix.arch }}
+        
+        # 复制可执行文件
+        cp -r build/macosx/${{ matrix.arch }}/${{ matrix.build_type }}/* artifacts/macos-${{ matrix.arch }}/ 2>/dev/null || true
+        
+        # 创建.app包（如果需要）
+        if [ -f "artifacts/macos-${{ matrix.arch }}/${{ env.PROJECT_NAME }}" ]; then
+          mkdir -p "artifacts/macos-${{ matrix.arch }}/${{ env.PROJECT_NAME }}.app/Contents/MacOS"
+          cp "artifacts/macos-${{ matrix.arch }}/${{ env.PROJECT_NAME }}" "artifacts/macos-${{ matrix.arch }}/${{ env.PROJECT_NAME }}.app/Contents/MacOS/"
+        fi
+        
+        # 压缩
+        cd artifacts
+        tar -czf macos-${{ matrix.arch }}-${{ matrix.build_type }}.tar.gz macos-${{ matrix.arch }}/
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: macos-${{ matrix.arch }}-${{ matrix.build_type }}
+        path: artifacts/macos-${{ matrix.arch }}-${{ matrix.build_type }}.tar.gz
+
+  build-cross-platform:
+    needs: version-info
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [mingw, android, ios]  # 交叉编译目标
+        
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install xmake and toolchains
+      run: |
+        curl -fsSL https://xmake.io/shget.text | bash
+        echo "$HOME/.xmake/bin" >> $GITHUB_PATH
+        
+        # 安装交叉编译工具链
+        if [ "${{ matrix.target }}" = "mingw" ]; then
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-x86-64 g++-mingw-w64-i686
+        elif [ "${{ matrix.target }}" = "android" ]; then
+          xmake repo --add third-party https://github.com/xmake-io/xmake-repo.git
+        fi
+        
+    - name: Build for ${{ matrix.target }}
+      run: |
+        # 更新版本号
+        if [[ "${{ needs.version-info.outputs.version }}" != "0.0.0-dev"* ]]; then
+          sed -i "s/set_version(\"[^\"]*\")/set_version(\"${{ needs.version-info.outputs.version }}\")/" xmake.lua
+        fi
+        
+        # 根据目标平台配置
+        case "${{ matrix.target }}" in
+          mingw)
+            xmake f -p mingw -a x86_64 --mode=release
+            ;;
+          android)
+            xmake f -p android --ndk=~/android-ndk-r23b --mode=release
+            ;;
+          ios)
+            xmake f -p iphoneos --mode=release
+            ;;
+        esac
+        
+        xmake build -v
+        
+    - name: Package cross-platform binaries
+      run: |
+        mkdir -p artifacts/${{ matrix.target }}
+        
+        # 复制构建结果
+        case "${{ matrix.target }}" in
+          mingw)
+            cp -r build/mingw/x86_64/release/* artifacts/${{ matrix.target }}/ 2>/dev/null || true
+            ;;
+          android)
+            cp -r build/android/arm64-v8a/release/*.apk artifacts/${{ matrix.target }}/ 2>/dev/null || true
+            ;;
+          ios)
+            cp -r build/iphoneos/arm64/release/*.ipa artifacts/${{ matrix.target }}/ 2>/dev/null || true
+            ;;
+        esac
+        
+        # 压缩
+        cd artifacts
+        tar -czf ${{ matrix.target }}-release.tar.gz ${{ matrix.target }}/
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.target }}-release
+        path: artifacts/${{ matrix.target }}-release.tar.gz
+
+  create-release:
+    needs: [version-info, build-linux, build-windows, build-macos]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        release_name: Release ${{ github.ref_name }}
+        body: |
+          # Release ${{ github.ref_name }}
+          
+          ## Build Info
+          - Version: ${{ needs.version-info.outputs.version }}
+          - Git Commit: ${{ needs.version-info.outputs.git_commit }}
+          - Build Date: ${{ env.BUILD_DATE }}
+          
+          ## Downloads
+          Below are the binaries for different platforms:
+          
+          ### Linux
+          - x86_64 Release
+          - x86_64 Debug
+          - ARM64 Release
+          - ARM64 Debug
+          
+          ### Windows
+          - x64 Release
+          - x64 Debug
+          - x86 Release
+          - x86 Debug
+          
+          ### macOS
+          - x86_64 Release
+          - x86_64 Debug
+          - ARM64 Release
+          - ARM64 Debug
+          
+        draft: false
+        prerelease: false
+        files: |
+          linux-*/
+          windows-*/
+          macos-*/
+          mingw-*/
+          
+    - name: Generate SHA256 checksums
+      run: |
+        # 为所有发布文件生成校验和
+        find . -name "*.tar.gz" -o -name "*.zip" | while read file; do
+          sha256sum "$file" > "$file.sha256"
+        done
+        
+        # 上传校验和文件到发布
+        gh release upload ${{ github.ref_name }} *.sha256 \
+          --clobber \
+          --repo ${{ github.repository }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
