@@ -2,79 +2,60 @@ name: Release Build
 on:
   push:
     tags: ['v*']
-  workflow_dispatch:
-    inputs:
-      version:
-        description: '版本号'
-        required: true
 
-# 直接在步骤中计算版本号
 jobs:
-  linux-x64:
+  build:
     runs-on: ubuntu
     steps:
-      # 步骤 1: 检出代码（使用 Gitea 地址）
       - name: Checkout
         run: |
-          REPO_URL="https://git.fig-lang.cn/$GITEA_REPOSITORY"
-          echo "Cloning from: $REPO_URL"
-          git clone $REPO_URL .
-          if [ -n "$GITHUB_REF" ]; then
-            git checkout $GITHUB_SHA
-          fi
+          git clone https://git.fig-lang.cn/${{ github.repository }} .
+          git checkout ${{ github.sha }}
           
-      # 步骤 2: 确定版本号
-      - name: Set Version
+      - name: Get Version
         run: |
-          if [ -n "${{ inputs.version }}" ]; then
-            VERSION="${{ inputs.version }}"
-          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            VERSION="${GITHUB_REF#refs/tags/}"
-          else
-            VERSION="dev-$(date +%Y%m%d-%H%M%S)"
-          fi
+          VERSION=${GITHUB_REF#refs/tags/}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           
-      # 步骤 3: 安装 xmake
       - name: Install xmake
         run: |
-          curl --retry 3 --retry-delay 5 -fsSL https://xmake.io/shget.text | bash
+          curl -fsSL https://xmake.io/shget.text | bash
           echo "$HOME/.local/bin" >> $GITHUB_PATH
           
-      # 步骤 4: 构建
       - name: Build
         run: |
           xmake f -p linux -a x86_64 -m release
           xmake -j$(nproc)
           
-      # 步骤 5: 打包
       - name: Package
         run: |
           mkdir -p Fig-${{ env.VERSION }}-linux-x86_64
           cp build/linux/x86_64/release/Fig Fig-${{ env.VERSION }}-linux-x86_64/
-          if [ -d "src/Module/Library" ]; then
-            cp -r src/Module/Library Fig-${{ env.VERSION }}-linux-x86_64/
-          fi
+          cp -r src/Module/Library Fig-${{ env.VERSION }}-linux-x86_64/
           tar -czf Fig-${{ env.VERSION }}-linux-x86_64.tar.gz Fig-${{ env.VERSION }}-linux-x86_64
+          sha256sum Fig-${{ env.VERSION }}-linux-x86_64.tar.gz > checksum.txt
           
-      # 步骤 6: 生成校验和
-      - name: Create Checksum
+      - name: Upload to Release
+        env:
+          TOKEN: ${{ secrets.CI_TOKEN }}
         run: |
-          sha256sum Fig-${{ env.VERSION }}-linux-x86_64.tar.gz > Fig-${{ env.VERSION }}-linux-x86_64.sha256
-          
-      # 步骤 7: 上传到 Gitea Packages
-      - name: Upload to Gitea
-        run: |
+          # 创建 Release
           curl -X POST \
-            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Authorization: token $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"tag_name\":\"${{ env.VERSION }}\",\"name\":\"Fig ${{ env.VERSION }}\"}" \
+            https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}/releases || true
+          
+          # 上传文件
+          curl -X POST \
+            -H "Authorization: token $TOKEN" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @Fig-${{ env.VERSION }}-linux-x86_64.tar.gz \
-            "https://git.fig-lang.cn/api/packages/$GITEA_REPOSITORY_OWNER/generic/fig-releases/${{ env.VERSION }}/Fig-${{ env.VERSION }}-linux-x86_64.tar.gz"
+            "https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}/releases/${{ env.VERSION }}/assets?name=Fig-${{ env.VERSION }}-linux-x86_64.tar.gz"
             
+          # 上传校验和
           curl -X POST \
-            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Authorization: token $TOKEN" \
             -H "Content-Type: text/plain" \
-            --data-binary @Fig-${{ env.VERSION }}-linux-x86_64.sha256 \
-            "https://git.fig-lang.cn/api/packages/$GITEA_REPOSITORY_OWNER/generic/fig-releases/${{ env.VERSION }}/Fig-${{ env.VERSION }}-linux-x86_64.sha256"
-        env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+            --data-binary @checksum.txt \
+            "https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}/releases/${{ env.VERSION }}/assets?name=Fig-${{ env.VERSION }}-linux-x86_64.sha256"
