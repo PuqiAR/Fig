@@ -1,173 +1,80 @@
 name: Release Build
 on:
   push:
-    tags: ["v*"]
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       version:
-        description: "版本号 (如: 1.0.0)"
+        description: '版本号'
         required: true
-        default: "dev"
 
-env:
-  VERSION: ${{ github.event.inputs.version || github.ref_name }}
-
+# 直接在步骤中计算版本号
 jobs:
   linux-x64:
     runs-on: ubuntu
     steps:
+      # 步骤 1: 检出代码（使用 Gitea 地址）
       - name: Checkout
-        uses: actions/checkout@v3
-
+        run: |
+          REPO_URL="https://git.fig-lang.cn/$GITEA_REPOSITORY"
+          echo "Cloning from: $REPO_URL"
+          git clone $REPO_URL .
+          if [ -n "$GITHUB_REF" ]; then
+            git checkout $GITHUB_SHA
+          fi
+          
+      # 步骤 2: 确定版本号
+      - name: Set Version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            VERSION="dev-$(date +%Y%m%d-%H%M%S)"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          
+      # 步骤 3: 安装 xmake
       - name: Install xmake
         run: |
-          curl -fsSL https://xmake.io/shget.text | bash
+          curl --retry 3 --retry-delay 5 -fsSL https://xmake.io/shget.text | bash
           echo "$HOME/.local/bin" >> $GITHUB_PATH
-
+          
+      # 步骤 4: 构建
       - name: Build
         run: |
           xmake f -p linux -a x86_64 -m release
           xmake -j$(nproc)
-
+          
+      # 步骤 5: 打包
       - name: Package
         run: |
           mkdir -p Fig-${{ env.VERSION }}-linux-x86_64
           cp build/linux/x86_64/release/Fig Fig-${{ env.VERSION }}-linux-x86_64/
-          cp -r src/Module/Library Fig-${{ env.VERSION }}-linux-x86_64/
+          if [ -d "src/Module/Library" ]; then
+            cp -r src/Module/Library Fig-${{ env.VERSION }}-linux-x86_64/
+          fi
           tar -czf Fig-${{ env.VERSION }}-linux-x86_64.tar.gz Fig-${{ env.VERSION }}-linux-x86_64
-
+          
+      # 步骤 6: 生成校验和
       - name: Create Checksum
         run: |
-          sha256sum Fig-${{ env.VERSION }}-linux-x86_64.tar.gz > sha256sum.txt
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: Fig-${{ env.VERSION }}-linux-x86_64
-          path: |
-            Fig-${{ env.VERSION }}-linux-x86_64.tar.gz
-            sha256sum.txt
-
-  linux-arm64:
-    runs-on: ubuntu
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Install xmake and cross compiler
+          sha256sum Fig-${{ env.VERSION }}-linux-x86_64.tar.gz > Fig-${{ env.VERSION }}-linux-x86_64.sha256
+          
+      # 步骤 7: 上传到 Gitea Packages
+      - name: Upload to Gitea
         run: |
-          curl -fsSL https://xmake.io/shget.text | bash
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-
-      - name: Build
-        run: |
-          xmake f -p linux -a arm64 -m release --toolchain=/usr/bin/aarch64-linux-gnu
-          xmake -j$(nproc)
-
-      - name: Package
-        run: |
-          mkdir -p Fig-${{ env.VERSION }}-linux-arm64
-          cp build/linux/arm64/release/Fig Fig-${{ env.VERSION }}-linux-arm64/
-          cp -r src/Module/Library Fig-${{ env.VERSION }}-linux-arm64/
-          tar -czf Fig-${{ env.VERSION }}-linux-arm64.tar.gz Fig-${{ env.VERSION }}-linux-arm64
-
-      - name: Create Checksum
-        run: |
-          sha256sum Fig-${{ env.VERSION }}-linux-arm64.tar.gz > sha256sum.txt
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: Fig-${{ env.VERSION }}-linux-arm64
-          path: |
-            Fig-${{ env.VERSION }}-linux-arm64.tar.gz
-            sha256sum.txt
-
-  windows-x64:
-    runs-on: ubuntu
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Install xmake and mingw
-        run: |
-          curl -fsSL https://xmake.io/shget.text | bash
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-          sudo apt-get update
-          sudo apt-get install -y mingw-w64
-
-      - name: Build
-        run: |
-          xmake f -p mingw -a x86_64 -m release
-          xmake -j$(nproc)
-
-      - name: Package
-        run: |
-          mkdir -p Fig-${{ env.VERSION }}-windows-x86_64
-          cp build/mingw/x86_64/release/Fig.exe Fig-${{ env.VERSION }}-windows-x86_64/
-          cp -r src/Module/Library Fig-${{ env.VERSION }}-windows-x86_64/
-          zip -r Fig-${{ env.VERSION }}-windows-x86_64.zip Fig-${{ env.VERSION }}-windows-x86_64
-
-      - name: Create Checksum
-        run: |
-          sha256sum Fig-${{ env.VERSION }}-windows-x86_64.zip > sha256sum.txt
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: Fig-${{ env.VERSION }}-windows-x86_64
-          path: |
-            Fig-${{ env.VERSION }}-windows-x86_64.zip
-            sha256sum.txt
-
-  create-release:
-    needs: [linux-x64, linux-arm64, windows-x64]
-    runs-on: ubuntu
-    if: startsWith(github.ref, 'refs/tags/')
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v3
-
-      - name: Combine checksums
-        run: |
-          cat */sha256sum.txt > all-checksums.txt
-          echo "=== SHA256 Checksums ===" > checksums.txt
-          cat all-checksums.txt >> checksums.txt
-          echo "" >> checksums.txt
-          echo "Generated at: $(date)" >> checksums.txt
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-
-      - name: Upload Release Assets
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          for file in Fig-${{ env.VERSION }}-*.tar.gz Fig-${{ env.VERSION }}-*.zip; do
-            if [ -f "$file" ]; then
-              echo "Uploading $file"
-              curl -X POST \
-                -H "Authorization: token $GITHUB_TOKEN" \
-                -H "Content-Type: application/octet-stream" \
-                --data-binary @"$file" \
-                "https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}/releases/${{ github.ref_name }}/assets?name=$(basename $file)"
-            fi
-          done
-
-          # 上传 checksums.txt
           curl -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @Fig-${{ env.VERSION }}-linux-x86_64.tar.gz \
+            "https://git.fig-lang.cn/api/packages/$GITEA_REPOSITORY_OWNER/generic/fig-releases/${{ env.VERSION }}/Fig-${{ env.VERSION }}-linux-x86_64.tar.gz"
+            
+          curl -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: text/plain" \
-            --data-binary @checksums.txt \
-            "https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}/releases/${{ github.ref_name }}/assets?name=checksums.txt"
+            --data-binary @Fig-${{ env.VERSION }}-linux-x86_64.sha256 \
+            "https://git.fig-lang.cn/api/packages/$GITEA_REPOSITORY_OWNER/generic/fig-releases/${{ env.VERSION }}/Fig-${{ env.VERSION }}-linux-x86_64.sha256"
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
