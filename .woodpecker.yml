@@ -8,6 +8,10 @@ steps:
     environment:
       SHELL: "/bin/bash"
     commands:
+      # 安装 git
+      - apt-get update -y
+      - apt-get install -y git
+
       # Linux release build
       - xmake f -m release
       - xmake -v
