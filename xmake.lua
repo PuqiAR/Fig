@@ -13,6 +13,11 @@ target("Fig")
         add_ldflags("-stdlib=libc++")
     elseif is_plat("windows") then
         set_toolchains("mingw")
+        add_cxxflags("-stdlib=libc++")
+        add_ldflags("-static")
+    elseif is_plat("mingw") then
+        set_toolchains("mingw")
+        add_cxxflags("-static")
         add_ldflags("-static")
     end
     
