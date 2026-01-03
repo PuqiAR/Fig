@@ -1,24 +1,16 @@
-FROM ubuntu:22.04
+FROM ubuntu:24.04  # 改用 Ubuntu 24.04，自带 GCC 13
 
 # 设置非root用户
 RUN useradd -m -s /bin/bash builder
 
-# 1. 添加包含 GCC 13 的软件源并安装
+# 1. 安装基础工具（Ubuntu 24.04 已有 GCC 13）
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends software-properties-common && \
-    add-apt-repository -y ppa:ubuntu-toolchain-r/test && \
-    apt-get update && \
     apt-get install -y --no-install-recommends \
         wget tar git curl ca-certificates \
         build-essential \
-        gcc-13 g++-13 \
         && rm -rf /var/lib/apt/lists/*
 
-# 2. 设置 GCC 13 为默认编译器
-RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 && \
-    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
-
-# 3. 切换到builder用户安装xmake
+# 2. 切换到builder用户安装xmake
 USER builder
 WORKDIR /home/builder
 
@@ -31,7 +23,7 @@ USER root
 RUN cp /home/builder/xmake /usr/local/bin/xmake && \
     chmod +x /usr/local/bin/xmake
 
-# 4. 验证编译器版本
+# 3. 验证编译器版本
 RUN gcc --version && g++ --version
 
 USER builder
