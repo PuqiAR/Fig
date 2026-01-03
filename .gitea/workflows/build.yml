@@ -1,11 +1,11 @@
 name: Release Build
 on:
   push:
-    tags: ['*']  # 匹配所有 tag
+    tags: ['*']
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 (如: v1.0.0, 1.0.0, release-v1.0)'
+        description: '版本号'
         required: true
 
 jobs:
@@ -14,24 +14,28 @@ jobs:
     steps:
       - name: Checkout
         run: |
+          apt-get update && apt-get install -y git curl
           git clone https://git.fig-lang.cn/${{ github.repository }} .
           git checkout ${{ github.ref }}
           
+      - name: Install Dependencies
+        run: |
+          apt-get update
+          apt-get install -y curl wget gcc g++ make build-essential
+          
+      - name: Install xmake
+        run: |
+          curl -fsSL https://xmake.io/shget.text | bash
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          
       - name: Get Version
         run: |
-          # 从 tag 名获取版本，或使用手动输入
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ inputs.version }}"
           else
             VERSION="${GITHUB_REF#refs/tags/}"
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "Building version: $VERSION"
-          
-      - name: Install xmake
-        run: |
-          curl -fsSL https://xmake.io/shget.text | bash
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
           
       - name: Build
         run: |
@@ -40,6 +44,7 @@ jobs:
           
       - name: Package
         run: |
+          apt-get install -y zip
           mkdir -p Fig-${{ env.VERSION }}-linux-x86_64
           cp build/linux/x86_64/release/Fig Fig-${{ env.VERSION }}-linux-x86_64/
           cp -r src/Module/Library Fig-${{ env.VERSION }}-linux-x86_64/
@@ -50,21 +55,19 @@ jobs:
         env:
           TOKEN: ${{ secrets.CI_TOKEN }}
         run: |
-          # 创建或更新 Release
+          apt-get install -y curl
           curl -X POST \
             -H "Authorization: token $TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"tag_name\":\"${{ env.VERSION }}\",\"name\":\"Fig ${{ env.VERSION }}\",\"prerelease\":false}" \
-            https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}/releases || echo "Release may already exist"
+            -d "{\"tag_name\":\"${{ env.VERSION }}\",\"name\":\"Fig ${{ env.VERSION }}\"}" \
+            https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}/releases || true
           
-          # 上传文件
           curl -X POST \
             -H "Authorization: token $TOKEN" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @Fig-${{ env.VERSION }}-linux-x86_64.tar.gz \
             "https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}/releases/${{ env.VERSION }}/assets?name=Fig-${{ env.VERSION }}-linux-x86_64.tar.gz"
             
-          # 上传校验和
           curl -X POST \
             -H "Authorization: token $TOKEN" \
             -H "Content-Type: text/plain" \
