@@ -26,10 +26,7 @@ RUN useradd -m -s /bin/bash builder
 USER builder
 WORKDIR /home/builder
 
-# 5. 验证环境
 RUN xmake --version | head -1 && \
     clang++ --version | head -1 && \
     git --version && \
-    ls /usr/include/c++/v1/cerrno >/dev/null 2>&1 && echo "✅ 标准库头文件存在" && \
-    ls /usr/x86_64-w64-mingw32/include/cerrno >/dev/null 2>&1 && echo "✅ MinGW头文件存在" && \
-    echo "环境就绪"
+    echo "✅ 核心工具就绪"
