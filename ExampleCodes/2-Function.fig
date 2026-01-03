@@ -1,10 +1,11 @@
+import std.io;
+
 func greeting(name:String) -> String
 {
     return "Hello " + name + "!";
 }
 
-const print := __fstdout_println; // link to std out
-print(greeting("Fig"));
+io.println(greeting("Fig"));
 
 func adder(x)
 {
@@ -12,4 +13,4 @@ func adder(x)
 }
 
 const add2 = adder(2);
-print(add2(3));
+io.println(add2(3));

@@ -46,9 +46,26 @@ jobs:
           xmake build -j$(nproc)
           echo "Linux构建成功。"
 
+      # 🔧 新增：构建Linux平台安装器
+      - name: 构建Linux安装器
+        run: |
+          echo "开始构建Linux安装器..."
+          cd Installer/ConsoleInstaller
+          # 确保pip已安装
+          if ! command -v pip3 &> /dev/null; then
+            echo "安装pip3..."
+            apt-get update && apt-get install -y python3-pip
+          fi
+          # 安装依赖并构建
+          pip3 install --upgrade pip
+          pip3 install -r requirements.txt
+          python3 -m PyInstaller -F -n fig-setup --distpath ./dist/linux main.py
+          echo "Linux安装器构建完成"
+
       - name: 打包Linux发布文件
         run: |
-          PACKAGE_NAME="Fig-${{ env.VERSION }}-linux-x86_64"
+          VERSION="${{ env.VERSION }}"
+          PACKAGE_NAME="Fig-${VERSION}-linux-x86_64"
           mkdir -p "${PACKAGE_NAME}"
           cp build/linux/x86_64/release/Fig "${PACKAGE_NAME}/"
           if [ -d "src/Module/Library" ]; then
@@ -88,6 +105,7 @@ jobs:
           
           echo "使用发布 ID: $RELEASE_ID 进行上传"
           
+          # 上传语言包
           curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @Fig-$VERSION-linux-x86_64.tar.gz \
@@ -97,6 +115,15 @@ jobs:
             -H "Content-Type: text/plain" \
             --data-binary @Fig-$VERSION-linux-x86_64.sha256 \
             "$API/releases/$RELEASE_ID/assets?name=Fig-$VERSION-linux-x86_64.sha256"
+          
+          # 🔧 新增：上传Linux安装器
+          if [ -f "Installer/ConsoleInstaller/dist/linux/fig-setup" ]; then
+            echo "正在上传Linux安装器..."
+            curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary @Installer/ConsoleInstaller/dist/linux/fig-setup \
+              "$API/releases/$RELEASE_ID/assets?name=fig-setup"
+          fi
           
           echo "✅ Linux版本发布完成！"
 
@@ -142,6 +169,16 @@ jobs:
           xmake f -p windows -a x86_64 -m release -y
           xmake build -j $env:NUMBER_OF_PROCESSORS
           Write-Host 'Windows构建成功。'
+
+      # 🔧 新增：构建Windows平台安装器
+      - name: 构建Windows安装器
+        run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          Write-Host "开始构建Windows安装器..."
+          cd Installer\ConsoleInstaller
+          pip install -r requirements.txt
+          pyinstaller -F -i logo.ico -n FigSetup --distpath .\dist\windows main.py
+          Write-Host "Windows安装器构建完成"
 
       - name: 打包Windows发布文件
         run: |
@@ -203,8 +240,6 @@ jobs:
           $API = "https://git.fig-lang.cn/api/v1/repos/$REPO"
           $TOKEN = $env:GITEA_TOKEN
           
-          $TOKEN = $env:GITEA_TOKEN
-          
           Write-Host "正在上传Windows版本到发布 $VERSION ..."
           
           # 1. 尝试通过标签获取 Release ID
@@ -232,5 +267,16 @@ jobs:
           
           Write-Host '正在上传校验文件...'
           Invoke-RestMethod -Method Post -Uri "$API/releases/$RELEASE_ID/assets?name=Fig-$VERSION-windows-x86_64.sha256" -Headers @{Authorization = "token $TOKEN"; 'Content-Type' = 'text/plain' } -InFile "Fig-$VERSION-windows-x86_64.sha256"
+          
+          # 🔧 新增：上传Windows安装器
+          $InstallerPath = "Installer\ConsoleInstaller\dist\windows\FigSetup.exe"
+          if (Test-Path $InstallerPath) {
+              Write-Host '正在上传Windows安装器...'
+              Invoke-RestMethod -Method Post -Uri "$API/releases/$RELEASE_ID/assets?name=FigSetup.exe" `
+                -Headers @{
+                  Authorization = "token $TOKEN"
+                  'Content-Type' = 'application/octet-stream'
+                } -InFile $InstallerPath
+          }
           
           Write-Host '✅ Windows版本发布完成！'

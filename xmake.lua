@@ -7,6 +7,8 @@ target("Fig")
     set_kind("binary")
     set_languages("c++23")
 
+
+    add_ldflags("-static", {force = true})
     if is_plat("linux") then
         -- Linux: clang + libc++
         set_toolchains("clang")

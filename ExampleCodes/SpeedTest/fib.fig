@@ -1,3 +1,5 @@
+import std.io;
+
 func fib(x:Int) -> Int
 {
     if (x <= 1)
@@ -8,4 +10,4 @@ func fib(x:Int) -> Int
 }
 
 var result := fib(25);
-__fstdout_println("result: ", result);
+io.println("result: ", result);
