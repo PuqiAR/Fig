@@ -153,17 +153,6 @@ jobs:
           echo "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "Windows构建版本: $VERSION"
 
-      - name: 安装 xmake (Windows，可选)
-        run: |
-          # 如果工具链验证步骤发现没有 xmake，再执行安装
-          if (-not (Get-Command xmake -ErrorAction SilentlyContinue)) {
-            echo "正在安装 xmake..."
-            curl -fsSL https://xmake.io/shget.text -o xmake.ps1
-            powershell -ExecutionPolicy Bypass -File xmake.ps1
-          } else {
-            echo "xmake 已安装，跳过安装步骤。"
-          }
-
       - name: 构建项目 (Windows Native)
         run: |
           xmake f -p windows -a x86_64 -m release -y
