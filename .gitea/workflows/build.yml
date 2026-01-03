@@ -15,7 +15,14 @@ jobs:
       image: ubuntu:22.04
 
     steps:
-      # 1. 安装xmake（修复语法错误）
+      # 0. 先安装curl
+      - name: 准备环境
+        run: |
+          apt-get update
+          apt-get install -y curl
+          echo "环境准备完成"
+          
+      # 1. 安装xmake
       - name: 安装xmake
         run: |
           curl -fsSL https://xmake.io/shget.text -o install.sh
@@ -25,6 +32,7 @@ jobs:
       # 2. 检出代码
       - name: 检出代码
         run: |
+          apt-get install -y git
           git clone https://git.fig-lang.cn/${{ github.repository }} .
           git checkout ${{ github.ref }}
           
@@ -37,7 +45,6 @@ jobs:
             VERSION="${GITHUB_REF#refs/tags/}"
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "构建版本: $VERSION"
           
       # 4. 构建
       - name: 构建
@@ -67,18 +74,15 @@ jobs:
           API="https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}"
           
           curl -sS -X POST -H "Authorization: token $TOKEN" \
-            -H "Content-Type: application/json" \
             -d "{\"tag_name\":\"$VERSION\"}" \
             "$API/releases" 2>/dev/null || true
           
           curl -sS -X POST -H "Authorization: token $TOKEN" \
-            -H "Content-Type: application/octet-stream" \
             --data-binary @Fig-$VERSION-linux-x86_64.tar.gz \
             "$API/releases/$VERSION/assets?name=Fig-$VERSION-linux-x86_64.tar.gz"
           
           curl -sS -X POST -H "Authorization: token $TOKEN" \
-            -H "Content-Type: text/plain" \
             --data-binary @Fig-$VERSION-linux-x86_64.sha256 \
             "$API/releases/$VERSION/assets?name=Fig-$VERSION-linux-x86_64.sha256"
           
-          echo "✅ 发布完成！"
+          echo "✅ 完成！"
