@@ -139,8 +139,8 @@ jobs:
         run: |
           # 确保Git在PATH中
           $env:Path = "C:\Program Files\Git\cmd;$env:Path"
-          git clone https://git.fig-lang.cn/${{ github.repository }} .
-          git checkout ${{ github.ref }}
+          git clone https://git.fig-lang.cn/$env:GITHUB_REPOSITORY .
+          git checkout $env:GITHUB_REF
 
       - name: 设置版本
         run: |
@@ -154,12 +154,10 @@ jobs:
           Write-Host "引用名称: $RefName"
           
           if ($EventName -eq 'workflow_dispatch') {
-            # 手动触发：从输入获取版本
-            # Gitea 通常会把 inputs.xxx 转为 INPUT_XXX 环境变量
+            # 手动触发：尝试从多种可能的环境变量获取版本
             $VERSION = $env:INPUT_VERSION
             if (-not $VERSION) {
-              # 如果环境变量名不同，尝试其他常见名称
-              $VERSION = $env:VERSION
+              $VERSION = $env:VERSION_INPUT
               if (-not $VERSION) {
                 $VERSION = "dev-build"
               }
@@ -171,10 +169,11 @@ jobs:
           
           Write-Host "构建版本: $VERSION"
           echo "VERSION=$VERSION" >> $env:GITHUB_ENV
+
       - name: 构建项目 (Windows Native)
         run: |
           powershell -Command "
-            xmake f -p windows -p mingw -a x86_64 -m release -y
+            xmake f -p windows -a x86_64 -m release -y
             xmake build -j`$env:NUMBER_OF_PROCESSORS
             Write-Host 'Windows构建成功。'
           "
@@ -201,7 +200,8 @@ jobs:
               Copy-Item -Recurse 'src\Module\Library' `$PACKAGE_NAME\
             }
             Compress-Archive -Path `$PACKAGE_NAME -DestinationPath \"`$PACKAGE_NAME.zip\"
-            Get-FileHash \"`$PACKAGE_NAME.zip\" -Algorithm SHA256 | Out-File \"`$PACKAGE_NAME.sha256\" -Encoding UTF8
+            `$Hash = Get-FileHash \"`$PACKAGE_NAME.zip\" -Algorithm SHA256
+            \"`$(`$Hash.Hash)  `$PACKAGE_NAME.zip\" | Out-File \"`$PACKAGE_NAME.sha256\" -Encoding UTF8
             Write-Host \"Windows打包完成: `$PACKAGE_NAME.zip\"
           "
 
@@ -211,7 +211,8 @@ jobs:
         run: |
           powershell -Command "
             `$VERSION = `$env:VERSION
-            `$API = 'https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}'
+            `$REPO = `$env:GITHUB_REPOSITORY
+            `$API = \"https://git.fig-lang.cn/api/v1/repos/`$REPO\"
             
             Write-Host \"正在上传Windows版本到发布 `$VERSION ...\"
             
