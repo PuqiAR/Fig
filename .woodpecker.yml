@@ -1,64 +1,77 @@
 steps:
-  - name: build-cross
-    image: "ubuntu:24.04"
-    shell: /bin/bash   # 强制 bash，避免 dash 解析错误
-    when:
-      event:
-        - push
-        - tag
+
+  # -------------------------------
+  # Linux Build
+  # -------------------------------
+  - name: build-linux
+    image: ubuntu:24.04
+    shell: /bin/sh
     commands:
-      # 1️⃣ 国内源加速
-      - cp /etc/apt/sources.list /etc/apt/sources.list.backup
-      - |
-        cat <<EOF > /etc/apt/sources.list
-        deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs) main restricted universe multiverse
-        deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-updates main restricted universe multiverse
-        deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-security main restricted universe multiverse
-        deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-backports main restricted universe multiverse
-        EOF
+      # 安装依赖
       - apt-get update -y
-      - apt-get install -y curl git build-essential clang llvm mingw-w64 ninja-build jq
+      - apt-get install -y git build-essential curl
 
-      # 2️⃣ 下载并安装 xmake 到全局 PATH（稳定）
-      - curl -fsSL https://xmake.io/shget.text -o /tmp/xmake-get.sh
-      - chmod +x /tmp/xmake-get.sh
-      - bash /tmp/xmake-get.sh --install-to=/usr/local/bin
+      # 安装 xmake
+      - git clone --depth=1 https://github.com/xmake-io/xmake.git /tmp/xmake
+      - cd /tmp/xmake && make install PREFIX=/usr/local
+      - xmake --version
 
-      # 3️⃣ 获取真实版本号
-      - VERSION=$(git describe --tags --always --dirty)
+      # 构建项目
+      - cd /woodpecker/src
+      - xmake f -p linux -a x86_64 -m release -y
+      - xmake build -y
 
-      # 4️⃣ Linux 构建
-      - xmake f -m release
-      - xmake -v
-      - mkdir -p dist
-      - cp `xmake u -o`/Fig dist/Fig-${VERSION}-linux-x86_64
+      # 获取版本号
+      - VERSION=$(grep -R "__FCORE_VERSION" src/Core/core.hpp | sed -E 's/.*"(.+)".*/\1/')
 
-      # 5️⃣ Windows cross-build
-      - xmake f -m release --plat=windows --arch=x86_64 --cc=x86_64-w64-mingw32-g++ --cxx=x86_64-w64-mingw32-g++
-      - xmake -v
-      - cp `xmake u -o`/Fig.exe dist/Fig-${VERSION}-windows-x86_64.exe
+      # 生成文件名
+      - cp build/linux/x86_64/release/Fig Fig-${VERSION}-linux-x86_64
 
-  - name: gitea-release
-    image: "ubuntu:24.04"
-    shell: /bin/bash
-    when:
-      event:
-        - tag
-    environment:
-      GITEA_TOKEN:
-        from_secret: GITEA_TOKEN
+      # 上传到 Gitea Release
+      - |
+        if [ -n "$GITEA_TOKEN" ]; then
+          curl -X POST "https://git.fig-lang.cn/api/v1/repos/PuqiAR/Fig/releases" \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -F "tag_name=${VERSION}" \
+            -F "name=Fig-${VERSION}-linux-x86_64" \
+            -F "body=Linux x86_64 release" \
+            -F "assets=@Fig-${VERSION}-linux-x86_64"
+        fi
+
+  # -------------------------------
+  # Windows Build (cross compile)
+  # -------------------------------
+  - name: build-windows
+    image: ubuntu:24.04
+    shell: /bin/sh
     commands:
-      - TAG=$(git describe --tags --exact-match 2>/dev/null || echo ${DRONE_TAG})
-      - echo "Uploading Fig binaries for tag $TAG to Gitea"
+      # 安装依赖
+      - apt-get update -y
+      - apt-get install -y git build-essential curl mingw-w64
 
-      # Linux binary
-      - |
-        curl -X POST -H "Authorization: token ${GITEA_TOKEN}" \
-        -F "name=Fig-${TAG}-linux-x86_64" -F "file=@dist/Fig-${TAG}-linux-x86_64" \
-        "https://git.fig-lang.cn/api/v1/repos/PuqiAR/Fig/releases/${TAG}/assets"
+      # 安装 xmake
+      - git clone --depth=1 https://github.com/xmake-io/xmake.git /tmp/xmake
+      - cd /tmp/xmake && make install PREFIX=/usr/local
+      - xmake --version
 
-      # Windows binary
+      # 构建项目
+      - cd /woodpecker/src
+      - xmake f -p mingw -a x86_64 -m release -y
+      - xmake build -y
+
+      # 获取版本号
+      - VERSION=$(grep -R "__FCORE_VERSION" src/Core/core.hpp | sed -E 's/.*"(.+)".*/\1/')
+
+      # 生成文件名
+      - cp build/mingw/x86_64/release/Fig.exe Fig-${VERSION}-windows-x86_64.exe
+
+      # 上传到 Gitea Release
       - |
-        curl -X POST -H "Authorization: token ${GITEA_TOKEN}" \
-        -F "name=Fig-${TAG}-windows-x86_64.exe" -F "file=@dist/Fig-${TAG}-windows-x86_64.exe" \
-        "https://git.fig-lang.cn/api/v1/repos/PuqiAR/Fig/releases/${TAG}/assets"
+        if [ -n "$GITEA_TOKEN" ]; then
+          curl -X POST "https://git.fig-lang.cn/api/v1/repos/PuqiAR/Fig/releases" \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -F "tag_name=${VERSION}" \
+            -F "name=Fig-${VERSION}-windows-x86_64.exe" \
+            -F "body=Windows x86_64 release" \
+            -F "assets=@Fig-${VERSION}-windows-x86_64.exe"
+        fi
