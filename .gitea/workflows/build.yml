@@ -14,23 +14,23 @@ jobs:
     runs-on: ubuntu
     container:
       image: ubuntu:22.04
-      # 使用host网络模式
       options: --network=host
 
     steps:
-      # 1. 安装基础工具
+      # 1. 安装基础工具（确保包含 wget）
       - name: 安装基础工具
         run: |
           apt-get update
-          apt-get install -y tar git curl
-          echo "基础工具安装完成。"
+          # 明确安装 wget, tar, git, curl
+          apt-get install -y wget tar git curl
+          echo "基础工具（包括wget）安装完成。"
 
-      # 2. 离线安装 xmake
+      # 2. 离线安装 xmake（关键修正步骤）
       - name: 离线安装 xmake
         run: |
           echo "=== 开始从指定链接安装 xmake ==="
           
-          # 直接从你提供的 Gitea 仓库链接下载 xmake 二进制文件
+          # 使用已经安装好的wget下载
           wget -O /usr/local/bin/xmake https://git.fig-lang.cn/PuqiAR/xmake-binary-copy/raw/commit/989d1f2dabb0bc8d5981a5f900c2cf7c2ac78ee4/xmake-bundle-v3.0.5.linux.x86_64
           
           # 赋予执行权限
