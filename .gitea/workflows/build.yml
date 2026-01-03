@@ -52,11 +52,7 @@ jobs:
           echo "开始构建Linux安装器..."
 
           cd Installer/ConsoleInstaller
-          # 确保pip已安装
-          if ! command -v pip3 &> /dev/null; then
-            echo "安装pip3..."
-            apt-get update && apt-get install -y python3-pip
-          fi
+
           # 安装依赖并构建
           pip3 install --upgrade pip
           pip3 install -r requirements.txt
