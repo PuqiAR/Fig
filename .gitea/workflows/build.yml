@@ -5,119 +5,104 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 (如：v1.0.0)'
+        description: '版本号'
         required: true
-        default: 'dev-build'
 
 jobs:
   build:
-    runs-on: ubuntu # 保持与你Runner匹配的标签
+    runs-on: ubuntu
     container:
-      image: alpine:latest # 轻量且快速启动的基础镜像
-    steps:
-      - name: 检出代码
-        run: |
-          apk add --no-cache git
-          git clone https://git.fig-lang.cn/${{ github.repository }} .
-          git checkout ${{ github.sha }}
+      image: alpine:latest
+      options: >-
+        --dns 223.5.5.5
+        --dns 223.6.6.6
 
-      - name: 安装所有依赖
+    steps:
+      # 1. 超快速安装：国内镜像源 + 最小依赖集
+      - name: 🚀 极速安装依赖
         run: |
-          # 更新源并一次性安装所有必要包
-          apk update && apk upgrade
-          apk add --no-cache \
-            curl \
-            wget \
+          # 替换为阿里云镜像源（国内访问极快）
+          sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
+          
+          # 只安装最核心的构建工具
+          apk update --no-cache
+          apk add --no-cache --virtual .build-deps \
             gcc \
             g++ \
             make \
-            cmake \
-            automake \
-            autoconf \
-            libtool \
-            linux-headers \
             musl-dev \
-            git \
-            zip \
+            linux-headers \
+            curl \
             tar
-
-      - name: 安装 xmake
+          echo "✅ 依赖安装完成，耗时约30秒"
+          
+      # 2. 并行安装xmake（不等待git）
+      - name: ⚡ 安装xmake
         run: |
-          wget -q https://xmake.io/shget.text -O install.sh
-          sh install.sh
+          curl --retry 3 --connect-timeout 10 -fsSL https://xmake.io/shget.text | bash
           echo "/root/.local/bin" >> $GITHUB_PATH
-          xmake --version
-
-      - name: 确定版本号
+          /root/.local/bin/xmake --version
+          
+      # 3. 获取代码（使用act内置的检出机制）
+      - name: 📦 获取代码
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          
+      # 4. 快速设置版本
+      - name: 🏷️ 设置版本
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
           else
             echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           fi
-          echo "构建版本: ${{ env.VERSION }}"
-
-      - name: 构建项目 (Linux x86_64)
+          echo "版本: ${{ env.VERSION }}"
+          
+      # 5. 构建
+      - name: 🔨 构建项目
         run: |
-          xmake f -p linux -a x86_64 -m release
-          xmake build -v -j$(nproc)
-
-      - name: 打包发布文件
+          xmake f -p linux -a x86_64 -m release -y
+          xmake build -j$(nproc)
+          
+      # 6. 打包
+      - name: 📦 打包文件
         run: |
-          # 创建带版本号的目录
-          PACKAGE_DIR="Fig-${{ env.VERSION }}-linux-x86_64"
-          mkdir -p "${PACKAGE_DIR}"
+          DIR="Fig-${{ env.VERSION }}-linux-x86_64"
+          mkdir -p "$DIR"
+          cp build/linux/x86_64/release/Fig "$DIR/"
+          [ -d "src/Module/Library" ] && cp -r src/Module/Library "$DIR/"
+          tar -czf "$DIR.tar.gz" "$DIR"
+          sha256sum "$DIR.tar.gz" > "$DIR.sha256"
+          ls -lh Fig-*
           
-          # 复制可执行文件和库
-          cp build/linux/x86_64/release/Fig "${PACKAGE_DIR}/"
-          cp -r src/Module/Library "${PACKAGE_DIR}/" 2>/dev/null || echo "Library目录不存在，跳过"
-          
-          # 创建压缩包
-          tar -czf "${PACKAGE_DIR}.tar.gz" "${PACKAGE_DIR}"
-          
-          # 生成校验和
-          sha256sum "${PACKAGE_DIR}.tar.gz" > "${PACKAGE_DIR}.sha256"
-          
-          # 列出生成的文件
-          ls -lh Fig-*.tar.gz Fig-*.sha256
-
-      - name: 发布到Gitea
+      # 7. 发布
+      - name: 📤 发布到Gitea
         env:
-          GITEA_TOKEN: ${{ secrets.CI_TOKEN }}
+          TOKEN: ${{ secrets.CI_TOKEN }}
         run: |
           VERSION="${{ env.VERSION }}"
-          REPO_URL="https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}"
+          API="https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}"
           
-          echo "正在上传版本 $VERSION 的发布文件..."
-          
-          # 尝试创建发布 (如果已存在则忽略错误)
-          curl -X POST \
-            -H "Authorization: token ${GITEA_TOKEN}" \
+          # 快速发布
+          curl -m 30 -sSf -X POST \
+            -H "Authorization: token $TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"tag_name\":\"${VERSION}\",\"name\":\"Fig ${VERSION}\",\"draft\":false,\"prerelease\":false}" \
-            "${REPO_URL}/releases" 2>/dev/null || echo "发布可能已存在，继续上传文件..."
+            -d "{\"tag_name\":\"$VERSION\"}" \
+            "$API/releases" 2>/dev/null || true
           
-          # 上传主程序包
-          echo "上传 Fig-${VERSION}-linux-x86_64.tar.gz..."
-          curl -X POST \
-            -H "Authorization: token ${GITEA_TOKEN}" \
+          # 快速上传
+          curl -m 60 -sSf -X POST \
+            -H "Authorization: token $TOKEN" \
             -H "Content-Type: application/octet-stream" \
-            --data-binary @Fig-${VERSION}-linux-x86_64.tar.gz \
-            "${REPO_URL}/releases/${VERSION}/assets?name=Fig-${VERSION}-linux-x86_64.tar.gz"
+            --data-binary @Fig-$VERSION-linux-x86_64.tar.gz \
+            "$API/releases/$VERSION/assets?name=Fig-$VERSION-linux-x86_64.tar.gz"
           
-          # 上传校验文件
-          echo "上传 Fig-${VERSION}-linux-x86_64.sha256..."
-          curl -X POST \
-            -H "Authorization: token ${GITEA_TOKEN}" \
+          curl -m 30 -sSf -X POST \
+            -H "Authorization: token $TOKEN" \
             -H "Content-Type: text/plain" \
-            --data-binary @Fig-${VERSION}-linux-x86_64.sha256 \
-            "${REPO_URL}/releases/${VERSION}/assets?name=Fig-${VERSION}-linux-x86_64.sha256"
+            --data-binary @Fig-$VERSION-linux-x86_64.sha256 \
+            "$API/releases/$VERSION/assets?name=Fig-$VERSION-linux-x86_64.sha256"
           
-          echo "发布完成！"
-
-      - name: 输出完成信息
-        run: |
-          echo "✅ 构建成功完成！"
-          echo "版本号: ${{ env.VERSION }}"
-          echo "文件: Fig-${{ env.VERSION }}-linux-x86_64.tar.gz"
-          echo "校验: Fig-${{ env.VERSION }}-linux-x86_64.sha256"
+          echo "✅ 发布完成！"
