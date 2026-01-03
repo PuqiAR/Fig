@@ -27,7 +27,7 @@ USER root
 RUN cp /home/builder/xmake /usr/local/bin/xmake && \
     chmod +x /usr/local/bin/xmake
 
-# 5. 验证环境
-RUN clang++ --version && xmake --version
+# # 5. 验证环境
+# RUN clang++ --version && xmake --version
 
 USER builder
