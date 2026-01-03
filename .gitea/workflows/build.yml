@@ -110,13 +110,34 @@ jobs:
     steps:
       - name: 验证Windows工具链
         run: |
-          # 检查 xmake 和 clang 是否在 PATH 中
-          where xmake || echo "警告: xmake 未找到"
-          where clang++ || echo "警告: clang++ 未找到"
-          # 显示版本信息
-          if (Get-Command xmake -ErrorAction SilentlyContinue) { xmake --version }
-          if (Get-Command clang++ -ErrorAction SilentlyContinue) { clang++ --version }
-
+          # 设置当前 PowerShell 会话的执行策略
+          powershell -Command "Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force"
+          
+          # 使用 PowerShell 语法检查工具链
+          powershell -Command "
+            # 检查 xmake
+            if (Get-Command xmake -ErrorAction SilentlyContinue) {
+              Write-Host '✅ xmake 已安装'
+              xmake --version
+            } else {
+              Write-Host '警告: xmake 未找到'
+            }
+            
+            # 检查 clang++
+            if (Get-Command clang++ -ErrorAction SilentlyContinue) {
+              Write-Host '✅ clang++ 已安装'
+              clang++ --version
+            } else {
+              Write-Host '警告: clang++ 未找到'
+            }
+            
+            # 检查 git（可选）
+            if (Get-Command git -ErrorAction SilentlyContinue) {
+              Write-Host '✅ git 已安装'
+            } else {
+              Write-Host '警告: git 未找到'
+            }
+          "
       - name: 检出代码
         run: |
           git clone https://git.fig-lang.cn/${{ github.repository }} .
