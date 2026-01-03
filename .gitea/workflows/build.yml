@@ -143,8 +143,16 @@ jobs:
           git checkout ${{ github.ref }}
 
       - name: 设置版本
-        run: powershell -Command "if ('${{ github.event_name }}' -eq 'workflow_dispatch') { $VERSION = '${{ inputs.version }}' } else { $VERSION = '${{ github.ref }}' -replace 'refs/tags/', '' }; Write-Host '构建版本: $VERSION'; echo \"VERSION=$VERSION\" >> $env:GITHUB_ENV"
-
+        run: |
+          powershell -Command "
+            if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+              `$VERSION = '${{ inputs.version }}'
+            } else {
+              `$VERSION = '${{ github.ref }}' -replace 'refs/tags/', ''
+            }
+            Write-Host \"构建版本: `$VERSION\"
+            echo \"VERSION=`$VERSION\" >> `$env:GITHUB_ENV
+          "
       - name: 构建项目 (Windows Native)
         run: |
           powershell -Command "
