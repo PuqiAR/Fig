@@ -1,15 +1,16 @@
 FROM ubuntu:24.04
 
-# 1. 添加 LLVM 官方仓库并安装 Clang 19 工具链
+# 1. 【关键优化】仅添加LLVM仓库并安装Clang 19必要组件
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        wget tar git curl ca-certificates gnupg lsb-release software-properties-common && \
+        wget gnupg ca-certificates && \
     wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
-    add-apt-repository -y "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-19 main" && \
+    echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-19 main" > /etc/apt/sources.list.d/llvm.list && \
     apt-get update && \
+    # 只安装最核心的Clang工具链、基础工具和xmake的依赖
     apt-get install -y --no-install-recommends \
-        build-essential \
         clang-19 lld-19 libc++-19-dev libc++abi-19-dev \
+        tar git curl \
         && rm -rf /var/lib/apt/lists/* && \
     update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100 && \
     update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100 && \
@@ -31,5 +32,4 @@ USER root
 RUN cp /home/builder/xmake /usr/local/bin/xmake && \
     chmod +x /usr/local/bin/xmake
 
-# 5. 切换回非root用户作为容器默认用户
 USER builder
