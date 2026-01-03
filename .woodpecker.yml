@@ -1,6 +1,6 @@
 steps:
   - name: build-cross
-    image: "xmake/xmake:ubuntu-latest"
+    image: "ubuntu:24.04"
     when:
       event:
         - push
@@ -8,23 +8,34 @@ steps:
     environment:
       SHELL: "/bin/bash"
     commands:
-      # 安装 git
+      # 1️⃣ 国内源加速
+      - cp /etc/apt/sources.list /etc/apt/sources.list.backup
+      - |
+        cat <<EOF > /etc/apt/sources.list
+        deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs) main restricted universe multiverse
+        deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-updates main restricted universe multiverse
+        deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-security main restricted universe multiverse
+        deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-backports main restricted universe multiverse
+        EOF
       - apt-get update -y
-      - apt-get install -y git
+      - apt-get install -y curl git build-essential clang llvm mingw-w64 ninja-build jq
 
-      # Linux release build
-      - xmake f -m release
-      - xmake -v
+      # 2️⃣ 安装 xmake
+      - curl -fsSL https://xmake.io/shget.text | bash
+
+      # 3️⃣ Linux release build
+      - /root/.xmake/bin/xmake f -m release
+      - /root/.xmake/bin/xmake -v
       - mkdir -p dist
-      - cp `xmake u -o`/Fig dist/Fig-linux
+      - cp `/root/.xmake/bin/xmake u -o`/Fig dist/Fig-linux
 
-      # Windows cross-build
-      - xmake f -m release --plat=windows --arch=x86_64 --cc=x86_64-w64-mingw32-g++ --cxx=x86_64-w64-mingw32-g++
-      - xmake -v
-      - cp `xmake u -o`/Fig.exe dist/Fig-windows.exe
+      # 4️⃣ Windows cross-build
+      - /root/.xmake/bin/xmake f -m release --plat=windows --arch=x86_64 --cc=x86_64-w64-mingw32-g++ --cxx=x86_64-w64-mingw32-g++
+      - /root/.xmake/bin/xmake -v
+      - cp `/root/.xmake/bin/xmake u -o`/Fig.exe dist/Fig-windows.exe
 
   - name: gitea-release
-    image: "xmake/xmake:ubuntu-latest"
+    image: "ubuntu:24.04"
     when:
       event:
         - tag
