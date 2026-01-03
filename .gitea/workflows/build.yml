@@ -171,12 +171,7 @@ jobs:
           echo "VERSION=$VERSION" >> $env:GITHUB_ENV
 
       - name: 构建项目 (Windows Native)
-        run: |
-          powershell -Command "
-            xmake f -p windows -a x86_64 -m release -y
-            xmake build -j`$env:NUMBER_OF_PROCESSORS
-            Write-Host 'Windows构建成功。'
-          "
+        run: powershell -Command "xmake f -p windows -a x86_64 -m release -y; xmake build -j`$env:NUMBER_OF_PROCESSORS; Write-Host 'Done'"
 
       - name: 打包Windows发布文件
         run: |
