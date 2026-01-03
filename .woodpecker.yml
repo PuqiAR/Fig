@@ -1,12 +1,11 @@
 steps:
   - name: build-cross
     image: "ubuntu:24.04"
+    shell: /bin/bash   # 强制 bash，避免 dash 语法报错
     when:
       event:
         - push
         - tag
-    environment:
-      SHELL: "/bin/bash"
     commands:
       # 1️⃣ 国内源加速
       - cp /etc/apt/sources.list /etc/apt/sources.list.backup
@@ -20,10 +19,10 @@ steps:
       - apt-get update -y
       - apt-get install -y curl git build-essential clang llvm mingw-w64 ninja-build jq
 
-      # 2️⃣ 安装 xmake 到全局 PATH
-      - bash <(curl -fsSL https://xmake.io/shget.text) --install-to=/usr/local/bin
+      # 2️⃣ 安装 xmake 到全局 PATH（安全稳定）
+      - curl -fsSL https://xmake.io/shget.text | bash -s -- --install-to=/usr/local/bin
 
-      # 3️⃣ 读取真实版本号
+      # 3️⃣ 获取版本号（tag 或 commit）
       - VERSION=$(git describe --tags --always --dirty)
 
       # 4️⃣ Linux 构建
@@ -39,6 +38,7 @@ steps:
 
   - name: gitea-release
     image: "ubuntu:24.04"
+    shell: /bin/bash
     when:
       event:
         - tag
@@ -46,7 +46,7 @@ steps:
       GITEA_TOKEN:
         from_secret: GITEA_TOKEN
     commands:
-      - TAG=$(git describe --tags --exact-match || echo ${DRONE_TAG})
+      - TAG=$(git describe --tags --exact-match 2>/dev/null || echo ${DRONE_TAG})
       - echo "Uploading Fig binaries for tag $TAG to Gitea"
 
       # Linux binary
