@@ -11,7 +11,7 @@ RUN apt-get update && \
         clang-19 lld-19 libc++-19-dev libc++abi-19-dev \
         mingw-w64 g++-mingw-w64 \
         git tar curl \
-        python3 python3-pip \
+        python3 python3-pip python3.12-venv \
         && rm -rf /var/lib/apt/lists/* && \
     update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100 && \
     update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100 && \
