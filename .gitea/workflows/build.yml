@@ -186,12 +186,15 @@ jobs:
         run: |
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           
-          # 确保版本号不为空
-          $VERSION = $env:VERSION
-          if ([string]::IsNullOrEmpty($VERSION)) {
-            Write-Host "警告：版本号为空，使用默认值 dev-build"
-            $VERSION = "dev-build"
+          # 🔧 修改：与发布步骤使用相同的版本号计算逻辑
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') {
+            $VERSION = $env:INPUT_VERSION
+            if (-not $VERSION) { $VERSION = "dev-build" }
+          } else {
+            $VERSION = $env:GITHUB_REF_NAME
           }
+          
+          Write-Host "打包版本: $VERSION"
           
           $PACKAGE_NAME = "Fig-${VERSION}-windows-x86_64"
           Write-Host "打包名称: $PACKAGE_NAME"
