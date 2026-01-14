@@ -238,9 +238,11 @@ namespace Fig::Ast
     };
 
     static const std::unordered_set<Operator> unaryOps{
-        Operator::Not,
-        Operator::Subtract,
-        Operator::BitNot,
+        Operator::Not,      // !
+        Operator::Subtract, // -
+        Operator::BitNot, // ~
+
+        Operator::BitAnd, // reference operator &
     };
     static const std::unordered_set<Operator> binaryOps{
         Operator::Add,

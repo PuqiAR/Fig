@@ -7,7 +7,7 @@ namespace Fig::Ast
     class InitExprAst final : public ExpressionAst
     {
     public:
-        FString structName;
+        Expression structe;
 
         std::vector<std::pair<FString, Expression>> args;
 
@@ -30,8 +30,8 @@ namespace Fig::Ast
             type = AstType::InitExpr;
         }
 
-        InitExprAst(FString _structName, std::vector<std::pair<FString, Expression>> _args, InitMode _initMode) :
-            structName(std::move(_structName)), args(std::move(_args)), initMode(_initMode)
+        InitExprAst(Expression _structe, std::vector<std::pair<FString, Expression>> _args, InitMode _initMode) :
+            structe(std::move(_structe)), args(std::move(_args)), initMode(_initMode)
         {
             type = AstType::InitExpr;
         }

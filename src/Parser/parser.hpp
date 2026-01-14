@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Ast/astBase.hpp"
 #include <Ast/ast.hpp>
 #include <Lexer/lexer.hpp>
 #include <Core/fig_string.hpp>
@@ -38,15 +39,8 @@ namespace Fig
             bool original;
 
         public:
-            SemicolonDisabler(Parser *parser) :
-                p(parser), original(p->needSemicolon)
-            {
-                p->needSemicolon = false;
-            }
-            ~SemicolonDisabler()
-            {
-                p->needSemicolon = original;
-            }
+            SemicolonDisabler(Parser *parser) : p(parser), original(p->needSemicolon) { p->needSemicolon = false; }
+            ~SemicolonDisabler() { p->needSemicolon = original; }
             // disable copy and assign
             SemicolonDisabler(const SemicolonDisabler &) = delete;
             SemicolonDisabler &operator=(const SemicolonDisabler &) = delete;
@@ -65,14 +59,8 @@ namespace Fig
             output.push_back(node);
         }
 
-        bool isTokenSymbol(Token tok)
-        {
-            return Lexer::symbol_map.contains(tok.getValue());
-        }
-        bool isTokenOp(Token tok)
-        {
-            return Ast::TokenToOp.contains(tok.getType());
-        }
+        bool isTokenSymbol(Token tok) { return Lexer::symbol_map.contains(tok.getValue()); }
+        bool isTokenOp(Token tok) { return Ast::TokenToOp.contains(tok.getType()); }
         bool isEOF()
         {
             if (tokenPruduced == 0) return false;
@@ -82,21 +70,19 @@ namespace Fig
     public:
         using Precedence = uint32_t;
         static const std::unordered_map<Ast::Operator, std::pair<Precedence, Precedence>> opPrecedence;
-        Parser(const Lexer &_lexer) :
-            lexer(_lexer)
-        {
-        }
+        static const std::unordered_map<Ast::Operator, Precedence> unaryOpPrecedence;
 
-        AddressableError* getError() const
-        {
-            return error.get();
-        }
+        Parser(const Lexer &_lexer) : lexer(_lexer) {}
+
+        AddressableError *getError() const { return error.get(); }
 
         template <class _ErrT, typename = AddressableError>
-        void throwAddressableError(FString msg, size_t line, size_t column, std::source_location loc = std::source_location::current())
+        void throwAddressableError(FString msg,
+                                   size_t line,
+                                   size_t column,
+                                   std::source_location loc = std::source_location::current())
         {
-            static_assert(std::is_base_of_v<AddressableError, _ErrT>,
-                          "_ErrT must derive from AddressableError");
+            static_assert(std::is_base_of_v<AddressableError, _ErrT>, "_ErrT must derive from AddressableError");
             _ErrT spError(msg, line, column, loc);
             error = std::make_unique<_ErrT>(spError);
             throw spError;
@@ -104,8 +90,7 @@ namespace Fig
         template <class _ErrT, typename = AddressableError>
         void throwAddressableError(FString msg, std::source_location loc = std::source_location::current())
         {
-            static_assert(std::is_base_of_v<AddressableError, _ErrT>,
-                          "_ErrT must derive from AddressableError");
+            static_assert(std::is_base_of_v<AddressableError, _ErrT>, "_ErrT must derive from AddressableError");
             // line, column provide by `currentAAI`
             _ErrT spError(msg, currentAAI.line, currentAAI.column, loc);
             error = std::make_unique<_ErrT>(spError);
@@ -115,22 +100,15 @@ namespace Fig
         template <class _ErrT, typename = UnaddressableError>
         void throwUnaddressableError(FString msg, std::source_location loc = std::source_location::current())
         {
-            static_assert(std::is_base_of_v<AddressableError, _ErrT>,
-                          "_ErrT must derive from AddressableError");
+            static_assert(std::is_base_of_v<AddressableError, _ErrT>, "_ErrT must derive from AddressableError");
             _ErrT spError(msg, loc);
             error = std::make_unique<_ErrT>(spError);
             throw spError;
         }
 
-        void setCurrentAAI(Ast::AstAddressInfo _aai)
-        {
-            currentAAI = std::move(_aai);
-        }
+        void setCurrentAAI(Ast::AstAddressInfo _aai) { currentAAI = std::move(_aai); }
 
-        Ast::AstAddressInfo getCurrentAAI() const
-        {
-            return currentAAI;
-        }
+        Ast::AstAddressInfo getCurrentAAI() const { return currentAAI; }
 
         inline const Token &nextToken()
         {
@@ -143,7 +121,8 @@ namespace Fig
             if (int64_t(currentTokenIndex - 1) < int64_t(0))
             // 同下 next注释
             {
-                throw std::runtime_error("Internal Error in Parser::rollbackToken, trying to rollback but it's already on the begin");
+                throw std::runtime_error(
+                    "Internal Error in Parser::rollbackToken, trying to rollback but it's already on the begin");
             }
             currentTokenIndex--;
         }
@@ -152,7 +131,8 @@ namespace Fig
             if (int64_t(currentTokenIndex) < (int64_t(tokenPruduced) - 1))
             {
                 /*
-                必须两个都显示转换为int64_t.否则，负数时会超出范围，变成int64_t max, 并且 CTI也需要显示转换，否则转换完的pruduced又会被转回去，变为 int64_t max
+                必须两个都显示转换为int64_t.否则，负数时会超出范围，变成int64_t max, 并且
+                CTI也需要显示转换，否则转换完的pruduced又会被转回去，变为 int64_t max
                 */
                 currentTokenIndex++;
                 setCurrentAAI(Ast::AstAddressInfo{.line = currentToken().line, .column = currentToken().column});
@@ -184,18 +164,11 @@ namespace Fig
             return tok;
         }
 
-        std::pair<Precedence, Precedence> getBindingPower(Ast::Operator op)
-        {
-            return opPrecedence.at(op);
-        }
-        Precedence getLeftBindingPower(Ast::Operator op)
-        {
-            return getBindingPower(op).first;
-        }
-        Precedence getRightBindingPower(Ast::Operator op)
-        {
-            return getBindingPower(op).second;
-        }
+        const std::pair<Precedence, Precedence> &getBindingPower(Ast::Operator op) const { return opPrecedence.at(op); }
+        Precedence getLeftBindingPower(Ast::Operator op) const { return getBindingPower(op).first; }
+        Precedence getRightBindingPower(Ast::Operator op) const { return getBindingPower(op).second; }
+
+        const Precedence &getUnaryBp(Ast::Operator op) const { return unaryOpPrecedence.at(op); }
 
         // template <class _Tp, class... Args>
         // std::shared_ptr<_Tp> makeAst(Args &&...args)
@@ -217,8 +190,9 @@ namespace Fig
             if (peekToken().getType() != type)
             {
                 throwAddressableError<SyntaxError>(FString(std::format("Expected `{}`, but got `{}`",
-                                                                           magic_enum::enum_name(type),
-                                                                           magic_enum::enum_name(peekToken().getType()))), loc);
+                                                                       magic_enum::enum_name(type),
+                                                                       magic_enum::enum_name(peekToken().getType()))),
+                                                   loc);
             }
         }
 
@@ -226,9 +200,11 @@ namespace Fig
         {
             if (currentToken().getType() != type)
             {
-                throwAddressableError<SyntaxError>(FString(std::format("Expected `{}`, but got `{}`",
-                                                                           magic_enum::enum_name(type),
-                                                                           magic_enum::enum_name(currentToken().getType()))), loc);
+                throwAddressableError<SyntaxError>(
+                    FString(std::format("Expected `{}`, but got `{}`",
+                                        magic_enum::enum_name(type),
+                                        magic_enum::enum_name(currentToken().getType()))),
+                    loc);
             }
         }
 
@@ -237,8 +213,9 @@ namespace Fig
             if (peekToken().getType() != type)
             {
                 throwAddressableError<SyntaxError>(FString(std::format("Expected `{}`, but got `{}`",
-                                                                           expected.toBasicString(),
-                                                                           magic_enum::enum_name(peekToken().getType()))), loc);
+                                                                       expected.toBasicString(),
+                                                                       magic_enum::enum_name(peekToken().getType()))),
+                                                   loc);
             }
         }
 
@@ -246,16 +223,15 @@ namespace Fig
         {
             if (currentToken().getType() != type)
             {
-                throwAddressableError<SyntaxError>(FString(std::format("Expected `{}`, but got `{}`",
-                                                                           expected.toBasicString(),
-                                                                           magic_enum::enum_name(currentToken().getType()))), loc);
+                throwAddressableError<SyntaxError>(
+                    FString(std::format("Expected `{}`, but got `{}`",
+                                        expected.toBasicString(),
+                                        magic_enum::enum_name(currentToken().getType()))),
+                    loc);
             }
         }
 
-        [[nodiscard]] SemicolonDisabler disableSemicolon()
-        {
-            return SemicolonDisabler(this);
-        }
+        [[nodiscard]] SemicolonDisabler disableSemicolon() { return SemicolonDisabler(this); }
 
         void expectSemicolon()
         {
@@ -287,14 +263,8 @@ namespace Fig
             next();
         }
 
-        bool isNext(TokenType type)
-        {
-            return peekToken().getType() == type;
-        }
-        bool isThis(TokenType type)
-        {
-            return currentToken().getType() == type;
-        }
+        bool isNext(TokenType type) { return peekToken().getType() == type; }
+        bool isThis(TokenType type) { return currentToken().getType() == type; }
 
         static constexpr FString varDefTypeFollowed = u8"(Followed)";
 
@@ -313,28 +283,30 @@ namespace Fig
 
         Ast::VarExpr __parseVarExpr(FString);
         Ast::FunctionDef __parseFunctionDef(bool); // entry: current is Token::Identifier (isPublic: Bool)
-        Ast::StructDef __parseStructDef(bool);     // entry: current is Token::Identifier (struct name) arg(isPublic: bool)
-        Ast::InterfaceDef __parseInterfaceDef(bool); // entry: current is Token::Identifier (interface name) arg(isPublic: bool)
-        Ast::Implement __parseImplement();         // entry: current is `impl`
+        Ast::StructDef __parseStructDef(bool); // entry: current is Token::Identifier (struct name) arg(isPublic: bool)
+        Ast::InterfaceDef
+        __parseInterfaceDef(bool);         // entry: current is Token::Identifier (interface name) arg(isPublic: bool)
+        Ast::Implement __parseImplement(); // entry: current is `impl`
 
-        Ast::Throw __parseThrow();                 // entry: current is `throw`
-        Ast::Try __parseTry();                     // entry: current is `try`
+        Ast::Throw __parseThrow(); // entry: current is `throw`
+        Ast::Try __parseTry();     // entry: current is `try`
 
         Ast::BinaryExpr __parseInfix(Ast::Expression, Ast::Operator, Precedence);
         Ast::UnaryExpr __parsePrefix(Ast::Operator, Precedence);
         Ast::Expression __parseCall(Ast::Expression);
-        
-        Ast::ListExpr __parseListExpr(); // entry: current is `[`
-        Ast::MapExpr __parseMapExpr(); // entry: current is `{`
 
-        Ast::InitExpr __parseInitExpr(FString);  // entry: current is `{`, ahead is struct name. arg (struct name : FString)
-        Ast::Expression __parseTupleOrParenExpr();             // entry: current is `(`
+        Ast::ListExpr __parseListExpr(); // entry: current is `[`
+        Ast::MapExpr __parseMapExpr();   // entry: current is `{`
+
+        Ast::InitExpr __parseInitExpr(
+            Ast::Expression); // entry: current is `{`, ahead is struct type exp.
+        Ast::Expression __parseTupleOrParenExpr(); // entry: current is `(`
 
         Ast::FunctionLiteralExpr __parseFunctionLiteralExpr(); // entry: current is Token::LParen after Token::Function
 
-        Ast::Import __parseImport();                           // entry: current is Token::Import
-        
-        Ast::Statement __parseStatement();                     // entry: (idk)
+        Ast::Import __parseImport(); // entry: current is Token::Import
+
+        Ast::Statement __parseStatement(bool = true); // entry: (idk)
         Ast::Expression parseExpression(Precedence, TokenType = TokenType::Semicolon, TokenType = TokenType::Semicolon);
         std::vector<Ast::AstBase> parseAll();
     };

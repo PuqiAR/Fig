@@ -557,10 +557,13 @@ namespace Fig
                 auto rnv = rhs.getNumericValue();
                 if (rnv == 0)
                     throw ValueError(FString(makeTypeErrorMessage("Division by zero", "/", lhs, rhs)));
-                bool bothInt = lhs.is<ValueType::IntClass>() && rhs.is<ValueType::IntClass>();
+                // bool bothInt = lhs.is<ValueType::IntClass>() && rhs.is<ValueType::IntClass>();
                 auto result = lhs.getNumericValue() / rnv;
-                if (bothInt && !isNumberExceededIntLimit(result))
-                    return Object(static_cast<ValueType::IntClass>(result));
+                // if (bothInt && !isNumberExceededIntLimit(result))
+                //     return Object(static_cast<ValueType::IntClass>(result));
+
+                // int / int maybe decimals
+                // DO NOT convert it to INT
                 return Object(result);
             }
             throw ValueError(FString(makeTypeErrorMessage("Unsupported operation", "/", lhs, rhs)));

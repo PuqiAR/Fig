@@ -6,6 +6,10 @@
 #include <Core/fig_string.hpp>
 #include <Utils/utils.hpp>
 
+#if 0
+    #include <iostream> // debug
+#endif
+
 namespace Fig
 {
 
@@ -339,21 +343,31 @@ namespace Fig
     {
         FString numStr;
         bool hasPoint = false;
-        // 负号(减号) 直接交由 scanSymbol处理，在parser中被分类->与数字结合/变为操作数
+
         while (hasNext())
         {
             UTF8Char ch = *it;
-            if (ch.isDigit() or ch == U'e') // . / e / - for scientific counting
+
+            // 数字或e（原代码允许e在数字中间）
+            if (ch.isDigit() || ch == U'e')
             {
                 numStr += ch.getString();
                 next();
             }
-            else if (ch == U'-' and numStr.ends_with(U'-'))
+            // 负号：只有当后面还有字符且不是数字结尾时才处理
+            else if (ch == U'-' && !numStr.empty() && (numStr.ends_with(U'e') || numStr.ends_with(U'E')))
             {
                 numStr += ch.getString();
                 next();
             }
-            else if (ch == U'.' and not hasPoint)
+            // 正号：同上
+            else if (ch == U'+' && !numStr.empty() && (numStr.ends_with(U'e') || numStr.ends_with(U'E')))
+            {
+                numStr += ch.getString();
+                next();
+            }
+            // 小数点：只能有一个
+            else if (ch == U'.' && !hasPoint)
             {
                 hasPoint = true;
                 numStr += ch.getString();
@@ -364,22 +378,96 @@ namespace Fig
                 break;
             }
         }
-        // Numbers in Fig-lang
-        /*
-            114514
-            1145.14
-            1.14e3  -> 1140
-            1.14e-3 -> 0.00114
-            .3      -> 0.3
-        */
-        // checking legality
-        if ((*numStr.end()) == u'e') // e 后面必须跟整数表示科学计数
+
+        // 检查合法性
+        if (numStr.empty()) { return IllegalTok; }
+
+        // 检查以e结尾的情况
+        if (numStr.ends_with(U'e'))
         {
-            error = SyntaxError(FString(
-                                    std::format("Ellegal number literal: {}", numStr.toBasicString())),
-                                this->line, it.column());
+            error = SyntaxError(
+                FString(std::format("Illegal number literal: {}", numStr.toBasicString())), this->line, it.column());
             return IllegalTok;
         }
+
+        // 检查是否至少有一个数字
+        bool hasDigit = false;
+        for (auto it = numStr.begin(); it != numStr.end(); ++it)
+        {
+            if (isdigit(*it))
+            {
+                hasDigit = true;
+                break;
+            }
+        }
+
+        if (!hasDigit)
+        {
+            error = SyntaxError(
+                FString(std::format("Illegal number literal: {}", numStr.toBasicString())), this->line, it.column());
+            return IllegalTok;
+        }
+
+        // 检查科学计数法格式：e后面必须有数字
+        size_t ePos = numStr.find(U'e');
+        if (ePos != FString::npos)
+        {
+            // e不能在开头
+            if (ePos == 0)
+            {
+                error = SyntaxError(FString(std::format("Illegal number literal: {}", numStr.toBasicString())),
+                                    this->line,
+                                    it.column());
+                return IllegalTok;
+            }
+
+            // e后面必须有内容
+            if (ePos + 1 >= numStr.length())
+            {
+                error = SyntaxError(FString(std::format("Illegal number literal: {}", numStr.toBasicString())),
+                                    this->line,
+                                    it.column());
+                return IllegalTok;
+            }
+
+            // 检查e后面的部分
+            bool hasDigitAfterE = false;
+            for (size_t i = ePos + 1; i < numStr.length(); ++i)
+            {
+                UTF8Char c = std::u8string(1,numStr[i]);
+                if (c == U'+' || c == U'-')
+                {
+                    // 符号只能紧跟在e后面
+                    if (i != ePos + 1)
+                    {
+                        error = SyntaxError(FString(std::format("Illegal number literal: {}", numStr.toBasicString())),
+                                            this->line,
+                                            it.column());
+                        return IllegalTok;
+                    }
+                    continue;
+                }
+
+                if (c.isDigit()) { hasDigitAfterE = true; }
+                else
+                {
+                    // e后面只能有符号和数字
+                    error = SyntaxError(FString(std::format("Illegal number literal: {}", numStr.toBasicString())),
+                                        this->line,
+                                        it.column());
+                    return IllegalTok;
+                }
+            }
+
+            if (!hasDigitAfterE)
+            {
+                error = SyntaxError(FString(std::format("Illegal number literal: {}", numStr.toBasicString())),
+                                    this->line,
+                                    it.column());
+                return IllegalTok;
+            }
+        }
+
         return Token(numStr, TokenType::LiteralNumber);
     }
     Token Lexer::scanSymbol()
@@ -434,7 +522,7 @@ namespace Fig
             next();
             return IllegalTok;
         }
-
+        // std::cerr << Token(sym, symbol_map.at(sym)).toString().toBasicString() << '\n;
         next();
         return Token(sym, symbol_map.at(sym));
     }
@@ -522,13 +610,13 @@ namespace Fig
             if (!hasNext())
             {
                 next();
-                // return Token(u8"/", this->symbol_map.at(u8"/")).setPos(last_line, last_column);
+                return Token(u8"/", this->symbol_map.at(u8"/")).setPos(last_line, last_column);
             }
             c = it.peek();
             if (c != U'/' and c != U'*')
             {
                 next();
-                // return Token(u8"/", this->symbol_map.at(u8"/")).setPos(last_line, last_column);
+                return Token(u8"/", this->symbol_map.at(u8"/")).setPos(last_line, last_column);
             }
             scanComments().setPos(last_line, last_column);
             return nextToken();

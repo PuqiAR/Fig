@@ -43,6 +43,10 @@ namespace Fig
         {
             return FString(toBasicString() + x.toBasicString());
         }
+        FString operator+(const char8_t *c)
+        {
+            return FString(*this + std::u8string(c));
+        }
 
         explicit FString(const std::u8string &str)
         {

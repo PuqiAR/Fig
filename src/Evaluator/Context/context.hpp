@@ -33,17 +33,13 @@ namespace Fig
         std::unordered_map<std::size_t, FString> functionNames;
 
         // implRegistry <Struct, ordered list of ImplRecord>
-        std::unordered_map<TypeInfo, std::vector<ImplRecord>, TypeInfoHash>
-            implRegistry;
+        std::unordered_map<TypeInfo, std::vector<ImplRecord>, TypeInfoHash> implRegistry;
 
     public:
         ContextPtr parent;
 
         Context(const Context &) = default;
-        Context(const FString &name, ContextPtr p = nullptr) :
-            scopeName(name), parent(p)
-        {
-        }
+        Context(const FString &name, ContextPtr p = nullptr) : scopeName(name), parent(p) {}
 
         void setParent(ContextPtr _parent) { parent = _parent; }
 
@@ -55,37 +51,28 @@ namespace Fig
         {
             variables.insert(c.variables.begin(), c.variables.end());
             functions.insert(c.functions.begin(), c.functions.end());
-            functionNames.insert(c.functionNames.begin(),
-                                 c.functionNames.end());
+            functionNames.insert(c.functionNames.begin(), c.functionNames.end());
             implRegistry.insert(c.implRegistry.begin(), c.implRegistry.end());
             // structTypeNames.insert(c.structTypeNames.begin(),
             // c.structTypeNames.end());
         }
 
-        std::unordered_map<size_t, Function> getFunctions() const
-        {
-            return functions;
-        }
+        std::unordered_map<size_t, Function> getFunctions() const { return functions; }
 
         std::shared_ptr<VariableSlot> get(const FString &name)
         {
             auto it = variables.find(name);
             if (it != variables.end()) return it->second;
             if (parent) return parent->get(name);
-            throw RuntimeError(FString(std::format("Variable '{}' not defined",
-                                                   name.toBasicString())));
+            throw RuntimeError(FString(std::format("Variable '{}' not defined", name.toBasicString())));
         }
         AccessModifier getAccessModifier(const FString &name)
         {
             if (variables.contains(name)) { return variables[name]->am; }
-            else if (parent != nullptr)
-            {
-                return parent->getAccessModifier(name);
-            }
+            else if (parent != nullptr) { return parent->getAccessModifier(name); }
             else
             {
-                throw RuntimeError(FString(std::format(
-                    "Variable '{}' not defined", name.toBasicString())));
+                throw RuntimeError(FString(std::format("Variable '{}' not defined", name.toBasicString())));
             }
         }
         bool isVariableMutable(const FString &name)
@@ -104,16 +91,14 @@ namespace Fig
             {
                 if (!isVariableMutable(name))
                 {
-                    throw RuntimeError(FString(std::format(
-                        "Variable '{}' is immutable", name.toBasicString())));
+                    throw RuntimeError(FString(std::format("Variable '{}' is immutable", name.toBasicString())));
                 }
                 variables[name]->value = value;
             }
             else if (parent != nullptr) { parent->set(name, value); }
             else
             {
-                throw RuntimeError(FString(std::format(
-                    "Variable '{}' not defined", name.toBasicString())));
+                throw RuntimeError(FString(std::format("Variable '{}' not defined", name.toBasicString())));
             }
         }
         void _update(const FString &name, ObjectPtr value)
@@ -122,8 +107,7 @@ namespace Fig
             else if (parent != nullptr) { parent->_update(name, value); }
             else
             {
-                throw RuntimeError(FString(std::format(
-                    "Variable '{}' not defined", name.toBasicString())));
+                throw RuntimeError(FString(std::format("Variable '{}' not defined", name.toBasicString())));
             }
         }
         void def(const FString &name,
@@ -133,14 +117,11 @@ namespace Fig
         {
             if (containsInThisScope(name))
             {
-                throw RuntimeError(FString(
-                    std::format("Variable '{}' already defined in this scope",
-                                name.toBasicString())));
+                throw RuntimeError(
+                    FString(std::format("Variable '{}' already defined in this scope", name.toBasicString())));
             }
-            variables[name] =
-                std::make_shared<VariableSlot>(name, value, ti, am);
-            if (ti == ValueType::Function
-                and value->getTypeInfo() == ValueType::Function)
+            variables[name] = std::make_shared<VariableSlot>(name, value, ti, am);
+            if (ti == ValueType::Function and value->getTypeInfo() == ValueType::Function)
             {
                 auto &fn = value->as<Function>();
                 functions[fn.id] = fn;
@@ -152,19 +133,42 @@ namespace Fig
             //     structTypeNames[st.id] = name;
             // }
         }
+        void
+        defReference(const FString &name, const TypeInfo &ti, AccessModifier am, std::shared_ptr<VariableSlot> target)
+        {
+            if (containsInThisScope(name))
+            {
+                throw RuntimeError(
+                    FString(std::format("Variable '{}' already defined in this scope", name.toBasicString())));
+            }
+            variables[name] = std::make_shared<VariableSlot>(
+                name,
+                target->value,
+                ti,
+                am,
+                true,
+                target
+            );
+        }
         std::optional<Function> getFunction(std::size_t id)
         {
             auto it = functions.find(id);
             if (it != functions.end()) { return it->second; }
             else if (parent) { return parent->getFunction(id); }
-            else { return std::nullopt; }
+            else
+            {
+                return std::nullopt;
+            }
         }
         std::optional<FString> getFunctionName(std::size_t id)
         {
             auto it = functionNames.find(id);
             if (it != functionNames.end()) { return it->second; }
             else if (parent) { return parent->getFunctionName(id); }
-            else { return std::nullopt; }
+            else
+            {
+                return std::nullopt;
+            }
         }
         // std::optional<FString> getStructName(std::size_t id)
         // {
@@ -188,24 +192,15 @@ namespace Fig
             else if (parent != nullptr) { return parent->contains(name); }
             return false;
         }
-        bool containsInThisScope(const FString &name) const
-        {
-            return variables.contains(name);
-        }
+        bool containsInThisScope(const FString &name) const { return variables.contains(name); }
 
-        TypeInfo getTypeInfo(const FString &name)
-        {
-            return get(name)->declaredType;
-        }
+        TypeInfo getTypeInfo(const FString &name) { return get(name)->declaredType; }
         bool isInFunctionContext()
         {
             ContextPtr ctx = shared_from_this();
             while (ctx)
             {
-                if (ctx->getScopeName().find(u8"<Function ") == 0)
-                {
-                    return true;
-                }
+                if (ctx->getScopeName().find(u8"<Function ") == 0) { return true; }
                 ctx = ctx->parent;
             }
             return false;
@@ -215,8 +210,7 @@ namespace Fig
             ContextPtr ctx = shared_from_this();
             while (ctx)
             {
-                if (ctx->getScopeName().find(u8"<While ") == 0
-                    or ctx->getScopeName().find(u8"<For ") == 0)
+                if (ctx->getScopeName().find(u8"<While ") == 0 or ctx->getScopeName().find(u8"<For ") == 0)
                 {
                     return true;
                 }
@@ -225,8 +219,7 @@ namespace Fig
             return false;
         }
 
-        bool hasImplRegisted(const TypeInfo &structType,
-                             const TypeInfo &interfaceType) const
+        bool hasImplRegisted(const TypeInfo &structType, const TypeInfo &interfaceType) const
         {
             auto it = implRegistry.find(structType);
             if (it != implRegistry.end())
@@ -239,9 +232,7 @@ namespace Fig
             return parent && parent->hasImplRegisted(structType, interfaceType);
         }
 
-        std::optional<ImplRecord>
-        getImplRecord(const TypeInfo &structType,
-                      const TypeInfo &interfaceType) const
+        std::optional<ImplRecord> getImplRecord(const TypeInfo &structType, const TypeInfo &interfaceType) const
         {
             auto it = implRegistry.find(structType);
             if (it != implRegistry.end())
@@ -257,9 +248,7 @@ namespace Fig
             return std::nullopt;
         }
 
-        void setImplRecord(const TypeInfo &structType,
-                           const TypeInfo &interfaceType,
-                           const ImplRecord &record)
+        void setImplRecord(const TypeInfo &structType, const TypeInfo &interfaceType, const ImplRecord &record)
         {
             auto &list = implRegistry[structType];
 
@@ -271,8 +260,7 @@ namespace Fig
             list.push_back(record); // order is the level
         }
 
-        bool hasMethodImplemented(const TypeInfo &structType,
-                                  const FString &functionName) const
+        bool hasMethodImplemented(const TypeInfo &structType, const FString &functionName) const
         {
             auto it = implRegistry.find(structType);
             if (it != implRegistry.end())
@@ -283,19 +271,16 @@ namespace Fig
                 }
             }
 
-            return parent
-                   && parent->hasMethodImplemented(structType, functionName);
+            return parent && parent->hasMethodImplemented(structType, functionName);
         }
 
-        bool hasDefaultImplementedMethod(const TypeInfo &structType,
-                                         const FString &functionName) const
+        bool hasDefaultImplementedMethod(const TypeInfo &structType, const FString &functionName) const
         {
             auto it = implRegistry.find(structType);
             if (it == implRegistry.end()) return false;
 
             std::vector<TypeInfo> implementedInterfaces;
-            for (auto &record : it->second)
-                implementedInterfaces.push_back(record.interfaceType);
+            for (auto &record : it->second) implementedInterfaces.push_back(record.interfaceType);
 
             for (auto &[_, slot] : variables)
             {
@@ -303,25 +288,22 @@ namespace Fig
 
                 InterfaceType &interface = slot->value->as<InterfaceType>();
 
-                bool implemented = std::any_of(
-                    implementedInterfaces.begin(),
-                    implementedInterfaces.end(),
-                    [&](const TypeInfo &ti) { return ti == interface.type; });
+                bool implemented = std::any_of(implementedInterfaces.begin(),
+                                               implementedInterfaces.end(),
+                                               [&](const TypeInfo &ti) { return ti == interface.type; });
 
                 if (!implemented) continue;
 
                 for (auto &method : interface.methods)
                 {
-                    if (method.name == functionName && method.hasDefaultBody())
-                        return true;
+                    if (method.name == functionName && method.hasDefaultBody()) return true;
                 }
             }
 
             return false;
         }
 
-        Function getDefaultImplementedMethod(const TypeInfo &structType,
-                                             const FString &functionName)
+        Function getDefaultImplementedMethod(const TypeInfo &structType, const FString &functionName)
         {
             // O(N²)
             // SLOW
@@ -335,8 +317,7 @@ namespace Fig
             if (it == implRegistry.end()) assert(false);
 
             std::vector<TypeInfo> implementedInterfaces;
-            for (auto &record : it->second)
-                implementedInterfaces.push_back(record.interfaceType);
+            for (auto &record : it->second) implementedInterfaces.push_back(record.interfaceType);
 
             for (auto &[_, slot] : variables)
             {
@@ -344,10 +325,9 @@ namespace Fig
 
                 InterfaceType &interface = slot->value->as<InterfaceType>();
 
-                bool implemented = std::any_of(
-                    implementedInterfaces.begin(),
-                    implementedInterfaces.end(),
-                    [&](const TypeInfo &ti) { return ti == interface.type; });
+                bool implemented = std::any_of(implementedInterfaces.begin(),
+                                               implementedInterfaces.end(),
+                                               [&](const TypeInfo &ti) { return ti == interface.type; });
 
                 if (!implemented) continue;
 
@@ -357,10 +337,8 @@ namespace Fig
                     {
                         if (!method.hasDefaultBody()) assert(false);
 
-                        return Function(method.paras,
-                                        TypeInfo(method.returnType),
-                                        method.defaultBody,
-                                        shared_from_this());
+                        return Function(
+                            method.paras, TypeInfo(method.returnType), method.defaultBody, shared_from_this());
                     }
                 }
             }
@@ -369,8 +347,7 @@ namespace Fig
             return Function(); // ignore warning
         }
 
-        const Function &getImplementedMethod(const TypeInfo &structType,
-                                             const FString &functionName) const
+        const Function &getImplementedMethod(const TypeInfo &structType, const FString &functionName) const
         {
             auto it = implRegistry.find(structType);
             if (it != implRegistry.end())
@@ -382,11 +359,10 @@ namespace Fig
                 }
             }
 
-            if (parent)
-                return parent->getImplementedMethod(structType, functionName);
+            if (parent) return parent->getImplementedMethod(structType, functionName);
 
             assert(false); // not found
-            throw ""; // ignore warning
+            throw "";      // ignore warning
         }
 
         void printStackTrace(std::ostream &os = std::cerr, int indent = 0) const
@@ -403,8 +379,7 @@ namespace Fig
             os << "[STACK TRACE]\n";
             for (int i = static_cast<int>(chain.size()) - 1; i >= 0; --i)
             {
-                os << "  #" << (chain.size() - 1 - i) << " "
-                   << chain[i]->scopeName.toBasicString() << "\n";
+                os << "  #" << (chain.size() - 1 - i) << " " << chain[i]->scopeName.toBasicString() << "\n";
             }
         }
     };

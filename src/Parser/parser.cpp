@@ -56,7 +56,15 @@ namespace Fig
         // {Ast::Operator::Dot, {40, 41}},
     };
 
-    Ast::VarDef Parser::__parseVarDef(bool isPublic)
+    const std::unordered_map<Ast::Operator, Parser::Precedence> Parser::unaryOpPrecedence = {
+        {Ast::Operator::Subtract, 150}, // -
+        {Ast::Operator::BitAnd, 150}, // &
+        {Ast::Operator::BitNot, 150}, // ~
+        {Ast::Operator::Not, 150}, // !
+    };
+
+        Ast::VarDef
+        Parser::__parseVarDef(bool isPublic)
     {
         // entry: current is keyword `var` or `const`
         bool isConst = (currentToken().getType() == TokenType::Const ? true : false);
@@ -416,8 +424,7 @@ namespace Fig
                         block));
                     continue;
                 }
-                expect(TokenType::Semicolon);
-                next(); // consume `;`
+                expectSemicolon();
 
                 methods.push_back(Ast::InterfaceMethod(
                     funcName,
@@ -563,7 +570,7 @@ namespace Fig
         return makeAst<Ast::TrySt>(body, catches, finallyBlock);
     }
 
-    Ast::Statement Parser::__parseStatement()
+    Ast::Statement Parser::__parseStatement(bool allowExp)
     {
         Ast::Statement stmt;
         if (isThis(TokenType::EndOfFile)) { return makeAst<Ast::EofStmt>(); }
@@ -661,12 +668,20 @@ namespace Fig
         {
             stmt = __parseTry();
         }
-        else
+        else if (allowExp)
         {
             // expression statement
             Ast::Expression exp = parseExpression(0);
             expectSemicolon();
             stmt = makeAst<Ast::ExpressionStmtAst>(exp);
+        }
+        else 
+        {
+            throw SyntaxError(
+                u8"invalid syntax",
+                currentAAI.line,
+                currentAAI.column
+            );
         }
         return stmt;
     }
@@ -700,7 +715,7 @@ namespace Fig
         }
         else
         {
-            condition = parseExpression(0);
+            condition = parseExpression(0, TokenType::LeftBrace);
         }
         // parenthesis is not required
         expect(TokenType::LeftBrace); // {
@@ -723,7 +738,7 @@ namespace Fig
                 }
                 else
                 {
-                    elifCondition = parseExpression(0);
+                    elifCondition = parseExpression(0, TokenType::LeftBrace);
                 }
                 expect(TokenType::LeftBrace); // {
                 Ast::BlockStatement elifBody = __parseBlockStatement();
@@ -776,7 +791,9 @@ namespace Fig
             throwAddressableError<SyntaxError>(u8"Control flow statements cannot be used as for loop increment");
         }
 
-        return __parseStatement();
+        Ast::Expression exp = parseExpression(0, TokenType::LeftBrace);
+        // expectSemicolon(); we dont check the semicolon
+        return makeAst<Ast::ExpressionStmtAst>(exp);
     }
     Ast::For Parser::__parseFor()
     {
@@ -788,14 +805,14 @@ namespace Fig
             next(); // consume `(`
         // support 3-part for loop
         // for init; condition; increment {}
-        Ast::Statement initStmt = __parseStatement(); // auto check ``
+        Ast::Statement initStmt = __parseStatement(false); // auto check ``
         Ast::Expression condition = parseExpression(0);
         expectSemicolon(); // auto consume `;`
 
         Ast::Statement incrementStmt = nullptr;
         if (!isThis(paren ? TokenType::RightParen : TokenType::LeftBrace)) // need parse increment?
         {
-            auto guard = disableSemicolon();
+            // auto guard = disableSemicolon();
             incrementStmt = __parseIncrementStatement();
         } // after parse increment, semicolon check state restored
         if (paren)
@@ -906,7 +923,7 @@ namespace Fig
         return makeAst<Ast::MapExprAst>(val);
     }
 
-    Ast::InitExpr Parser::__parseInitExpr(FString structName)
+    Ast::InitExpr Parser::__parseInitExpr(Ast::Expression structe)
     {
         // entry: current is `{`
         next(); // consume `{`
@@ -917,7 +934,7 @@ namespace Fig
         .2 Person {name: "Fig", age: 1, sex: "IDK"}; // can be unordered
         .3 Person {name, age, sex};
         */
-        uint8_t mode; // 0=undetermined, 1=positional, 2=named, 3=shorthand
+        uint8_t mode = 0; // 0=undetermined, 1=positional, 2=named, 3=shorthand
 
         while (!isThis(TokenType::RightBrace))
         {
@@ -977,7 +994,7 @@ namespace Fig
         }
         expect(TokenType::RightBrace);
         next(); // consume `}`
-        return makeAst<Ast::InitExprAst>(structName, args,
+        return makeAst<Ast::InitExprAst>(structe, args,
                                          (mode == 1 ? Ast::InitExprAst::InitMode::Positional :
                                                       (mode == 2 ? Ast::InitExprAst::InitMode::Named : Ast::InitExprAst::InitMode::Shorthand)));
     }
@@ -1067,8 +1084,7 @@ namespace Fig
                 throw SyntaxError();
             }
         }
-        expect(TokenType::Semicolon);
-        next(); // consume `;`
+        expectSemicolon();
         return makeAst<Ast::ImportSt>(path);
     }
 
@@ -1117,37 +1133,36 @@ namespace Fig
         {
             FString id = tok.getValue();
             next();
-            if (currentToken().getType() == TokenType::LeftBrace)
-            {
-                lhs = __parseInitExpr(id); // a_struct{init...}
-            }
-            else
-            {
-                lhs = __parseVarExpr(id);
-            }
+            lhs = __parseVarExpr(id);
         }
         else if (isTokenOp(tok) && isOpUnary((op = Ast::TokenToOp.at(tok.getType()))))
         {
             // prefix
             next();
-            lhs = __parsePrefix(op, getRightBindingPower(op));
+            lhs = makeAst<Ast::UnaryExprAst>(op, parseExpression(bp, stop, stop2));
         }
         else
         {
-            throwAddressableError<SyntaxError>(FString(u8"Unexpected token in expression"));
+            throwAddressableError<SyntaxError>(FString(u8"Unexpected token in expression:") + tok.toString());
         }
 
         // infix / (postfix) ?
         while (true)
         {
             tok = currentToken();
-            if (tok.getType() == TokenType::Semicolon || tok == EOFTok) break;
+            if (tok.getType() == stop || tok.getType() == stop2|| tok == EOFTok) break;
 
             /* Postfix */
 
             if (tok.getType() == TokenType::LeftParen)
             {
                 lhs = __parseCall(lhs);
+                continue;
+            }
+
+            if (tok.getType() == TokenType::LeftBrace)
+            {
+                lhs = __parseInitExpr(lhs);
                 continue;
             }
 
@@ -1169,7 +1184,7 @@ namespace Fig
             if (tok.getType() == TokenType::LeftBracket)
             {
                 next(); // consume '['
-                auto indexExpr = parseExpression(0, TokenType::RightBracket);
+                auto indexExpr = parseExpression(0, TokenType::RightBracket, stop2);
                 expect(TokenType::RightBracket);
                 next(); // consume ']'
 
@@ -1181,7 +1196,7 @@ namespace Fig
             if (tok.getType() == TokenType::Question)
             {
                 next(); // consume ?
-                Ast::Expression trueExpr = parseExpression(0, TokenType::Colon);
+                Ast::Expression trueExpr = parseExpression(0, TokenType::Colon, stop2);
                 expect(TokenType::Colon);
                 next(); // consume :
                 Ast::Expression falseExpr = parseExpression(0, TokenType::Semicolon, stop2);
@@ -1196,7 +1211,7 @@ namespace Fig
             if (bp >= lbp) break;
 
             next(); // consume op
-            lhs = __parseInfix(lhs, op, getRightBindingPower(op));
+            lhs = makeAst<Ast::BinaryExprAst>(lhs, op, parseExpression(bp, stop, stop2));
         }
 
         return lhs;

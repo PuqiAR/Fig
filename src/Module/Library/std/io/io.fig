@@ -43,7 +43,8 @@ public func println(objects...) -> Int
 
 public func printf(objects...) -> Any
 {
-    __fstdout_print(formater.formatByListArgs(objects));
+    var result := formater.formatByListArgs(objects);
+    __fstdout_print(result);
 }
 
 // inputs

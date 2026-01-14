@@ -573,6 +573,12 @@ namespace Fig
         for (const auto &stmt : fnStruct.body->stmts)
         {
             StatementResult sr = evalStatement(stmt, newContext);
+            if (sr.isError())
+            {
+                throw EvaluatorError(u8"UncaughtExceptionError",
+                                     std::format("Uncaught exception: {}", sr.result->toString().toBasicString()),
+                                     stmt);
+            }
             if (!sr.isNormal())
             {
                 retVal = sr.result;
@@ -683,20 +689,14 @@ namespace Fig
             }
             case AstType::InitExpr: {
                 auto initExpr = std::dynamic_pointer_cast<Ast::InitExprAst>(exp);
-                if (!ctx->contains(initExpr->structName))
-                {
-                    throw EvaluatorError(
-                        u8"StructNotFoundError",
-                        std::format("Structure type '{}' not found", initExpr->structName.toBasicString()),
-                        initExpr);
-                }
-                ObjectPtr structTypeVal = ctx->get(initExpr->structName)->value;
+                LvObject structeLv = evalLv(initExpr->structe, ctx);
+                ObjectPtr structTypeVal = structeLv.get();
+                const FString &structName = structeLv.name();
                 if (!structTypeVal->is<StructType>())
                 {
-                    throw EvaluatorError(
-                        u8"NotAStructTypeError",
-                        std::format("'{}' is not a structure type", initExpr->structName.toBasicString()),
-                        initExpr);
+                    throw EvaluatorError(u8"NotAStructTypeError",
+                                         std::format("'{}' is not a structure type", structName.toBasicString()),
+                                         initExpr);
                 }
                 const StructType &structT = structTypeVal->as<StructType>();
 
@@ -717,7 +717,8 @@ namespace Fig
                     }
 
                     // default value
-                    if (argSize == 0) {
+                    if (argSize == 0)
+                    {
                         if (type == ValueType::Any || type == ValueType::Null || type == ValueType::Function)
                         {
                             throw EvaluatorError(
@@ -824,7 +825,7 @@ namespace Fig
                 {
                     throw EvaluatorError(u8"StructInitArgumentMismatchError",
                                          std::format("Structure '{}' expects {} to {} fields, but {} were provided",
-                                                     initExpr->structName.toBasicString(),
+                                                     structName.toBasicString(),
                                                      minArgs,
                                                      maxArgs,
                                                      initExpr->args.size()),
@@ -837,7 +838,7 @@ namespace Fig
                     evaluatedArgs.push_back({argName, eval(argExpr, ctx)});
                 }
                 ContextPtr instanceCtx = std::make_shared<Context>(
-                    FString(std::format("<StructInstance {}>", initExpr->structName.toBasicString())), ctx);
+                    FString(std::format("<StructInstance {}>", structName.toBasicString())), ctx);
                 /*
                     3 ways of calling constructor
                     .1 Person {"Fig", 1, "IDK"};
@@ -869,7 +870,7 @@ namespace Fig
                                         u8"StructFieldTypeMismatchError",
                                         std::format(
                                             "In structure '{}', field '{}' expects type '{}', but got type '{}'",
-                                            initExpr->structName.toBasicString(),
+                                            structName.toBasicString(),
                                             fieldName.toBasicString(),
                                             expectedType.toString().toBasicString(),
                                             prettyType(defaultVal).toBasicString()),
@@ -886,7 +887,7 @@ namespace Fig
                                 throw EvaluatorError(
                                     u8"StructFieldTypeMismatchError",
                                     std::format("In structure '{}', field '{}' expects type '{}', but got type '{}'",
-                                                initExpr->structName.toBasicString(),
+                                                structName.toBasicString(),
                                                 fieldName.toBasicString(),
                                                 expectedType.toString().toBasicString(),
                                                 prettyType(argVal).toBasicString()),
@@ -907,7 +908,7 @@ namespace Fig
                                 throw EvaluatorError(u8"StructFieldRedeclarationError",
                                                      std::format("Field '{}' already initialized in structure '{}'",
                                                                  fieldName.toBasicString(),
-                                                                 initExpr->structName.toBasicString()),
+                                                                 structName.toBasicString()),
                                                      initExpr);
                             }
                             if (i + 1 > got)
@@ -925,7 +926,7 @@ namespace Fig
                                         u8"StructFieldTypeMismatchError",
                                         std::format(
                                             "In structure '{}', field '{}' expects type '{}', but got type '{}'",
-                                            initExpr->structName.toBasicString(),
+                                            structName.toBasicString(),
                                             fieldName.toBasicString(),
                                             expectedType.toString().toBasicString(),
                                             prettyType(defaultVal).toBasicString()),
@@ -941,7 +942,7 @@ namespace Fig
                                 throw EvaluatorError(
                                     u8"StructFieldTypeMismatchError",
                                     std::format("In structure '{}', field '{}' expects type '{}', but got type '{}'",
-                                                initExpr->structName.toBasicString(),
+                                                structName.toBasicString(),
                                                 fieldName.toBasicString(),
                                                 field.type.toString().toBasicString(),
                                                 prettyType(argVal).toBasicString()),
