@@ -1,5 +1,5 @@
 #include <Ast/Statements/ErrorFlow.hpp>
-#include "Value/VariableSlot.hpp"
+#include <Value/VariableSlot.hpp>
 #include <Value/value.hpp>
 #include <Ast/AccessModifier.hpp>
 #include <Ast/Statements/ImplementSt.hpp>
@@ -17,6 +17,7 @@
 #include <Context/context.hpp>
 #include <Utils/utils.hpp>
 #include <Parser/parser.hpp>
+#include <Core/executablePath.hpp>
 
 #include <filesystem>
 #include <fstream>
@@ -68,7 +69,7 @@ namespace Fig
                                 AccessModifier::PublicConst),
                             ctx); // fake l-value
         }
-    
+
         if (ctx->hasMethodImplemented(baseVal->getTypeInfo(), member))
         {
             // builtin type implementation!
@@ -985,8 +986,8 @@ namespace Fig
             }
 
             default: assert(false);
-            return Object::getNullInstance(); // ignore warning
         }
+        return Object::getNullInstance(); // ignore warning
     }
     StatementResult Evaluator::evalBlockStatement(Ast::BlockStatement block, ContextPtr ctx)
     {
@@ -1481,6 +1482,14 @@ namespace Fig
         static const std::vector<fs::path> defaultLibraryPath{"Library", "Library/fpm"};
 
         std::vector<fs::path> pathToFind(defaultLibraryPath);
+
+        fs::path interpreterPath = getExecutablePath().parent_path();
+
+        for (fs::path &p : pathToFind)
+        {
+            p = interpreterPath / p; // 相对路径 -> 绝对路径
+        }
+
         pathToFind.insert(
             pathToFind.begin(),
             fs::path(this->sourcePath.toBasicString()).parent_path()); // first search module at the source file path
