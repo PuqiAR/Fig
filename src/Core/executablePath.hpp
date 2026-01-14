@@ -1,7 +1,6 @@
 #pragma once
 
 #include <filesystem>
-#include <libloaderapi.h>
 
 #ifdef _WIN32
     #include <libloaderapi.h>
