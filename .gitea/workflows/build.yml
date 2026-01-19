@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "版本号 (例如: v1.0.0)"
+        description: "版本号 (例如: v1.0.0, v1.1.0-alpha)"
         required: true
         default: "dev-build"
 
@@ -39,6 +39,31 @@ jobs:
           echo "构建版本: $VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
+      - name: 获取提交信息
+        run: |
+          # 获取最新提交信息，如果是标签则获取标签指向的提交
+          if git describe --tags --exact-match >/dev/null 2>&1; then
+            # 标签发布：获取标签关联的提交信息
+            COMMIT_HASH=$(git rev-list -n 1 $VERSION)
+            COMMIT_MSG=$(git log -1 --pretty=format:"%s" $COMMIT_HASH)
+            COMMIT_BODY=$(git log -1 --pretty=format:"%b" $COMMIT_HASH)
+          else
+            # 手动触发或非标签提交：获取最新提交信息
+            COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+            COMMIT_BODY=$(git log -1 --pretty=format:"%b")
+          fi
+          
+          # 组合完整的提交信息
+          if [ -n "$COMMIT_BODY" ]; then
+            RELEASE_BODY="${COMMIT_MSG}%0A%0A${COMMIT_BODY}"
+          else
+            RELEASE_BODY="${COMMIT_MSG}"
+          fi
+          
+          # 保存到环境变量
+          echo "RELEASE_BODY=${RELEASE_BODY}" >> $GITHUB_ENV
+          echo "提交信息已保存"
+
       - name: 构建项目 (Linux)
         run: |
           echo "开始构建Linux版本..."
@@ -46,19 +71,13 @@ jobs:
           xmake build -j$(nproc)
           echo "Linux构建成功。"
 
-      # 🔧 新增：构建Linux平台安装器
       - name: 构建Linux安装器
         run: |
           echo "开始构建Linux安装器..."
-
           cd Installer/ConsoleInstaller
-
           python3 -m venv venv
           . venv/bin/activate
-
           pip config set global.index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
-
-          # 安装依赖并构建
           pip install --upgrade pip
           pip install -r requirements.txt
           python3 -m PyInstaller -F -n FigSetup-Linux --distpath ./dist/linux main.py
@@ -83,13 +102,24 @@ jobs:
           GITEA_TOKEN: ${{ secrets.CI_TOKEN }}
         run: |
           VERSION="${{ env.VERSION }}"
+          RELEASE_BODY="${{ env.RELEASE_BODY }}"
           API="https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}"
           
+          # 根据版本后缀判断是否为预发布
+          if [[ "$VERSION" =~ -(alpha|beta|dev|rc) ]] || [[ "$VERSION" == "dev-build" ]]; then
+            PRERELEASE=true
+            echo "检测到预发布版本: $VERSION"
+          else
+            PRERELEASE=false
+            echo "检测到稳定版本: $VERSION"
+          fi
+          
           echo "正在为Linux版本创建/更新发布 $VERSION ..."
+          echo "发布描述: ${RELEASE_BODY//%0A/$'\n'}"
           
           RESPONSE=$(curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"tag_name\":\"$VERSION\",\"name\":\"Fig $VERSION\",\"draft\":false,\"prerelease\":false}" \
+            -d "{\"tag_name\":\"$VERSION\",\"name\":\"Fig $VERSION\",\"body\":\"$RELEASE_BODY\",\"draft\":false,\"prerelease\":$PRERELEASE}" \
             "$API/releases" 2>/dev/null || echo '{"id":0}')
           
           RELEASE_ID=$(echo "$RESPONSE" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
@@ -118,7 +148,7 @@ jobs:
             --data-binary @Fig-$VERSION-linux-x86_64.sha256 \
             "$API/releases/$RELEASE_ID/assets?name=Fig-$VERSION-linux-x86_64.sha256"
           
-          # 🔧 新增：上传Linux安装器
+          # 上传Linux安装器
           if [ -f "Installer/ConsoleInstaller/dist/linux/FigSetup-Linux" ]; then
             echo "正在上传Linux安装器..."
             curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
@@ -131,20 +161,15 @@ jobs:
 
   build-windows-x64:
     runs-on: windows
-    # 🔧 新增：在Job级别设置版本环境变量
-    env:
-      VERSION: ${{ github.ref_name }}
 
     steps:
       - name: 验证Windows工具链
         run: |
           Set-ExecutionPolicy Bypass -Scope Process -Force
-          # 检查 xmake
           if (Get-Command xmake -ErrorAction SilentlyContinue) {
             Write-Host '✅ xmake 已安装'
             xmake --version
           } else { Write-Host '警告: xmake 未找到' }
-          # 检查 clang++
           if (Get-Command clang++ -ErrorAction SilentlyContinue) {
             Write-Host '✅ clang++ 已安装'
             clang++ --version
@@ -156,7 +181,56 @@ jobs:
           git clone https://git.fig-lang.cn/$env:GITHUB_REPOSITORY .
           git checkout $env:GITHUB_REF
 
-      # 🔧 删除：移除整个"设置版本"步骤（不再需要）
+      - name: 设置版本和提交信息 (Windows)
+        run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          
+          # 版本号获取：直接从工作流上下文中获取
+          $eventType = '${{ github.event_name }}'
+          
+          if ($eventType -eq 'workflow_dispatch') {
+            $VERSION = '${{ inputs.version }}'
+          } else {
+            $VERSION = '${{ github.ref_name }}'
+          }
+          
+          # 如果版本号为空，使用默认值
+          if ([string]::IsNullOrWhiteSpace($VERSION)) {
+            $VERSION = "dev-build"
+          }
+          
+          Write-Host "构建版本: $VERSION"
+          
+          # 获取提交信息
+          if (git describe --tags --exact-match 2>$null) {
+            # 标签发布：获取标签关联的提交信息
+            $COMMIT_HASH = git rev-list -n 1 $VERSION 2>$null
+            if ($COMMIT_HASH) {
+              $COMMIT_MSG = git log -1 --pretty=format:"%s" $COMMIT_HASH 2>$null
+              $COMMIT_BODY = git log -1 --pretty=format:"%b" $COMMIT_HASH 2>$null
+            }
+          }
+          
+          if (-not $COMMIT_MSG) {
+            # 手动触发或非标签提交：获取最新提交信息
+            $COMMIT_MSG = git log -1 --pretty=format:"%s" 2>$null
+            $COMMIT_BODY = git log -1 --pretty=format:"%b" 2>$null
+          }
+          
+          # 组合完整的提交信息
+          $RELEASE_BODY = $COMMIT_MSG
+          if (-not [string]::IsNullOrWhiteSpace($COMMIT_BODY)) {
+            $RELEASE_BODY = "$COMMIT_MSG`n`n$COMMIT_BODY"
+          }
+          
+          # 替换换行符为URL编码（用于JSON）
+          $RELEASE_BODY_JSON = $RELEASE_BODY -replace "`n", "\n" -replace "`r", "\r"
+          
+          # 保存到环境变量
+          "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "RELEASE_BODY=$RELEASE_BODY_JSON" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          
+          Write-Host "版本和提交信息已保存"
 
       - name: 构建项目 (Windows Native)
         run: |
@@ -164,7 +238,6 @@ jobs:
           xmake build -j $env:NUMBER_OF_PROCESSORS
           Write-Host 'Windows构建成功。'
 
-      # 🔧 新增：构建Windows平台安装器
       - name: 构建Windows安装器
         run: |
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -178,13 +251,7 @@ jobs:
         run: |
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           
-          # 🔧 修改：直接使用环境变量
           $VERSION = $env:VERSION
-          if ([string]::IsNullOrEmpty($VERSION)) {
-            Write-Host "警告：版本号为空，使用默认值 dev-build"
-            $VERSION = "dev-build"
-          }
-          
           Write-Host "打包版本: $VERSION"
           
           $PACKAGE_NAME = "Fig-${VERSION}-windows-x86_64"
@@ -192,7 +259,6 @@ jobs:
           
           New-Item -ItemType Directory -Force -Path $PACKAGE_NAME
           
-          # 查找可执行文件
           if (Test-Path 'build\windows\x86_64\release\Fig.exe') {
             Copy-Item 'build\windows\x86_64\release\Fig.exe' $PACKAGE_NAME\
           } elseif (Test-Path 'build\windows\x86_64\release\Fig') {
@@ -206,11 +272,9 @@ jobs:
             Copy-Item -Recurse 'src\Module\Library' $PACKAGE_NAME\
           }
           
-          # 压缩文件
           $ZIP_NAME = "$PACKAGE_NAME.zip"
           Compress-Archive -Path $PACKAGE_NAME -DestinationPath $ZIP_NAME
           
-          # 生成校验文件
           $Hash = Get-FileHash $ZIP_NAME -Algorithm SHA256
           "$($Hash.Hash)  $ZIP_NAME" | Out-File "$PACKAGE_NAME.sha256" -Encoding UTF8
           
@@ -222,20 +286,30 @@ jobs:
         run: |
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           
-          # 🔧 修改：直接使用环境变量
           $VERSION = $env:VERSION
-          if ([string]::IsNullOrEmpty($VERSION)) {
-            Write-Host "警告：版本号为空，使用默认值 dev-build"
-            $VERSION = "dev-build"
-          }
-          
-          Write-Host "正在上传Windows版本到发布: $VERSION"
-          
+          $RELEASE_BODY = $env:RELEASE_BODY
           $REPO = $env:GITHUB_REPOSITORY
           $API = "https://git.fig-lang.cn/api/v1/repos/$REPO"
           $TOKEN = $env:GITEA_TOKEN
           
-          # 🔧 新增：检查必需的文件是否存在
+          # 根据版本后缀判断是否为预发布
+          if ($VERSION -match '-(alpha|beta|dev|rc)') {
+            $PRERELEASE = $true
+            Write-Host "检测到预发布版本: $VERSION"
+          } elseif ($VERSION -eq 'dev-build') {
+            $PRERELEASE = $true
+            Write-Host "检测到开发构建版本: $VERSION"
+          } else {
+            $PRERELEASE = $false
+            Write-Host "检测到稳定版本: $VERSION"
+          }
+          
+          # 恢复换行符
+          $RELEASE_BODY = $RELEASE_BODY -replace "\\n", "`n" -replace "\\r", "`r"
+          
+          Write-Host "正在上传Windows版本到发布: $VERSION"
+          Write-Host "发布描述: $RELEASE_BODY"
+          
           $ZIP_FILE = "Fig-$VERSION-windows-x86_64.zip"
           $HASH_FILE = "Fig-$VERSION-windows-x86_64.sha256"
           $INSTALLER_PATH = "Installer\ConsoleInstaller\dist\windows\FigSetup.exe"
@@ -248,17 +322,16 @@ jobs:
           
           Write-Host "正在为Windows版本创建/更新发布 $VERSION ..."
           
-          # 🔧 关键修改：直接创建发布，不先检查（与Linux逻辑一致）
+          # 准备发布请求体
           $CREATE_BODY = @{
             tag_name = $VERSION
             name = "Fig $VERSION"
+            body = $RELEASE_BODY
             draft = $false
-            prerelease = $false
-          } | ConvertTo-Json -Compress
+            prerelease = $PRERELEASE
+          } | ConvertTo-Json
           
-          Write-Host "创建发布请求体: $CREATE_BODY"
-          
-          # 直接创建发布（Gitea会自动处理重复创建）
+          # 创建或获取发布
           $RESPONSE = Invoke-RestMethod -Method Post -Uri "$API/releases" `
             -Headers @{
               Authorization = "token $TOKEN"
@@ -266,7 +339,6 @@ jobs:
             } -Body $CREATE_BODY -ErrorAction SilentlyContinue
           
           if (-not $RESPONSE -or -not $RESPONSE.id) {
-            # 如果创建失败，尝试通过标签获取已有发布的ID
             Write-Host "创建失败，尝试获取已有发布..."
             $RESPONSE = Invoke-RestMethod -Uri "$API/releases/tags/$VERSION" `
               -Headers @{Authorization = "token $TOKEN" } `
@@ -296,7 +368,6 @@ jobs:
               'Content-Type' = 'text/plain'
             } -InFile $HASH_FILE -ErrorAction SilentlyContinue
           
-          # 上传Windows安装器
           if (Test-Path $INSTALLER_PATH) {
             Write-Host "正在上传Windows安装器..."
             Invoke-RestMethod -Method Post -Uri "$API/releases/$RELEASE_ID/assets?name=FigSetup.exe" `
@@ -304,8 +375,6 @@ jobs:
                 Authorization = "token $TOKEN"
                 'Content-Type' = 'application/octet-stream'
               } -InFile $INSTALLER_PATH -ErrorAction SilentlyContinue
-          } else {
-            Write-Host "⚠️  警告：未找到安装器文件 $INSTALLER_PATH"
           }
           
           Write-Host "✅ Windows版本发布完成！"
