@@ -105,17 +105,19 @@ jobs:
           RELEASE_BODY="${{ env.RELEASE_BODY }}"
           API="https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}"
           
-          # 根据版本后缀判断是否为预发布
-          if [[ "$VERSION" =~ -(alpha|beta|dev|rc) ]] || [[ "$VERSION" == "dev-build" ]]; then
-            PRERELEASE=true
-            echo "检测到预发布版本: $VERSION"
-          else
-            PRERELEASE=false
-            echo "检测到稳定版本: $VERSION"
-          fi
+          # 修复：使用兼容性最好的case语句判断预发布版本
+          case "$VERSION" in
+            *-alpha* | *-beta* | *-dev* | *-rc* | dev-build)
+              PRERELEASE=true
+              echo "检测到预发布版本: $VERSION"
+              ;;
+            *)
+              PRERELEASE=false
+              echo "检测到稳定版本: $VERSION"
+              ;;
+          esac
           
           echo "正在为Linux版本创建/更新发布 $VERSION ..."
-          echo "发布描述: ${RELEASE_BODY//%0A/$'\n'}"
           
           RESPONSE=$(curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
@@ -185,53 +187,44 @@ jobs:
         run: |
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           
-          # 版本号获取：直接从工作流上下文中获取
+          # 1. 获取版本号（直接使用Gitea上下文，避免环境变量问题）
           $eventType = '${{ github.event_name }}'
           
           if ($eventType -eq 'workflow_dispatch') {
+            # 手动触发：使用输入框的值
             $VERSION = '${{ inputs.version }}'
           } else {
+            # 标签推送：使用标签名
             $VERSION = '${{ github.ref_name }}'
           }
           
-          # 如果版本号为空，使用默认值
+          # 兜底：如果版本号为空，使用默认值
           if ([string]::IsNullOrWhiteSpace($VERSION)) {
             $VERSION = "dev-build"
           }
           
           Write-Host "构建版本: $VERSION"
           
-          # 获取提交信息
-          if (git describe --tags --exact-match 2>$null) {
-            # 标签发布：获取标签关联的提交信息
-            $COMMIT_HASH = git rev-list -n 1 $VERSION 2>$null
-            if ($COMMIT_HASH) {
-              $COMMIT_MSG = git log -1 --pretty=format:"%s" $COMMIT_HASH 2>$null
-              $COMMIT_BODY = git log -1 --pretty=format:"%b" $COMMIT_HASH 2>$null
-            }
-          }
+          # 2. 安全地获取提交信息（完全避免在非标签提交上执行`git describe`）
+          $COMMIT_MSG = $null
+          $COMMIT_BODY = $null
           
-          if (-not $COMMIT_MSG) {
-            # 手动触发或非标签提交：获取最新提交信息
-            $COMMIT_MSG = git log -1 --pretty=format:"%s" 2>$null
-            $COMMIT_BODY = git log -1 --pretty=format:"%b" 2>$null
-          }
+          # 首先，总是尝试获取当前HEAD的提交信息（最安全）
+          $COMMIT_MSG = git log -1 --pretty=format:"%s" 2>$null
+          $COMMIT_BODY = git log -1 --pretty=format:"%b" 2>$null
           
-          # 组合完整的提交信息
+          # 3. 组合Release正文
           $RELEASE_BODY = $COMMIT_MSG
           if (-not [string]::IsNullOrWhiteSpace($COMMIT_BODY)) {
-            $RELEASE_BODY = "$COMMIT_MSG`n`n$COMMIT_BODY"
+            $RELEASE_BODY = "${COMMIT_MSG}`n`n${COMMIT_BODY}"
           }
           
-          # 替换换行符为URL编码（用于JSON）
-          $RELEASE_BODY_JSON = $RELEASE_BODY -replace "`n", "\n" -replace "`r", "\r"
-          
-          # 保存到环境变量
+          # 4. 将正文中的换行符转换为JSON可识别的\n，并设置环境变量
+          $RELEASE_BODY_JSON = $RELEASE_BODY -replace "`r`n", "\n" -replace "`n", "\n"
           "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "RELEASE_BODY=$RELEASE_BODY_JSON" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           
-          Write-Host "版本和提交信息已保存"
-
+          Write-Host "版本和提交信息已设置"
       - name: 构建项目 (Windows Native)
         run: |
           xmake f -p windows -a x86_64 -m release -y
