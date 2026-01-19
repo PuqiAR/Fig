@@ -271,138 +271,137 @@ jobs:
         run: |
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           
-          # 🔥 核心修复：不依赖任何前置环境变量，自行获取版本
-          Write-Host “=== 开始发布流程 ==="
+          Write-Host "=== 开始发布流程 ==="
           
-          # 1. 确定版本号 (唯一可靠来源：Git仓库本身)
+          # 1. 确定版本号
           $VERSION = $null
           
           # 首先尝试获取当前HEAD指向的精确标签
           $exactTag = git describe --tags --exact-match 2>$null
           if ($exactTag) {
               $VERSION = $exactTag.Trim()
-              Write-Host “方式一：通过精确标签获取版本: $VERSION”
+              Write-Host "方式一：通过精确标签获取版本: $VERSION"
           }
           
           # 如果失败，尝试获取指向当前HEAD的所有标签
           if (-not $VERSION) {
               $tagsAtHead = git tag --points-at HEAD 2>$null
               if ($tagsAtHead) {
-                  $VERSION = ($tagsAtHead -split “`n”)[0].Trim()
-                  Write-Host “方式二：通过HEAD关联标签获取版本: $VERSION”
+                  $VERSION = ($tagsAtHead -split "`n")[0].Trim()
+                  Write-Host "方式二：通过HEAD关联标签获取版本: $VERSION"
               }
           }
           
           # 如果仍然失败，说明是手动触发或无标签推送，使用 dev-build
           if (-not $VERSION) {
-              $VERSION = “dev-build”
-              Write-Host “方式三：无标签，使用默认版本: $VERSION”
+              $VERSION = "dev-build"
+              Write-Host "方式三：无标签，使用默认版本: $VERSION"
           }
           
-          Write-Host “最终发布版本: $VERSION”
+          Write-Host "最终发布版本: $VERSION"
           
           # 2. 根据版本后缀判断是否为预发布
-          if ($VERSION -match ‘-(alpha|beta|dev|rc)’) {
+          if ($VERSION -match '-(alpha|beta|dev|rc)') {
               $PRERELEASE = $true
-              Write-Host “版本类型：预发布版本”
-          } elseif ($VERSION -eq ‘dev-build’) {
+              Write-Host "版本类型：预发布版本"
+          } elseif ($VERSION -eq 'dev-build') {
               $PRERELEASE = $true
-              Write-Host “版本类型：开发构建”
+              Write-Host "版本类型：开发构建"
           } else {
               $PRERELEASE = $false
-              Write-Host “版本类型：稳定版本”
+              Write-Host "版本类型：稳定版本"
           }
           
           # 3. 获取本次提交信息作为发布描述
-          $COMMIT_MSG = git log -1 --pretty=format:“%s” 2>$null
-          $COMMIT_BODY = git log -1 --pretty=format:“%b” 2>$null
+          $COMMIT_MSG = git log -1 --pretty=format:"%s" 2>$null
+          $COMMIT_BODY = git log -1 --pretty=format:"%b" 2>$null
           
           $RELEASE_BODY = $COMMIT_MSG
           if (-not [string]::IsNullOrWhiteSpace($COMMIT_BODY)) {
-              $RELEASE_BODY = “${COMMIT_MSG}`n`n${COMMIT_BODY}”
+              $RELEASE_BODY = "${COMMIT_MSG}`n`n${COMMIT_BODY}"
           }
           
           # 将正文中的换行符转换为JSON可识别的\n
-          $RELEASE_BODY_JSON = $RELEASE_BODY -replace “`r`n”， “\n” -replace “`n”， “\n”
+          $RELEASE_BODY_JSON = $RELEASE_BODY -replace "`r`n", "\n" -replace "`n", "\n"
           
-          Write-Host “发布描述: $RELEASE_BODY”
+          Write-Host "发布描述: $RELEASE_BODY"
           
           # 4. 设置API相关变量
           $REPO = $env:GITHUB_REPOSITORY
-          $API = “https://git.fig-lang.cn/api/v1/repos/$REPO”
+          $API = "https://git.fig-lang.cn/api/v1/repos/$REPO"
           $TOKEN = $env:GITEA_TOKEN
           
           # 5. 检查必需的文件
-          $ZIP_FILE = “Fig-$VERSION-windows-x86_64.zip”
-          $HASH_FILE = “Fig-$VERSION-windows-x86_64.sha256”
-          $INSTALLER_PATH = “Installer\ConsoleInstaller\dist\windows\FigSetup.exe”
+          $ZIP_FILE = "Fig-$VERSION-windows-x86_64.zip"
+          $HASH_FILE = "Fig-$VERSION-windows-x86_64.sha256"
+          $INSTALLER_PATH = "Installer\ConsoleInstaller\dist\windows\FigSetup.exe"
           
           if (-not (Test-Path $ZIP_FILE)) {
-              Write-Host “❌ 致命错误：找不到构建产物 $ZIP_FILE”
-              Write-Host “当前目录文件列表：”
+              Write-Host "❌ 致命错误：找不到构建产物 $ZIP_FILE"
+              Write-Host "当前目录文件列表："
               Get-ChildItem *.zip
               exit 1
           }
           
-          Write-Host “正在为版本 [$VERSION] 创建/更新发布...”
+          Write-Host "正在为版本 [$VERSION] 创建/更新发布..."
           
           # 6. 创建发布请求体
           $CREATE_BODY = @{
               tag_name = $VERSION
-              name = “Fig $VERSION”
+              name = "Fig $VERSION"
               body = $RELEASE_BODY_JSON
               draft = $false
               prerelease = $PRERELEASE
           } | ConvertTo-Json
           
-          Write-Host “发布请求体: $CREATE_BODY”
+          Write-Host "发布请求体: $CREATE_BODY"
           
           # 7. 创建或获取已有的发布
-          $RESPONSE = Invoke-RestMethod -Method Post -Uri “$API/releases” `
+          $RESPONSE = Invoke-RestMethod -Method Post -Uri "$API/releases" `
               -Headers @{
-                  Authorization = “token $TOKEN”
-                  ‘Content-Type’ = ‘application/json’
+                  Authorization = "token $TOKEN"
+                  'Content-Type' = 'application/json'
               } -Body $CREATE_BODY -ErrorAction SilentlyContinue
           
           if (-not $RESPONSE -or -not $RESPONSE.id) {
-              Write-Host “创建新发布失败，尝试获取已有发布...”
-              $RESPONSE = Invoke-RestMethod -Uri “$API/releases/tags/$VERSION” `
-                  -Headers @{Authorization = “token $TOKEN” } `
+              Write-Host "创建新发布失败，尝试获取已有发布..."
+              $RESPONSE = Invoke-RestMethod -Uri "$API/releases/tags/$VERSION" `
+                  -Headers @{Authorization = "token $TOKEN" } `
                   -ErrorAction SilentlyContinue
           }
           
           if ($RESPONSE -and $RESPONSE.id) {
               $RELEASE_ID = $RESPONSE.id
-              Write-Host “✅ 成功获取发布 ID: $RELEASE_ID”
+              Write-Host "✅ 成功获取发布 ID: $RELEASE_ID"
           } else {
-              Write-Host “❌ 致命错误：无法创建或获取发布”
+              Write-Host "❌ 致命错误：无法创建或获取发布"
               exit 1
           }
           
           # 8. 上传所有资产
-          Write-Host “正在上传ZIP文件 [$ZIP_FILE]...”
-          $uploadResult1 = Invoke-RestMethod -Method Post -Uri “$API/releases/$RELEASE_ID/assets?name=$ZIP_FILE” `
+          Write-Host "正在上传ZIP文件 [$ZIP_FILE]..."
+          $uploadResult1 = Invoke-RestMethod -Method Post -Uri "$API/releases/$RELEASE_ID/assets?name=$ZIP_FILE" `
               -Headers @{
-                  Authorization = “token $TOKEN”
-                  ‘Content-Type’ = ‘application/octet-stream’
+                  Authorization = "token $TOKEN"
+                  'Content-Type' = 'application/octet-stream'
               } -InFile $ZIP_FILE -ErrorAction SilentlyContinue
           
-          Write-Host “正在上传校验文件 [$HASH_FILE]...”
-          $uploadResult2 = Invoke-RestMethod -Method Post -Uri “$API/releases/$RELEASE_ID/assets?name=$HASH_FILE” `
+          Write-Host "正在上传校验文件 [$HASH_FILE]..."
+          $uploadResult2 = Invoke-RestMethod -Method Post -Uri "$API/releases/$RELEASE_ID/assets?name=$HASH_FILE" `
               -Headers @{
-                  Authorization = “token $TOKEN”
-                  ‘Content-Type’ = ‘text/plain’
+                  Authorization = "token $TOKEN"
+                  'Content-Type' = 'text/plain'
               } -InFile $HASH_FILE -ErrorAction SilentlyContinue
           
           if (Test-Path $INSTALLER_PATH) {
-              Write-Host “正在上传Windows安装器 [FigSetup.exe]...”
-              $uploadResult3 = Invoke-RestMethod -Method Post -Uri “$API/releases/$RELEASE_ID/assets?name=FigSetup.exe” `
+              Write-Host "正在上传Windows安装器 [FigSetup.exe]..."
+              $uploadResult3 = Invoke-RestMethod -Method Post -Uri "$API/releases/$RELEASE_ID/assets?name=FigSetup.exe" `
                   -Headers @{
-                      Authorization = “token $TOKEN”
-                      ‘Content-Type’ = ‘application/octet-stream’
+                      Authorization = "token $TOKEN"
+                      'Content-Type' = 'application/octet-stream'
                   } -InFile $INSTALLER_PATH -ErrorAction SilentlyContinue
           } else {
-              Write-Host “⚠️  警告：未找到安装器文件，跳过上传”
+              Write-Host "⚠️  警告：未找到安装器文件，跳过上传"
           }
           
-          Write-Host “✅ Windows版本 [$VERSION] 发布完成！”
+          Write-Host "✅ Windows版本 [$VERSION] 发布完成！"
