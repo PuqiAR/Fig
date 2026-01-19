@@ -187,10 +187,11 @@ jobs:
         run: |
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           
-          # 1. 获取版本号（直接使用Gitea上下文，避免环境变量问题）
-          $eventType = '${{ github.event_name }}'
+          # 最简版本逻辑
+          # 手动触发 -> 使用输入框的文本（默认是dev-build）
+          # 标签推送 -> 使用标签名
           
-          if ($eventType -eq 'workflow_dispatch') {
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') {
             # 手动触发：使用输入框的值
             $VERSION = '${{ inputs.version }}'
           } else {
@@ -198,33 +199,24 @@ jobs:
             $VERSION = '${{ github.ref_name }}'
           }
           
-          # 兜底：如果版本号为空，使用默认值
-          if ([string]::IsNullOrWhiteSpace($VERSION)) {
-            $VERSION = "dev-build"
-          }
-          
           Write-Host "构建版本: $VERSION"
           
-          # 2. 安全地获取提交信息（完全避免在非标签提交上执行`git describe`）
-          $COMMIT_MSG = $null
-          $COMMIT_BODY = $null
-          
-          # 首先，总是尝试获取当前HEAD的提交信息（最安全）
+          # 获取提交信息
           $COMMIT_MSG = git log -1 --pretty=format:"%s" 2>$null
           $COMMIT_BODY = git log -1 --pretty=format:"%b" 2>$null
           
-          # 3. 组合Release正文
           $RELEASE_BODY = $COMMIT_MSG
           if (-not [string]::IsNullOrWhiteSpace($COMMIT_BODY)) {
             $RELEASE_BODY = "${COMMIT_MSG}`n`n${COMMIT_BODY}"
           }
           
-          # 4. 将正文中的换行符转换为JSON可识别的\n，并设置环境变量
+          # 设置环境变量
           $RELEASE_BODY_JSON = $RELEASE_BODY -replace "`r`n", "\n" -replace "`n", "\n"
           "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "RELEASE_BODY=$RELEASE_BODY_JSON" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           
           Write-Host "版本和提交信息已设置"
+          
       - name: 构建项目 (Windows Native)
         run: |
           xmake f -p windows -a x86_64 -m release -y
