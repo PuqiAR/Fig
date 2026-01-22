@@ -1,5 +1,6 @@
 import std.io;
 import std.time;
+import std.value;
 
 func benchmark(fn: Function, arg: Any) -> Null
 {
@@ -58,8 +59,26 @@ func fib(x)
     return fib(x - 1) + fib(x - 2);
 }
 
-const n := 28;
+func fib_tail(n, a=0, b=1) {
+    if n == 0 { return a; }
+    if n == 1 { return b; }
+    return fib_tail(n-1, b, a+b);
+}
 
+const n := 30;
+
+io.println("! fib(" + value.string_from(n) + "):");
 benchmark(fib, n);
+io.print("\n\n");
+
+io.println("! fib_memo(" + value.string_from(n) + "):");
 benchmark(fib_memo, n);
+io.print("\n\n");
+
+io.println("! fib_iter(" + value.string_from(n) + "):");
 benchmark(fib_iter, n);
+io.print("\n\n");
+
+io.println("! fib_tail(" + value.string_from(n) + "):");
+benchmark(fib_tail, n);
+io.print("\n\n");
