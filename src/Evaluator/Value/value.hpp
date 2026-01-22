@@ -6,6 +6,7 @@
 #include <Value/Type.hpp>
 #include <Value/valueError.hpp>
 #include <Value/module.hpp>
+#include <Value/value_forward.hpp>
 
 #include <memory>
 #include <variant>
@@ -31,10 +32,8 @@ namespace Fig
             static_cast<ValueType::DoubleClass>(std::numeric_limits<ValueType::IntClass>::min());
         return d > intMaxAsDouble || d < intMinAsDouble;
     }
-    class Object;
-    using ObjectPtr = std::shared_ptr<Object>;
 
-
+    TypeInfo actualType(std::shared_ptr<const Object> obj);
     FString prettyType(std::shared_ptr<const Object> obj);
 
     bool operator==(const Object &, const Object &);
@@ -509,7 +508,7 @@ namespace Fig
             {
                 bool bothInt = lhs.is<ValueType::IntClass>() && rhs.is<ValueType::IntClass>();
                 auto result = lhs.getNumericValue() + rhs.getNumericValue();
-                if (bothInt && !isNumberExceededIntLimit(result))
+                if (bothInt)
                     return Object(static_cast<ValueType::IntClass>(result));
                 return Object(result);
             }
@@ -526,7 +525,7 @@ namespace Fig
             {
                 bool bothInt = lhs.is<ValueType::IntClass>() && rhs.is<ValueType::IntClass>();
                 auto result = lhs.getNumericValue() - rhs.getNumericValue();
-                if (bothInt && !isNumberExceededIntLimit(result))
+                if (bothInt)
                     return Object(static_cast<ValueType::IntClass>(result));
                 return Object(result);
             }
@@ -541,8 +540,18 @@ namespace Fig
             {
                 bool bothInt = lhs.is<ValueType::IntClass>() && rhs.is<ValueType::IntClass>();
                 auto result = lhs.getNumericValue() * rhs.getNumericValue();
-                if (bothInt && !isNumberExceededIntLimit(result))
+                if (bothInt)
                     return Object(static_cast<ValueType::IntClass>(result));
+                return Object(result);
+            }
+            if (lhs.is<ValueType::StringClass>() && rhs.is<ValueType::IntClass>())
+            {
+                FString result;
+                const FString &l = lhs.as<ValueType::StringClass>();
+                for (size_t i=0; i < rhs.getNumericValue(); ++i)
+                {
+                    result += l;
+                }
                 return Object(result);
             }
             throw ValueError(FString(makeTypeErrorMessage("Unsupported operation", "*", lhs, rhs)));
@@ -559,7 +568,7 @@ namespace Fig
                     throw ValueError(FString(makeTypeErrorMessage("Division by zero", "/", lhs, rhs)));
                 // bool bothInt = lhs.is<ValueType::IntClass>() && rhs.is<ValueType::IntClass>();
                 auto result = lhs.getNumericValue() / rnv;
-                // if (bothInt && !isNumberExceededIntLimit(result))
+                // if (bothInt)
                 //     return Object(static_cast<ValueType::IntClass>(result));
 
                 // int / int maybe decimals
@@ -573,15 +582,24 @@ namespace Fig
         {
             if (lhs.isNull() || rhs.isNull())
                 throw ValueError(FString(makeTypeErrorMessage("Cannot modulo", "%", lhs, rhs)));
+            if (lhs.is<ValueType::IntClass>() && rhs.is<ValueType::IntClass>())
+            {
+                ValueType::IntClass lv = lhs.as<ValueType::IntClass>();
+                ValueType::IntClass rv = lhs.as<ValueType::IntClass>();
+                if (rv == 0) throw ValueError(FString(makeTypeErrorMessage("Modulo by zero", "/", lhs, rhs)));
+
+                ValueType::IntClass q = lv / rv;
+                ValueType::IntClass r = lv % rv;
+                if (r != 0 && ((lv < 0) != (rv < 0))) { q -= 1; }
+                return q;
+            }
+            
             if (lhs.isNumeric() && rhs.isNumeric())
             {
                 auto rnv = rhs.getNumericValue();
                 if (rnv == 0)
                     throw ValueError(FString(makeTypeErrorMessage("Modulo by zero", "/", lhs, rhs)));
-                bool bothInt = lhs.is<ValueType::IntClass>() && rhs.is<ValueType::IntClass>();
                 auto result = std::fmod(lhs.getNumericValue(), rnv);
-                if (bothInt && !isNumberExceededIntLimit(result))
-                    return Object(static_cast<ValueType::IntClass>(result));
                 return Object(result);
             }
             throw ValueError(FString(makeTypeErrorMessage("Unsupported operation", "%", lhs, rhs)));
@@ -698,7 +716,7 @@ namespace Fig
             {
                 bool bothInt = base.is<ValueType::IntClass>() && exp.is<ValueType::IntClass>();
                 auto result = std::pow(base.getNumericValue(), exp.getNumericValue());
-                if (bothInt && !isNumberExceededIntLimit(result))
+                if (bothInt)
                     return Object(static_cast<ValueType::IntClass>(result));
                 return Object(result);
             }
@@ -706,7 +724,6 @@ namespace Fig
         }
     };
 
-    using ObjectPtr = std::shared_ptr<Object>;
     using RvObject = ObjectPtr;
 
     inline bool operator==(const ValueKey &l, const ValueKey &r)

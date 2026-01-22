@@ -1,3 +1,4 @@
+#include "Value/structType.hpp"
 #include <Value/Type.hpp>
 #include <Value/value.hpp>
 #include <Context/context.hpp>
@@ -26,9 +27,7 @@ namespace Fig
         {
             if (!typeMap.contains(_name))
             {
-                throw RuntimeError(FString(std::format(
-                    "No type named '{}'",
-                    _name.toBasicString())));
+                throw RuntimeError(FString(std::format("No type named '{}'", _name.toBasicString())));
                 // *this = ValueType::String;
             }
             id = typeMap.at(name); // may throw
@@ -41,10 +40,7 @@ namespace Fig
             ObjectPtr value = key.value;
             const TypeInfo &type = value->getTypeInfo();
 
-            if (type == ValueType::Int)
-            {
-                return std::hash<ValueType::IntClass>{}(value->as<ValueType::IntClass>());
-            }
+            if (type == ValueType::Int) { return std::hash<ValueType::IntClass>{}(value->as<ValueType::IntClass>()); }
             if (type == ValueType::Double)
             {
                 return std::hash<ValueType::DoubleClass>{}(value->as<ValueType::DoubleClass>());
@@ -61,10 +57,7 @@ namespace Fig
             {
                 auto HashFields = [](std::vector<Field> fields) {
                     size_t r = 0;
-                    for (auto &f : fields)
-                    {
-                        r += std::hash<Field>{}(f);
-                    }
+                    for (auto &f : fields) { r += std::hash<Field>{}(f); }
                     return r;
                 };
                 const StructType &st = value->as<StructType>();
@@ -73,19 +66,30 @@ namespace Fig
             if (type == ValueType::StructInstance)
             {
                 const StructInstance &si = value->as<StructInstance>();
-                return std::hash<TypeInfo>{}(si.parentType) + std::hash<uint64_t>{}(reinterpret_cast<uint64_t>(std::addressof(*si.localContext)));
+                return std::hash<TypeInfo>{}(si.parentType)
+                       + std::hash<uint64_t>{}(reinterpret_cast<uint64_t>(std::addressof(*si.localContext)));
             }
             assert(false);
             throw ""; // ignore warning
         }
     }
 
-    FString prettyType(std::shared_ptr<const Object> obj)
+    TypeInfo actualType(std::shared_ptr<const Object> obj)
     {
         auto t = obj->getTypeInfo();
-        if (t == ValueType::StructInstance)
-            return obj->as<StructInstance>().parentType.toString();
-        return t.toString();
+        
+        // dispatch builtin struct types (like Int{}, List{} e.g...)
+        if (t == ValueType::StructType)
+        {
+            return obj->as<StructType>().type;
+        }
+
+        if (t == ValueType::StructInstance) return obj->as<StructInstance>().parentType;
+        return t;
+    }
+    FString prettyType(std::shared_ptr<const Object> obj)
+    {
+        return actualType(obj).toString();
     }
 
     const TypeInfo ValueType::Any(FString(u8"Any"), true);                       // id: 1
@@ -102,8 +106,6 @@ namespace Fig
     const TypeInfo ValueType::Module(FString(u8"Module"), true);                 // id: 12
     const TypeInfo ValueType::InterfaceType(FString(u8"InterfaceType"), true);   // id: 13
 
-
-
     bool implements(const TypeInfo &structType, const TypeInfo &interfaceType, ContextPtr ctx)
     {
         return ctx->hasImplRegisted(structType, interfaceType);
@@ -111,28 +113,25 @@ namespace Fig
 
     bool isTypeMatch(const TypeInfo &expected, ObjectPtr obj, ContextPtr ctx)
     {
-        if (expected == ValueType::Any)
-            return true;
+        if (expected == ValueType::Any) return true;
 
         TypeInfo actual = obj->getTypeInfo();
 
-        if (obj->is<StructInstance>())
+        if (obj->is<StructType>())
+        {
+            const StructType &t = obj->as<StructType>();
+            if (expected == t.type) // the StructType typeinfo
+            {
+                return true;
+            }
+        }
+        else if (obj->is<StructInstance>())
         {
             const StructInstance &si = obj->as<StructInstance>();
-            if (si.parentType == expected)
-            {
-                return true;
-            }
-            if (implements(si.parentType, expected, ctx))
-            {
-                return true;
-            }
-            return false;
+            if (si.parentType == expected) { return true; }
+            if (implements(si.parentType, expected, ctx)) { return true; }
         }
-        else
-        {
-            return expected == actual;
-        }
+        return expected == actual;
     }
 
 } // namespace Fig

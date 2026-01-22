@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string_view>
 
-#define __FCORE_VERSION "0.4.1-alpha"
+#define __FCORE_VERSION "0.4.2-alpha"
 
 #if defined(_WIN32)
     #define __FCORE_PLATFORM "Windows"

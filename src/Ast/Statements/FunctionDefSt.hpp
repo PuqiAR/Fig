@@ -23,14 +23,14 @@ namespace Fig::Ast
         FString name;
         FunctionParameters paras;
         bool isPublic;
-        FString retType;
+        Expression retType; 
         BlockStatement body;
-        FunctionDefSt() :
-            retType(ValueType::Null.name)
+
+        FunctionDefSt()
         {
             type = AstType::FunctionDefSt;
         }
-        FunctionDefSt(FString _name, FunctionParameters _paras, bool _isPublic, FString _retType, BlockStatement _body)
+        FunctionDefSt(FString _name, FunctionParameters _paras, bool _isPublic, Expression _retType, BlockStatement _body)
         {
             type = AstType::FunctionDefSt;
 

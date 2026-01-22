@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Ast/Expressions/VarExpr.hpp"
+#include "Ast/Statements/VarDef.hpp"
+#include "Ast/astBase.hpp"
 #include <Ast/Statements/InterfaceDefSt.hpp>
 #include <Ast/functionParameters.hpp>
 #include <Core/fig_string.hpp>
@@ -35,11 +38,19 @@ namespace Fig
             {u8"true", Object::getTrueInstance()},
             {u8"false", Object::getFalseInstance()},
             {u8"Error",
-             std::make_shared<Object>(InterfaceType(
-                 ErrorInterfaceTypeInfo,
-                 {Ast::InterfaceMethod(u8"toString", Ast::FunctionParameters({}, {}), u8"String", nullptr),
-                  Ast::InterfaceMethod(u8"getErrorClass", Ast::FunctionParameters({}, {}), u8"String", nullptr),
-                  Ast::InterfaceMethod(u8"getErrorMessage", Ast::FunctionParameters({}, {}), u8"String", nullptr)}))},
+             std::make_shared<Object>(InterfaceType(ErrorInterfaceTypeInfo,
+                                                    {Ast::InterfaceMethod(u8"toString",
+                                                                          Ast::FunctionParameters({}, {}),
+                                                                          std::make_shared<Ast::VarExprAst>(u8"String"),
+                                                                          nullptr),
+                                                     Ast::InterfaceMethod(u8"getErrorClass",
+                                                                          Ast::FunctionParameters({}, {}),
+                                                                          std::make_shared<Ast::VarExprAst>(u8"String"),
+                                                                          nullptr),
+                                                     Ast::InterfaceMethod(u8"getErrorMessage",
+                                                                          Ast::FunctionParameters({}, {}),
+                                                                          std::make_shared<Ast::VarExprAst>(u8"String"),
+                                                                          nullptr)}))},
 
             {u8"Any", std::make_shared<Object>(StructType(ValueType::Any, nullptr, {}, true))},
             {u8"Int", std::make_shared<Object>(StructType(ValueType::Int, nullptr, {}, true))},

@@ -111,7 +111,7 @@ private:
         printFString(node->name, 0);
         printIndent(indent + 2);
         std::cout << "Type: ";
-        printFString(node->typeName, 0);
+        printFString(node->declaredType->toString(), 0);
         if (node->expr)
         {
             printIndent(indent + 2);

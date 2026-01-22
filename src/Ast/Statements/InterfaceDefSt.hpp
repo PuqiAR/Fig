@@ -25,7 +25,7 @@ namespace Fig::Ast
     {
         FString name;
         FunctionParameters paras;
-        FString returnType;
+        Expression returnType;
 
         BlockStatement defaultBody = nullptr; // nullptr is non-default func
 

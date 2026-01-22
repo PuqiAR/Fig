@@ -1,13 +1,12 @@
 #pragma once
 
-#include "Ast/astBase.hpp"
+#include <Ast/astBase.hpp>
 #include <Ast/ast.hpp>
 #include <Lexer/lexer.hpp>
 #include <Core/fig_string.hpp>
 #include <Error/error.hpp>
 
 #include <memory>
-#include <print>
 #include <source_location>
 #include <unordered_map>
 
@@ -248,7 +247,7 @@ namespace Fig
 
         [[nodiscard]] SemicolonDisabler disableSemicolon() { return SemicolonDisabler(this); }
 
-        void expectSemicolon()
+        void expectSemicolon(std::source_location loc = std::source_location::current())
         {
             // if need semicolon and stream has `;`, consume it. if not need semicolon, do nothing
 
@@ -263,18 +262,18 @@ namespace Fig
             }
 
             // normal semicolon check
-            expectConsume(TokenType::Semicolon);
+            expectConsume(TokenType::Semicolon, loc);
         }
 
-        void expectConsume(TokenType type, FString expected)
+        void expectConsume(TokenType type, FString expected, std::source_location loc = std::source_location::current())
         {
-            expect(type, expected);
+            expect(type, expected, loc);
             next();
         }
 
-        void expectConsume(TokenType type)
+        void expectConsume(TokenType type, std::source_location loc = std::source_location::current())
         {
-            expect(type);
+            expect(type, loc);
             next();
         }
 
@@ -314,6 +313,8 @@ namespace Fig
         Ast::MapExpr __parseMapExpr();   // entry: current is `{`
 
         Ast::InitExpr __parseInitExpr(Ast::Expression); // entry: current is `{`, ahead is struct type exp.
+    
+
         Ast::Expression __parseTupleOrParenExpr();      // entry: current is `(`
 
         Ast::FunctionLiteralExpr __parseFunctionLiteralExpr(); // entry: current is Token::LParen after Token::Function

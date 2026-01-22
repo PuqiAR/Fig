@@ -31,6 +31,7 @@ namespace Fig
         For,       // for
         If,        // if
         Else,      // else
+        New,       // new
         Struct,    // struct
         Interface, // interface
         Implement, // impl

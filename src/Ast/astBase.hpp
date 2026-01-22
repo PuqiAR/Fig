@@ -26,14 +26,15 @@ namespace Fig::Ast
         TernaryExpr,
 
         /* Postfix */
-        MemberExpr, // a.b
-        IndexExpr,  // a[b]
+        MemberExpr,   // a.b
+        IndexExpr,    // a[b]
         FunctionCall, // a()
 
         /* Literals */
         ListExpr,  // [1, "2", 3
         TupleExpr, // (1, 2, 3)
         MapExpr,   // {a: 1}
+
         InitExpr,  // struct{"123", 456}
         FunctionLiteralExpr,
 
@@ -119,30 +120,20 @@ namespace Fig::Ast
 
         _AstBase() {}
 
-        void setAAI(AstAddressInfo _aai)
-        {
-            aai = std::move(_aai);
-        }
+        void setAAI(AstAddressInfo _aai) { aai = std::move(_aai); }
 
         virtual FString typeName()
         {
-            return FString::fromStringView(
-                FStringView::fromBasicStringView(magic_enum::enum_name(type)));
+            return FString::fromStringView(FStringView::fromBasicStringView(magic_enum::enum_name(type)));
         }
         virtual FString toString()
         {
             return FString(std::format("<Base Ast '{}' at {}:{}>", typeName().toBasicString(), aai.line, aai.column));
         }
 
-        AstAddressInfo getAAI()
-        {
-            return aai;
-        }
+        AstAddressInfo getAAI() { return aai; }
 
-        AstType getType()
-        {
-            return type;
-        }
+        AstType getType() { return type; }
     };
 
     class StatementAst : public _AstBase
@@ -150,10 +141,7 @@ namespace Fig::Ast
     public:
         using _AstBase::_AstBase;
         using _AstBase::operator=;
-        StatementAst()
-        {
-            type = AstType::StatementBase;
-        }
+        StatementAst() { type = AstType::StatementBase; }
 
         virtual FString toString() override
         {
@@ -164,10 +152,7 @@ namespace Fig::Ast
     class EofStmt final : public StatementAst
     {
     public:
-        EofStmt()
-        {
-            type = AstType::StatementBase;
-        }
+        EofStmt() { type = AstType::StatementBase; }
 
         virtual FString toString() override
         {
@@ -180,10 +165,7 @@ namespace Fig::Ast
     public:
         using _AstBase::_AstBase;
         using _AstBase::operator=;
-        ExpressionAst()
-        {
-            type = AstType::ExpressionBase;
-        }
+        ExpressionAst() { type = AstType::ExpressionBase; }
 
         virtual FString toString() override
         {
@@ -242,41 +224,22 @@ namespace Fig::Ast
     static const std::unordered_set<Operator> unaryOps{
         Operator::Not,      // !
         Operator::Subtract, // -
-        Operator::BitNot, // ~
+        Operator::BitNot,   // ~
 
         Operator::BitAnd, // reference operator &
     };
     static const std::unordered_set<Operator> binaryOps{
-        Operator::Add,
-        Operator::Subtract,
-        Operator::Multiply,
-        Operator::Divide,
-        Operator::Modulo,
-        Operator::Power,
-        Operator::And,
-        Operator::Or,
+        Operator::Add,         Operator::Subtract,     Operator::Multiply,    Operator::Divide,
+        Operator::Modulo,      Operator::Power,        Operator::And,         Operator::Or,
 
-        Operator::Equal,
-        Operator::NotEqual,
-        Operator::Less,
-        Operator::LessEqual,
-        Operator::Greater,
-        Operator::GreaterEqual,
-        Operator::Is,
+        Operator::Equal,       Operator::NotEqual,     Operator::Less,        Operator::LessEqual,
+        Operator::Greater,     Operator::GreaterEqual, Operator::Is,
 
-        Operator::BitAnd,
-        Operator::BitOr,
-        Operator::BitXor,
-        Operator::BitNot,
-        Operator::ShiftLeft,
-        Operator::ShiftRight,
+        Operator::BitAnd,      Operator::BitOr,        Operator::BitXor,      Operator::BitNot,
+        Operator::ShiftLeft,   Operator::ShiftRight,
 
-        Operator::Assign,
-        Operator::PlusAssign,
-        Operator::MinusAssign,
-        Operator::AsteriskAssign,
-        Operator::SlashAssign,
-        Operator::CaretAssign
+        Operator::Assign,      Operator::PlusAssign,   Operator::MinusAssign, Operator::AsteriskAssign,
+        Operator::SlashAssign, Operator::CaretAssign
 
         // Operator::Walrus,
         // Operator::Dot
@@ -352,19 +315,9 @@ namespace Fig::Ast
     {
     public:
         std::vector<Statement> stmts;
-        BlockStatementAst()
-        {
-            type = AstType::BlockStatement;
-        }
-        BlockStatementAst(std::vector<Statement> _stmts) :
-            stmts(std::move(_stmts))
-        {
-            type = AstType::BlockStatement;
-        }
-        virtual FString typeName() override
-        {
-            return FString(u8"BlockStatement");
-        }
+        BlockStatementAst() { type = AstType::BlockStatement; }
+        BlockStatementAst(std::vector<Statement> _stmts) : stmts(std::move(_stmts)) { type = AstType::BlockStatement; }
+        virtual FString typeName() override { return FString(u8"BlockStatement"); }
         virtual FString toString() override
         {
             return FString(std::format("<StmtAst '{}' at {}:{}>", typeName().toBasicString(), aai.line, aai.column));

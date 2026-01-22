@@ -47,5 +47,5 @@ public struct Time
 
 public func now() -> Time
 {
-    return Time{__ftime_now_ns()};
+    return new Time{__ftime_now_ns()};
 }

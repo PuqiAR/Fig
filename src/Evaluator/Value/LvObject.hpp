@@ -87,7 +87,7 @@ namespace Fig
                             std::format("Variable `{}` expects type `{}`, but got '{}'",
                                         s->name.toBasicString(),
                                         s->declaredType.toString().toBasicString(),
-                                        v->getTypeInfo().toString().toBasicString())));
+                                        prettyType(v).toBasicString())));
                 }
                 if (isAccessConst(s->am))
                 {

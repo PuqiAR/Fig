@@ -12,12 +12,12 @@ namespace Fig::Ast
     {
         AccessModifier am;
         FString fieldName;
-        FString tiName;
+        Expression declaredType; 
         Expression defaultValueExpr;
 
         StructDefField() {}
-        StructDefField(AccessModifier _am, FString _fieldName, FString _tiName, Expression _defaultValueExpr) :
-            am(std::move(_am)), fieldName(std::move(_fieldName)), tiName(std::move(_tiName)), defaultValueExpr(std::move(_defaultValueExpr))
+        StructDefField(AccessModifier _am, FString _fieldName,  Expression _declaredType, Expression _defaultValueExpr) :
+            am(std::move(_am)), fieldName(std::move(_fieldName)), declaredType(std::move(_declaredType)), defaultValueExpr(std::move(_defaultValueExpr))
         {
         }
     };

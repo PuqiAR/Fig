@@ -33,14 +33,14 @@ public func format(objects ...) -> Any
 {
     if objects.length() < 1
     {
-        throw FormatError{"Require format string"};
+        throw new FormatError{"Require format string"};
     }
 
     var fmt := objects[0];
     var fmtType := value.type(fmt);
     if fmtType != "String"
     {
-        throw FormatError{"arg 0 (fmt) must be String type, got " + fmtType};
+        throw new FormatError{"arg 0 (fmt) must be String type, got " + fmtType};
     }
 
     var result := "";
@@ -56,7 +56,7 @@ public func format(objects ...) -> Any
         {
             if (i + 1 >= length)
             {
-                throw FormatError{"unclosed brace"};
+                throw new FormatError{"unclosed brace"};
             }
             
             var nextChar = fmt[i + 1];
@@ -80,12 +80,12 @@ public func format(objects ...) -> Any
             
             if endIndex == -1
             {
-                throw FormatError{"unclosed brace"};
+                throw new FormatError{"unclosed brace"};
             }
             
             if argIndex >= objects.length()
             {
-                throw FormatError{"require enough format expression"};
+                throw new FormatError{"require enough format expression"};
             }
             
             result += value.string_from(objects[argIndex]);
@@ -102,7 +102,7 @@ public func format(objects ...) -> Any
                 continue;
             }
             
-            throw FormatError{"invalid format syntax"};
+            throw new FormatError{"invalid format syntax"};
         }
         else
         {
@@ -122,14 +122,14 @@ public func formatByListArgs(objects) -> Any
     }
 if objects.length() < 1
     {
-        throw FormatError{"Require format string"};
+        throw new FormatError{"Require format string"};
     }
 
     var fmt := objects[0];
     var fmtType := value.type(fmt);
     if fmtType != "String"
     {
-        throw FormatError{"arg 0 (fmt) must be String type, got " + fmtType};
+        throw new FormatError{"arg 0 (fmt) must be String type, got " + fmtType};
     }
 
     var result := "";
@@ -145,7 +145,7 @@ if objects.length() < 1
         {
             if (i + 1 >= length)
             {
-                throw FormatError{"unclosed brace"};
+                throw new FormatError{"unclosed brace"};
             }
             
             var nextChar = fmt[i + 1];
@@ -169,12 +169,12 @@ if objects.length() < 1
             
             if endIndex == -1
             {
-                throw FormatError{"unclosed brace"};
+                throw new FormatError{"unclosed brace"};
             }
             
             if argIndex >= objects.length()
             {
-                throw FormatError{"require enough format expression"};
+                throw new FormatError{"require enough format expression"};
             }
             
             result += value.string_from(objects[argIndex]);
@@ -191,7 +191,7 @@ if objects.length() < 1
                 continue;
             }
             
-            throw FormatError{"invalid format syntax"};
+            throw new FormatError{"invalid format syntax"};
         }
         else
         {

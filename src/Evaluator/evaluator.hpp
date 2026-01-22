@@ -1,3 +1,4 @@
+#include "Ast/Expressions/InitExpr.hpp"
 #include <Ast/Statements/ImplementSt.hpp>
 #include <Ast/Statements/InterfaceDefSt.hpp>
 #include <Value/Type.hpp>
@@ -127,7 +128,7 @@ namespace Fig
         LvObject evalLv(Ast::Expression, ContextPtr); // for access: a.b / index a[b]
 
         /* Right-value eval*/
-
+        RvObject evalInitExpr(Ast::InitExpr, ContextPtr); // only allows evalUnary to call
         RvObject evalBinary(Ast::BinaryExpr, ContextPtr);   // normal binary expr: +, -, *....
         RvObject evalUnary(Ast::UnaryExpr, ContextPtr);     // unary expr
         RvObject evalTernary(Ast::TernaryExpr, ContextPtr); // ternary expr

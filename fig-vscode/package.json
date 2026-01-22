@@ -2,7 +2,7 @@
   "name": "fig-vscode",
   "displayName": "Fig Language",
   "description": "VSCode extension for Fig language with syntax highlighting",
-  "version": "0.0.2",
+  "version": "0.4.2",
   "publisher": "PuqiAR",
   "engines": {
     "vscode": "^1.90.0"

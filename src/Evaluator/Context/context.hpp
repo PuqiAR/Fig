@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Ast/Statements/InterfaceDefSt.hpp"
 #include "Value/interface.hpp"
 #include <Value/Type.hpp>
 #include <algorithm>
@@ -303,7 +304,7 @@ namespace Fig
             return false;
         }
 
-        Function getDefaultImplementedMethod(const TypeInfo &structType, const FString &functionName)
+        Ast::InterfaceMethod getDefaultImplementedMethod(const TypeInfo &structType, const FString &functionName)
         {
             // O(N²)
             // SLOW
@@ -336,15 +337,12 @@ namespace Fig
                     if (method.name == functionName)
                     {
                         if (!method.hasDefaultBody()) assert(false);
-
-                        return Function(
-                            method.paras, TypeInfo(method.returnType), method.defaultBody, shared_from_this());
+                        return method;
                     }
                 }
             }
 
             assert(false);
-            return Function(); // ignore warning
         }
 
         const Function &getImplementedMethod(const TypeInfo &structType, const FString &functionName) const

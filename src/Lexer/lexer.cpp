@@ -66,7 +66,10 @@ namespace Fig
         {FString(u8"["), TokenType::LeftBracket},
         {FString(u8"]"), TokenType::RightBracket},
         {FString(u8"{"), TokenType::LeftBrace},
-        {FString(u8"}"), TokenType::RightBrace}};
+        {FString(u8"}"), TokenType::RightBrace},
+        {FString(u8"?"), TokenType::Question},
+        {FString(u8"!"), TokenType::Not},
+    };
 
     const std::unordered_map<FString, TokenType> Lexer::keyword_map{
         {FString(u8"and"), TokenType::And},
@@ -81,6 +84,7 @@ namespace Fig
         {FString(u8"for"), TokenType::For},
         {FString(u8"if"), TokenType::If},
         {FString(u8"else"), TokenType::Else},
+        {FString(u8"new"), TokenType::New},
         {FString(u8"struct"), TokenType::Struct},
         {FString(u8"interface"), TokenType::Interface},
         {FString(u8"impl"), TokenType::Implement},

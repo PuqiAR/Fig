@@ -1,9 +1,9 @@
-#include "Ast/Statements/ErrorFlow.hpp"
-#include "Ast/Statements/ImplementSt.hpp"
-#include "Ast/astBase.hpp"
-#include "Ast/functionParameters.hpp"
-#include "Error/error.hpp"
-#include "Token/token.hpp"
+#include <Ast/Statements/ErrorFlow.hpp>
+#include <Ast/Statements/ImplementSt.hpp>
+#include <Ast/astBase.hpp>
+#include <Ast/functionParameters.hpp>
+#include <Error/error.hpp>
+#include <Token/token.hpp>
 #include <Parser/parser.hpp>
 
 namespace Fig
@@ -54,17 +54,17 @@ namespace Fig
 
         // // 点运算符
         // {Ast::Operator::Dot, {40, 41}},
+        {Ast::Operator::TernaryCond, {3, 2}},
     };
 
     const std::unordered_map<Ast::Operator, Parser::Precedence> Parser::unaryOpPrecedence = {
         {Ast::Operator::Subtract, 150}, // -
-        {Ast::Operator::BitAnd, 150}, // &
-        {Ast::Operator::BitNot, 150}, // ~
-        {Ast::Operator::Not, 150}, // !
+        {Ast::Operator::BitAnd, 150},   // &
+        {Ast::Operator::BitNot, 150},   // ~
+        {Ast::Operator::Not, 150},      // !
     };
 
-        Ast::VarDef
-        Parser::__parseVarDef(bool isPublic)
+    Ast::VarDef Parser::__parseVarDef(bool isPublic)
     {
         // entry: current is keyword `var` or `const`
         bool isConst = (currentToken().getType() == TokenType::Const ? true : false);
@@ -72,31 +72,31 @@ namespace Fig
         expect(TokenType::Identifier);
         FString name = currentToken().getValue();
         next();
-        FString tiName = ValueType::Any.name;
+        Ast::Expression declaredType = nullptr;
         bool hasSpecificType = false;
         if (isThis(TokenType::Colon)) // :
         {
-            expectPeek(TokenType::Identifier, FString(u8"Type name"));
-            next();
-            tiName = currentToken().getValue();
-            next();
+            next(); // consume `:`
+            declaredType = parseExpression(0, TokenType::Assign, TokenType::Semicolon);
             hasSpecificType = true;
         }
         if (isThis(TokenType::Semicolon))
         {
             next(); // consume `;`, no using expectConsume here cause we don't need to check again
-            return makeAst<Ast::VarDefAst>(isPublic, isConst, name, tiName, nullptr);
+            return makeAst<Ast::VarDefAst>(isPublic, isConst, name, declaredType, nullptr, false);
         }
         if (!isThis(TokenType::Assign) and !isThis(TokenType::Walrus)) expect(TokenType::Assign, u8"assign or walrus");
+        bool followupType = false;
+
         if (isThis(TokenType::Walrus))
         {
             if (hasSpecificType) throwAddressableError<SyntaxError>(FString(u8""));
-            tiName = Parser::varDefTypeFollowed;
+            followupType = true;
         }
         next();
         Ast::Expression exp = parseExpression(0);
         expectSemicolon();
-        return makeAst<Ast::VarDefAst>(isPublic, isConst, name, tiName, exp);
+        return makeAst<Ast::VarDefAst>(isPublic, isConst, name, declaredType, exp, followupType);
     }
 
     ObjectPtr Parser::__parseValue()
@@ -133,18 +133,12 @@ namespace Fig
                 return std::make_shared<Object>(i);
             }
         }
-        else if (currentToken().getType() == TokenType::LiteralString)
-        {
-            return std::make_shared<Object>(_val);
-        }
+        else if (currentToken().getType() == TokenType::LiteralString) { return std::make_shared<Object>(_val); }
         else if (currentToken().getType() == TokenType::LiteralBool)
         {
             return std::make_shared<Object>((_val == u8"true" ? true : false));
         }
-        else if (currentToken().getType() == TokenType::LiteralNull)
-        {
-            return Object::getNullInstance();
-        }
+        else if (currentToken().getType() == TokenType::LiteralNull) { return Object::getNullInstance(); }
         else
         {
             throw std::runtime_error(std::string("Internal Error at: ") + std::string(__func__));
@@ -237,17 +231,17 @@ namespace Fig
         next();
         expect(TokenType::LeftParen);
         Ast::FunctionParameters params = __parseFunctionParameters();
-        FString retTiName = ValueType::Any.name;
+
+        Ast::Expression returnType;
+
         if (isThis(TokenType::RightArrow)) // ->
         {
             next(); // skip `->`
-            expect(TokenType::Identifier);
-            retTiName = currentToken().getValue();
-            next(); // skip return type
+            returnType = parseExpression(0, TokenType::LeftBrace, TokenType::Semicolon);
         }
         expect(TokenType::LeftBrace);
         Ast::BlockStatement body = __parseBlockStatement();
-        return makeAst<Ast::FunctionDefSt>(funcName, params, isPublic, retTiName, body);
+        return makeAst<Ast::FunctionDefSt>(funcName, params, isPublic, returnType, body);
     }
     Ast::StructDef Parser::__parseStructDef(bool isPublic)
     {
@@ -289,13 +283,11 @@ namespace Fig
             {
                 throwAddressableError<SyntaxError>(FString(std::format("expect field name or field attribute")));
             }
-            FString tiName = ValueType::Any.name;
+            Ast::Expression fieldType = nullptr;
             if (isThis(TokenType::Colon))
             {
-                next();
-                expect(TokenType::Identifier, u8"type name");
-                tiName = currentToken().getValue();
-                next();
+                next(); // consume `:`
+                fieldType = parseExpression(0, TokenType::Assign, TokenType::Semicolon);
             }
             Ast::Expression initExpr = nullptr;
             if (isThis(TokenType::Assign))
@@ -305,7 +297,7 @@ namespace Fig
                 initExpr = parseExpression(0);
             }
             expectSemicolon();
-            return Ast::StructDefField(am, fieldName, tiName, initExpr);
+            return Ast::StructDefField(am, fieldName, fieldType, initExpr);
         };
         std::vector<Ast::Statement> stmts;
         std::vector<Ast::StructDefField> fields;
@@ -318,10 +310,7 @@ namespace Fig
                 next(); // consume `}`
                 break;
             }
-            if (isThis(TokenType::Identifier))
-            {
-                fields.push_back(__parseStructField(false));
-            }
+            if (isThis(TokenType::Identifier)) { fields.push_back(__parseStructField(false)); }
             else if (isThis(TokenType::Public))
             {
                 if (isNext(TokenType::Const))
@@ -361,23 +350,18 @@ namespace Fig
                 next(); // consume `struct`
                 stmts.push_back(__parseStructDef(false));
             }
-            else if (isThis(TokenType::Const))
-            {
-                fields.push_back(__parseStructField(false));
-            }
+            else if (isThis(TokenType::Const)) { fields.push_back(__parseStructField(false)); }
             else if (isThis(TokenType::Variable))
             {
-                throwAddressableError<SyntaxError>(FString("Variables are not allowed to be defined within a structure."));
+                throwAddressableError<SyntaxError>(
+                    FString("Variables are not allowed to be defined within a structure."));
             }
             else
             {
                 throwAddressableError<SyntaxError>(FString("Invalid syntax"));
             }
         }
-        if (!braceClosed)
-        {
-            throwAddressableError<SyntaxError>(FString("braces are not closed"));
-        }
+        if (!braceClosed) { throwAddressableError<SyntaxError>(FString("braces are not closed")); }
         return makeAst<Ast::StructDefSt>(isPublic, structName, fields, makeAst<Ast::BlockStatementAst>(stmts));
     }
 
@@ -409,27 +393,18 @@ namespace Fig
                 expect(TokenType::RightArrow); // ->
                 next();                        // consume `->`
 
-                expect(TokenType::Identifier, u8"return type");
-                FString returnType = currentToken().getValue();
-                next(); // consume return type
+                Ast::Expression returnType = parseExpression(0, TokenType::LeftBrace, TokenType::Semicolon);
 
                 if (isThis(TokenType::LeftBrace))
                 {
                     Ast::BlockStatement block = __parseBlockStatement();
 
-                    methods.push_back(Ast::InterfaceMethod(
-                        funcName,
-                        paras,
-                        returnType,
-                        block));
+                    methods.push_back(Ast::InterfaceMethod(funcName, paras, returnType, block));
                     continue;
                 }
                 expectSemicolon();
 
-                methods.push_back(Ast::InterfaceMethod(
-                    funcName,
-                    paras,
-                    returnType));
+                methods.push_back(Ast::InterfaceMethod(funcName, paras, returnType));
             }
             else
             {
@@ -454,7 +429,7 @@ namespace Fig
         FString structName = currentToken().getValue();
         next();                       // consume name
         expect(TokenType::LeftBrace); // {
-        next();  // consume `{`
+        next();                       // consume `{`
 
         std::vector<Ast::ImplementMethod> methods;
 
@@ -473,10 +448,7 @@ namespace Fig
                 Ast::FunctionParameters paras = __parseFunctionParameters();
                 expect(TokenType::LeftBrace);
                 Ast::BlockStatement body = __parseBlockStatement();
-                methods.push_back(Ast::ImplementMethod(
-                    funcName,
-                    paras,
-                    body));
+                methods.push_back(Ast::ImplementMethod(funcName, paras, body));
             }
             else
             {
@@ -501,18 +473,18 @@ namespace Fig
     {
         // entry: current is `try`
         next(); // consume `try`
-        
+
         /*
         try
         {
-            ...        
+            ...
         }
         catch(e: IOError)
         {
         }
         catch(e: TimeOutError)
         {
-        } 
+        }
         */
         expect(TokenType::LeftBrace);
         Ast::BlockStatement body = __parseBlockStatement();
@@ -540,15 +512,13 @@ namespace Fig
                     hasType = true;
                 }
                 expect(TokenType::RightParen); // ）
-                next(); // consume `)`
-                expect(TokenType::LeftBrace); // {
+                next();                        // consume `)`
+                expect(TokenType::LeftBrace);  // {
                 Ast::BlockStatement catchBody = __parseBlockStatement();
 
-                if (hasType)
+                if (hasType) { catches.push_back(Ast::Catch(errVarName, errVarType, catchBody)); }
+                else
                 {
-                    catches.push_back(Ast::Catch(errVarName, errVarType, catchBody));
-                }
-                else {
                     catches.push_back(Ast::Catch(errVarName, catchBody));
                 }
             }
@@ -563,7 +533,7 @@ namespace Fig
                 expect(TokenType::LeftBrace);
                 finallyBlock = __parseBlockStatement();
             }
-            else 
+            else
             {
                 break;
             }
@@ -575,17 +545,11 @@ namespace Fig
     {
         Ast::Statement stmt;
         if (isThis(TokenType::EndOfFile)) { return makeAst<Ast::EofStmt>(); }
-        else if (isThis(TokenType::Import))
-        {
-            stmt = __parseImport();
-        }
+        else if (isThis(TokenType::Import)) { stmt = __parseImport(); }
         else if (isThis(TokenType::Public))
         {
             next(); // consume `public`
-            if (isThis(TokenType::Variable) || isThis(TokenType::Const))
-            {
-                stmt = __parseVarDef(true);
-            }
+            if (isThis(TokenType::Variable) || isThis(TokenType::Const)) { stmt = __parseVarDef(true); }
             else if (isThis(TokenType::Function) and isNext(TokenType::Identifier))
             {
                 next();
@@ -596,19 +560,14 @@ namespace Fig
                 next();
                 stmt = __parseStructDef(true);
             }
-            else if (isThis(TokenType::Interface))
-            {
-                stmt = __parseInterfaceDef(true);
-            }
+            else if (isThis(TokenType::Interface)) { stmt = __parseInterfaceDef(true); }
             else
             {
-                throwAddressableError<SyntaxError>(FString(u8"Expected `var`, `const`, `function`, `struct` or `interface` after `public`"));
+                throwAddressableError<SyntaxError>(
+                    FString(u8"Expected `var`, `const`, `function`, `struct` or `interface` after `public`"));
             }
         }
-        else if (isThis(TokenType::Variable) || isThis(TokenType::Const))
-        {
-            stmt = __parseVarDef(false);
-        }
+        else if (isThis(TokenType::Variable) || isThis(TokenType::Const)) { stmt = __parseVarDef(false); }
         else if (isThis(TokenType::Function) and isNext(TokenType::Identifier))
         {
             next();
@@ -626,50 +585,20 @@ namespace Fig
             next();
             stmt = __parseInterfaceDef(false);
         }
-        else if (isThis(TokenType::Implement))
-        {
-            stmt = __parseImplement();
-        }
-        else if (isThis(TokenType::If))
-        {
-            stmt = __parseIf();
-        }
+        else if (isThis(TokenType::Implement)) { stmt = __parseImplement(); }
+        else if (isThis(TokenType::If)) { stmt = __parseIf(); }
         else if (isThis(TokenType::Else))
         {
             throwAddressableError<SyntaxError>(FString(u8"`else` without matching `if`"));
         }
-        else if (isThis(TokenType::LeftBrace))
-        {
-            stmt = __parseBlockStatement();
-        }
-        else if (isThis(TokenType::While))
-        {
-            stmt = __parseWhile();
-        }
-        else if (isThis(TokenType::For))
-        {
-            stmt = __parseFor();
-        }
-        else if (isThis(TokenType::Return))
-        {
-            stmt = __parseReturn();
-        }
-        else if (isThis(TokenType::Break))
-        {
-            stmt = __parseBreak();
-        }
-        else if (isThis(TokenType::Continue))
-        {
-            stmt = __parseContinue();
-        }
-        else if (isThis(TokenType::Throw))
-        {
-            stmt = __parseThrow();
-        }
-        else if (isThis(TokenType::Try))
-        {
-            stmt = __parseTry();
-        }
+        else if (isThis(TokenType::LeftBrace)) { stmt = __parseBlockStatement(); }
+        else if (isThis(TokenType::While)) { stmt = __parseWhile(); }
+        else if (isThis(TokenType::For)) { stmt = __parseFor(); }
+        else if (isThis(TokenType::Return)) { stmt = __parseReturn(); }
+        else if (isThis(TokenType::Break)) { stmt = __parseBreak(); }
+        else if (isThis(TokenType::Continue)) { stmt = __parseContinue(); }
+        else if (isThis(TokenType::Throw)) { stmt = __parseThrow(); }
+        else if (isThis(TokenType::Try)) { stmt = __parseTry(); }
         else if (allowExp)
         {
             // expression statement
@@ -677,7 +606,7 @@ namespace Fig
             expectSemicolon();
             stmt = makeAst<Ast::ExpressionStmtAst>(exp);
         }
-        else 
+        else
         {
             throwAddressableError<SyntaxError>(u8"invalid syntax", currentAAI.line, currentAAI.column);
         }
@@ -766,7 +695,7 @@ namespace Fig
         }
         else
         {
-            condition = parseExpression(0);
+            condition = parseExpression(0, TokenType::LeftBrace);
         }
         expect(TokenType::LeftBrace); // {
         Ast::BlockStatement body = __parseBlockStatement();
@@ -784,7 +713,8 @@ namespace Fig
             throwAddressableError<SyntaxError>(u8"BlockStatement cannot be used as for loop increment");
         }
 
-        if (isThis(TokenType::If) || isThis(TokenType::While) || isThis(TokenType::For) || isThis(TokenType::Return) || isThis(TokenType::Break) || isThis(TokenType::Continue))
+        if (isThis(TokenType::If) || isThis(TokenType::While) || isThis(TokenType::For) || isThis(TokenType::Return)
+            || isThis(TokenType::Break) || isThis(TokenType::Continue))
         {
             throwAddressableError<SyntaxError>(u8"Control flow statements cannot be used as for loop increment");
         }
@@ -799,8 +729,7 @@ namespace Fig
         // TODO: support enumeration
         next(); // consume `for`
         bool paren = isThis(TokenType::LeftParen);
-        if (paren)
-            next(); // consume `(`
+        if (paren) next(); // consume `(`
         // support 3-part for loop
         // for init; condition; increment {}
         Ast::Statement initStmt = __parseStatement(false); // auto check ``
@@ -813,8 +742,7 @@ namespace Fig
             // auto guard = disableSemicolon();
             incrementStmt = __parseIncrementStatement();
         } // after parse increment, semicolon check state restored
-        if (paren)
-            expectConsume(TokenType::RightParen);           // consume `)` if has `(`
+        if (paren) expectConsume(TokenType::RightParen);    // consume `)` if has `(`
         expect(TokenType::LeftBrace);                       // {
         Ast::BlockStatement body = __parseBlockStatement(); // auto consume `}`
         return makeAst<Ast::ForSt>(initStmt, condition, incrementStmt, body);
@@ -938,10 +866,7 @@ namespace Fig
         {
             if (mode == 0)
             {
-                if (isThis(TokenType::Identifier) && isNext(TokenType::Colon))
-                {
-                    mode = 2;
-                }
+                if (isThis(TokenType::Identifier) && isNext(TokenType::Colon)) { mode = 2; }
                 else if (isThis(TokenType::Identifier) && (isNext(TokenType::Comma) || isNext(TokenType::RightBrace)))
                 {
                     mode = 3;
@@ -985,17 +910,19 @@ namespace Fig
             }
             else if (!isThis(TokenType::RightBrace))
             {
-                throwAddressableError<SyntaxError>(FString(
-                    std::format("Expect `,` or `}}` in struct initialization expression, got {}",
-                                currentToken().toString().toBasicString())));
+                throwAddressableError<SyntaxError>(
+                    FString(std::format("Expect `,` or `}}` in struct initialization expression, got {}",
+                                        currentToken().toString().toBasicString())));
             }
         }
         expect(TokenType::RightBrace);
         next(); // consume `}`
-        return makeAst<Ast::InitExprAst>(structe, args,
-                                         (mode == 1 ? Ast::InitExprAst::InitMode::Positional :
-                                                      (mode == 2 ? Ast::InitExprAst::InitMode::Named : Ast::InitExprAst::InitMode::Shorthand)));
+        return makeAst<Ast::InitExprAst>(
+            structe,
+            args,
+            static_cast<Ast::InitExprAst::InitMode>(mode));
     }
+
     Ast::Expression Parser::__parseTupleOrParenExpr()
     {
         next();
@@ -1017,8 +944,7 @@ namespace Fig
             {
                 next(); // consume ','
 
-                if (currentToken().getType() == TokenType::RightParen)
-                    break;
+                if (currentToken().getType() == TokenType::RightParen) break;
 
                 elements.push_back(parseExpression(0));
             }
@@ -1069,10 +995,7 @@ namespace Fig
             expect(TokenType::Identifier, u8"package name");
             path.push_back(currentToken().getValue());
             next(); // consume package name
-            if (isThis(TokenType::Semicolon))
-            {
-                break;
-            }
+            if (isThis(TokenType::Semicolon)) { break; }
             else if (isThis(TokenType::Dot))
             {
                 next(); // consume `.`
@@ -1092,8 +1015,7 @@ namespace Fig
         Ast::Operator op;
 
         Token tok = currentToken();
-        if (tok == EOFTok)
-            throwAddressableError<SyntaxError>(FString(u8"Unexpected end of expression"));
+        if (tok == EOFTok) throwAddressableError<SyntaxError>(FString(u8"Unexpected end of expression"));
         if (tok.getType() == stop || tok.getType() == stop2)
         {
             if (lhs == nullptr) throwAddressableError<SyntaxError>(FString(u8"Expected expression"));
@@ -1139,6 +1061,14 @@ namespace Fig
             next();
             lhs = makeAst<Ast::UnaryExprAst>(op, parseExpression(bp, stop, stop2));
         }
+        else if (tok.getType() == TokenType::New)
+        {
+            // `new` now is an independent syntax
+            next();
+            Ast::Expression operand = parseExpression(bp, TokenType::LeftBrace);
+            expect(TokenType::LeftBrace);
+            lhs = __parseInitExpr(operand);
+        }
         else
         {
             throwAddressableError<SyntaxError>(FString(u8"Unexpected token in expression:") + tok.toString());
@@ -1148,21 +1078,31 @@ namespace Fig
         while (true)
         {
             tok = currentToken();
-            if (tok.getType() == stop || tok.getType() == stop2|| tok == EOFTok) break;
+            if (tok.getType() == stop || tok.getType() == stop2 || tok == EOFTok) break;
 
             /* Postfix */
+
+            if (tok.getType() == TokenType::LeftBrace)
+            {
+                throwAddressableError<SyntaxError>(
+                    FString(u8"Since Fig v0.4.2, please use new struct{} to avoid syntax ambiguity"));
+            }
 
             if (tok.getType() == TokenType::LeftParen)
             {
                 lhs = __parseCall(lhs);
                 continue;
             }
+            // else if (tok.getType() == TokenType::LeftBrace) { lhs = __parseInitExpr(lhs); }
+            /*
+                since Fig v0.4.2, use new struct{};
 
-            if (tok.getType() == TokenType::LeftBrace)
-            {
-                lhs = __parseInitExpr(lhs);
-                continue;
-            }
+                if a == A{}
+                is A{} struct init?
+                or A a variable, {} is the body?
+
+                fuck.
+            */
 
             // member access: a.b
             if (tok.getType() == TokenType::Dot)
@@ -1189,15 +1129,17 @@ namespace Fig
                 lhs = makeAst<Ast::IndexExprAst>(lhs, indexExpr);
                 continue;
             }
-
             // ternary
             if (tok.getType() == TokenType::Question)
             {
+                auto [lbp, rbp] = getBindingPower(Ast::Operator::TernaryCond);
+                if (bp >= lbp) break;
+
                 next(); // consume ?
-                Ast::Expression trueExpr = parseExpression(0, TokenType::Colon, stop2);
-                expect(TokenType::Colon);
-                next(); // consume :
-                Ast::Expression falseExpr = parseExpression(0, TokenType::Semicolon, stop2);
+                Ast::Expression trueExpr = parseExpression(0, TokenType::Colon);
+                expectConsume(TokenType::Colon);
+
+                Ast::Expression falseExpr = parseExpression(0);
                 lhs = makeAst<Ast::TernaryExprAst>(lhs, trueExpr, falseExpr);
                 continue;
             }
@@ -1219,10 +1161,7 @@ namespace Fig
     {
         output.clear();
         Token tok = currentToken();
-        if (tok == EOFTok)
-        {
-            return output;
-        }
+        if (tok == EOFTok) { return output; }
 
         while (!isEOF())
         {

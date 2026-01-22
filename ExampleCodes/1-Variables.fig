@@ -11,3 +11,69 @@ invalid!
 
 const Pi := 3.14; // recommended, auto detect type
 // equal -> const Pi: Double = 3.14;
+
+/*
+In fig, we have 13 builtin-type
+
+01  Any
+02  Null
+03  Int
+04  String
+05  Bool
+06  Double
+07  Function
+08  StructType
+09  StructInstance
+10  List
+11  Map
+12  Module
+13  InterfaceType
+
+3, 4, 5, 6, 10, 11 are initable
+
+value system:
+    object is immutable
+    (included basic types: Int, String...)
+
+    `variable` is a name, refers to an object
+    assignment is to bind name to value
+    
+    Example: var a := 10;
+
+    [name] 'a' ---> variable slot (name, declared type, access modifier, [value) ---> ObjectPtr ---> raw Object class
+               bind                                                              bind (shared_ptr)
+
+    For example:
+        var a := 10;
+        var b := 10;
+
+        `a` and `b` reference to the same object in memory
+
+        a = 20;
+
+        now a refers to a new object (20, Int)
+
+        what about complex types?
+        they actually have same behaviors with basic types
+
+        var a := [1, 2, 3, 4];
+        var b := a;
+
+        > a
+          [1, 2, 3, 4]
+        > b
+          [1, 2, 3, 4]
+        
+        set a[0] to 5
+
+        > a
+          [5, 2, 3, 4]
+        > b
+          [5, 2, 3, 4]
+
+        Why did such a result occur?
+    
+        " `a` and `b` reference to the same object in memory "
+
+        If you wish to obtain a copy, use List {a} to deeply copy it
+*/
