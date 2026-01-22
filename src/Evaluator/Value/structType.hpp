@@ -3,9 +3,9 @@
 #include <Core/fig_string.hpp>
 #include <Ast/Statements/StructDefSt.hpp>
 
-#include <Value/Type.hpp>
+#include <Evaluator/Value/Type.hpp>
 
-#include <Context/context_forward.hpp>
+#include <Evaluator/Context/context_forward.hpp>
 #include <atomic>
 #include <vector>
 

@@ -1,13 +1,13 @@
-#include "Value/structType.hpp"
-#include <Value/Type.hpp>
-#include <Value/value.hpp>
-#include <Context/context.hpp>
+#include <Evaluator/Value/structType.hpp>
+#include <Evaluator/Value/value_forward.hpp>
+#include <Evaluator/Value/Type.hpp>
+#include <Evaluator/Value/value.hpp>
+#include <Evaluator/Context/context.hpp>
 
 // #include <iostream>
 
 namespace Fig
 {
-    std::map<FString, size_t> TypeInfo::typeMap = {};
 
     TypeInfo::TypeInfo() : // only allow use in evaluate time !! <---- dynamic type system requirement
         id(1), name(FString(u8"Any"))
@@ -20,17 +20,17 @@ namespace Fig
         // std::cerr << "TypeInfo constructor called for type name: " << name.toBasicString() << "\n";
         if (reg)
         {
-            typeMap[name] = ++id_count;
+            getTypeMap()[name] = ++id_count;
             id = id_count;
         }
         else
         {
-            if (!typeMap.contains(_name))
+            if (!getTypeMap().contains(_name))
             {
                 throw RuntimeError(FString(std::format("No type named '{}'", _name.toBasicString())));
                 // *this = ValueType::String;
             }
-            id = typeMap.at(name); // may throw
+            id = getTypeMap().at(name); // may throw
         }
     }
 

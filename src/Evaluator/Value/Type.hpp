@@ -14,44 +14,32 @@ namespace Fig
     private:
         size_t id;
 
+        std::map<FString, size_t> &getTypeMap()
+        {
+            static std::map<FString, size_t> typeMap;
+            return typeMap;
+        }
+
     public:
         friend class TypeInfoHash;
 
         FString name;
 
-        FString toString() const
-        {
-            return name;
-        }
+        FString toString() const { return name; }
 
-        static std::map<FString, size_t> typeMap;
-
-        static size_t getID(FString _name)
-        {
-            return typeMap.at(_name);
-        }
-        size_t getInstanceID() const
-        {
-            return id;
-        }
+        size_t getInstanceID() const { return id; }
 
         TypeInfo();
         explicit TypeInfo(const FString &_name, bool reg = false);
         TypeInfo(const TypeInfo &other) = default;
 
-        bool operator==(const TypeInfo &other) const
-        {
-            return id == other.id;
-        }
+        bool operator==(const TypeInfo &other) const { return id == other.id; }
     };
-    
+
     class TypeInfoHash
     {
     public:
-        std::size_t operator()(const TypeInfo &ti) const
-        {
-            return std::hash<size_t>{}(ti.id);
-        }
+        std::size_t operator()(const TypeInfo &ti) const { return std::hash<size_t>{}(ti.id); }
     };
 
     // class Value;
@@ -77,39 +65,31 @@ namespace Fig
         using NullClass = std::monostate;
         using StringClass = FString;
 
-        static const std::unordered_set<TypeInfo, TypeInfoHash> builtinTypes
-        {
-            Any,
-            Null,
-            Int,
-            String,
-            Bool,
-            Double,
-            Function,
-            StructType,
-            StructInstance,
-            List,
-            Map,
-            Module,
-            InterfaceType
-        };
-
         inline bool isTypeBuiltin(const TypeInfo &type)
         {
+            static const std::unordered_set<TypeInfo, TypeInfoHash> builtinTypes{Any,
+                                                                                 Null,
+                                                                                 Int,
+                                                                                 String,
+                                                                                 Bool,
+                                                                                 Double,
+                                                                                 Function,
+                                                                                 StructType,
+                                                                                 StructInstance,
+                                                                                 List,
+                                                                                 Map,
+                                                                                 Module,
+                                                                                 InterfaceType};
             return builtinTypes.contains(type);
         }
     }; // namespace ValueType
 }; // namespace Fig
-
 
 namespace std
 {
     template <>
     struct hash<Fig::TypeInfo>
     {
-        size_t operator()(const Fig::TypeInfo &t)
-        {
-            return std::hash<size_t>{}(t.getInstanceID());
-        }
+        size_t operator()(const Fig::TypeInfo &t) { return std::hash<size_t>{}(t.getInstanceID()); }
     };
-};
+}; // namespace std

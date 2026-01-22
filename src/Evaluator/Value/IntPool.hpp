@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Value/value.hpp"
+#include <Evaluator/Value/value.hpp>
 #include <Core/fig_string.hpp>
-#include <Value/value_forward.hpp>
-#include <Value/Type.hpp>
+#include <Evaluator/Value/value_forward.hpp>
+#include <Evaluator/Value/Type.hpp>
 #include <array>
 #include <memory>
 

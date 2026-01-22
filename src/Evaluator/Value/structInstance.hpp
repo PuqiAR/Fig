@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Context/context_forward.hpp>
-#include <Value/Type.hpp>
+#include <Evaluator/Context/context_forward.hpp>
+#include <Evaluator/Value/Type.hpp>
 
 namespace Fig
 {

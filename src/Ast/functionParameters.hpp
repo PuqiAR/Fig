@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Ast/astBase.hpp>
-#include <Value/Type.hpp>
+#include <Evaluator/Value/Type.hpp>
 #include <Core/fig_string.hpp>
 
 #include <format>

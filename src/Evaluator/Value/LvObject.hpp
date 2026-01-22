@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Value/VariableSlot.hpp>
-#include <Value/value.hpp>
+#include <Evaluator/Value/VariableSlot.hpp>
+#include <Evaluator/Value/value.hpp>
 
 namespace Fig
 {

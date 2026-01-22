@@ -1,17 +1,17 @@
 #pragma once
 
-#include "Ast/Statements/InterfaceDefSt.hpp"
-#include "Value/interface.hpp"
-#include <Value/Type.hpp>
+#include <Ast/Statements/InterfaceDefSt.hpp>
+#include <Evaluator/Value/interface.hpp>
+#include <Evaluator/Value/Type.hpp>
 #include <algorithm>
 #include <unordered_map>
 #include <iostream>
 #include <memory>
 
-#include <Context/context_forward.hpp>
+#include <Evaluator/Context/context_forward.hpp>
 #include <Core/fig_string.hpp>
-#include <Value/value.hpp>
-#include <Value/VariableSlot.hpp>
+#include <Evaluator/Value/value.hpp>
+#include <Evaluator/Value/VariableSlot.hpp>
 
 namespace Fig
 {

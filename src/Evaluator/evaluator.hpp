@@ -1,62 +1,19 @@
-#include "Ast/Expressions/InitExpr.hpp"
+#include <Ast/Expressions/InitExpr.hpp>
 #include <Ast/Statements/ImplementSt.hpp>
 #include <Ast/Statements/InterfaceDefSt.hpp>
-#include <Value/Type.hpp>
+#include <Evaluator/Value/Type.hpp>
 #include <Ast/ast.hpp>
 
-#include <Context/context.hpp>
+#include <Evaluator/Context/context.hpp>
 #include <Error/error.hpp>
 #include <Module/builtins.hpp>
-#include <Value/LvObject.hpp>
+#include <Evaluator/Value/LvObject.hpp>
 #include <filesystem>
+
+#include <Evaluator/Core/StatementResult.hpp>
 
 namespace Fig
 {
-    struct StatementResult
-    {
-        ObjectPtr result;
-        enum class Flow
-        {
-            Normal,
-            Return,
-            Break,
-            Continue,
-            Error
-        } flow;
-
-        StatementResult(ObjectPtr val, Flow f = Flow::Normal) :
-            result(val), flow(f)
-        {
-        }
-
-        static StatementResult normal(ObjectPtr val = Object::getNullInstance())
-        {
-            return StatementResult(val, Flow::Normal);
-        }
-        static StatementResult returnFlow(ObjectPtr val)
-        {
-            return StatementResult(val, Flow::Return);
-        }
-        static StatementResult breakFlow()
-        {
-            return StatementResult(Object::getNullInstance(), Flow::Break);
-        }
-        static StatementResult continueFlow()
-        {
-            return StatementResult(Object::getNullInstance(), Flow::Continue);
-        }
-        static StatementResult errorFlow(ObjectPtr val)
-        {
-            return StatementResult(val, Flow::Error);
-        }
-
-        bool isNormal() const { return flow == Flow::Normal; }
-        bool shouldReturn() const { return flow == Flow::Return; }
-        bool shouldBreak() const { return flow == Flow::Break; }
-        bool shouldContinue() const { return flow == Flow::Continue; }
-        bool isError() const { return flow == Flow::Error; }
-    };
-
     class Evaluator
     {
     private:
@@ -92,7 +49,7 @@ namespace Fig
         {
             assert(global != nullptr);
 
-            for (auto &[name, fn] : Builtins::builtinFunctions)
+            for (auto &[name, fn] : Builtins::getBuiltinFunctions())
             {
                 int argc = Builtins::getBuiltinFunctionParamCount(name);
                 Function f(fn, argc);
@@ -108,7 +65,7 @@ namespace Fig
         {
             assert(global != nullptr);
 
-            for (auto &[name, val] : Builtins::builtinValues)
+            for (auto &[name, val] : Builtins::getBuiltinValues())
             {
                 global->def(
                     name,

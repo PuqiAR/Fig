@@ -3,8 +3,8 @@
 
 #include <Ast/AccessModifier.hpp>
 #include <Core/fig_string.hpp>
-#include <Value/Type.hpp>
-#include <Value/value_forward.hpp>
+#include <Evaluator/Value/Type.hpp>
+#include <Evaluator/Value/value_forward.hpp>
 
 #include <memory>
 namespace Fig

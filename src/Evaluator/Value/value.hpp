@@ -1,12 +1,12 @@
 #pragma once
-#include <Value/function.hpp>
-#include <Value/interface.hpp>
-#include <Value/structType.hpp>
-#include <Value/structInstance.hpp>
-#include <Value/Type.hpp>
-#include <Value/valueError.hpp>
-#include <Value/module.hpp>
-#include <Value/value_forward.hpp>
+#include <Evaluator/Value/function.hpp>
+#include <Evaluator/Value/interface.hpp>
+#include <Evaluator/Value/structType.hpp>
+#include <Evaluator/Value/structInstance.hpp>
+#include <Evaluator/Value/Type.hpp>
+#include <Evaluator/Value/valueError.hpp>
+#include <Evaluator/Value/module.hpp>
+#include <Evaluator/Value/value_forward.hpp>
 
 #include <memory>
 #include <variant>

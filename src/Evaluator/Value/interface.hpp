@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Ast/Statements/InterfaceDefSt.hpp>
-#include <Value/Type.hpp>
+#include <Evaluator/Value/Type.hpp>
 
 #include <vector>
 

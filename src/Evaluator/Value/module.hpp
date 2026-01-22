@@ -2,7 +2,7 @@
 
 #include <Core/fig_string.hpp>
 
-#include <Context/context_forward.hpp>
+#include <Evaluator/Context/context_forward.hpp>
 
 namespace Fig
 {

@@ -2,7 +2,7 @@
 #pragma once
 
 #include <Ast/astBase.hpp>
-#include <Value/value.hpp>
+#include <Evaluator/Value/value.hpp>
 
 namespace Fig::Ast
 {
