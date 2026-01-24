@@ -67,6 +67,30 @@ Replace `[file]` with the path to your input file.
 
     Gradual learning - Simple to start, powerful when needed
 
+## Performance Summary
+
+**Version:** 0.4.2-alpha (Tree-walker Interpreter)  
+**Test Hardware:** i5-13490F, Windows 11
+
+**Execution Times for Fibonacci(30):**
+- Naive Recursion: **11.72s**
+- Memoization: **0.93ms** (12,600× faster)
+- Iteration: **0.37ms** (31,300× faster)  
+- Tail Recursion: **0.40ms** (29,200× faster)
+
+**Visual Comparison:**
+```
+Naive Recursion  : ████████████████████████████████████████ 11.72s
+Memoization      : ▉ 0.93ms
+Iteration        : ▍ 0.37ms
+Tail Recursion   : ▎ 0.40ms
+```
+
+**Key Insight:** Algorithm choice dominates performance in this tree-walker implementation.
+
+**Detailed Reports:** [English](./docs/benchmark_result/benchmark_result_en_0.4.2-alpha.md) | [中文](./docs/benchmark_result/benchmark_result_zh_0.4.2-alpha.md)
+
+
 ## Language Documents
 
 see ./docs/en_US/...
