@@ -4,7 +4,6 @@
 #include <Evaluator/evaluator.hpp>
 #include <Evaluator/evaluator_error.hpp>
 
-
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -32,7 +31,6 @@ namespace Fig
         }
         return sr;
     }
-
 
     ContextPtr Evaluator::loadModule(const std::filesystem::path &path)
     {
@@ -76,6 +74,8 @@ namespace Fig
         }
         auto path = resolveModulePath(pathVec);
         ContextPtr modCtx = loadModule(path);
+
+        ctx->getImplRegistry().insert(modCtx->getImplRegistry().begin(), modCtx->getImplRegistry().end()); // load impl
 
         // std::cerr << modName.toBasicString() << '\n'; DEBUG
 

@@ -1,6 +1,7 @@
 # Fig Language - A Modern Scripting Language
 
 [Fig-Gitea](https://git.fig-lang.cn/PuqiAR/Fig)
+Recommend view on Gitea Endpoint
 
 [简体中文](README_ZH-CN.md "Chinese version")
 
@@ -55,35 +56,6 @@ xmake run Fig [file]
 
 Replace `[file]` with the path to your input file.
 
-### 📁 Project Structure
-.
-├── ExampleCodes                # Example programs & performance tests
-│   └── SpeedTest               # Performance benchmark samples
-├── LICENSE                     # Project license
-├── Logo                        # Project logo assets
-├── README.md                   # English README
-├── README_ZH-CN.md             # Chinese README
-├── compile_flags.txt           # Compiler flags helper
-├── fig-vscode                  # VSCode extension project
-│   ├── node_modules            # Extension dependencies
-│   ├── out                     # Built extension output
-│   ├── src                     # Extension source code
-│   └── syntaxes                # Syntax highlighting definition
-├── src                         # Core Fig language source
-│   ├── Ast                     # AST definitions
-│   ├── Context                 # Runtime context
-│   ├── Core                    # Core utilities (UTF8/string/etc.)
-│   ├── Error                   # Error handling system
-│   ├── Evaluator               # Interpreter / evaluator
-│   ├── Lexer                   # Lexical analyzer
-│   ├── Module                  # Modules and builtins
-│   ├── Parser                  # Parser
-│   ├── Token                   # Token definitions
-│   ├── Utils                   # Utilities & helper headers
-│   └── Value                   # Runtime type/value system
-├── test.fig                    # Test script
-└── xmake.lua                   # Xmake build config
-
 ## Language Philosophy
     Fig is designed around several core principles:
 
@@ -94,3 +66,9 @@ Replace `[file]` with the path to your input file.
     Modern ergonomics - Developer experience matters
 
     Gradual learning - Simple to start, powerful when needed
+
+## Language Documents
+
+see ./docs/en_US/...
+
+We're looking for translators to help translate our project and make it accessible to more language communities.

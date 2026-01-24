@@ -49,36 +49,6 @@ xmake run Fig [file]
 ```
 将`[file]`替换为输入文件的路径。
 
-### 📁 项目结构
-.
-├── ExampleCodes                # 示例代码与性能测试样例
-│   └── SpeedTest               # 性能相关测试示例
-├── LICENSE                     # 项目开源协议
-├── Logo                        # 项目标识资源
-├── README.md                   # 英文 README
-├── README_ZH-CN.md             # 中文 README
-├── compile_flags.txt           # C/C++ 编译器参数提示
-├── fig-vscode                  # VSCode 插件项目
-│   ├── node_modules            # VSCode 插件依赖
-│   ├── out                     # 构建产物
-│   ├── src                     # VSCode 插件源码
-│   └── syntaxes                # 语法高亮定义
-├── src                         # Fig 语言核心源码
-│   ├── Ast                     # 抽象语法树节点
-│   ├── Context                 # 运行上下文
-│   ├── Core                    # 核心基础设施（字符串/UTF8 等）
-│   ├── Error                   # 错误系统
-│   ├── Evaluator               # 解释执行器
-│   ├── Lexer                   # 词法分析器
-│   ├── Module                  # 模块与内置库
-│   ├── Parser                  # 语法解析器
-│   ├── Token                   # Token 定义
-│   ├── Utils                   # 实用工具与第三方 header
-│   └── Value                   # 运行时类型系统与值表示
-├── test.fig                    # 测试脚本
-└── xmake.lua                   # Xmake 构建脚本
-
-
 ## 语言设计哲学
 Fig 围绕几个核心原则设计：
 
@@ -86,3 +56,7 @@ Fig 围绕几个核心原则设计：
 2. **默认为安全** - 在编译时防止常见错误
 3. **现代人机工程学** - 开发者体验很重要
 4. **渐进式学习** - 入门简单，需要时功能强大
+
+## 语言文档
+在 docs/zh_CN/... 查看更多
+我们正在寻找译者来帮助翻译项目文件以便于不同语言社区的使用

@@ -142,14 +142,7 @@ namespace Fig
                 throw RuntimeError(
                     FString(std::format("Variable '{}' already defined in this scope", name.toBasicString())));
             }
-            variables[name] = std::make_shared<VariableSlot>(
-                name,
-                target->value,
-                ti,
-                am,
-                true,
-                target
-            );
+            variables[name] = std::make_shared<VariableSlot>(name, target->value, ti, am, true, target);
         }
         std::optional<Function> getFunction(std::size_t id)
         {
@@ -232,6 +225,13 @@ namespace Fig
             }
             return parent && parent->hasImplRegisted(structType, interfaceType);
         }
+
+        std::unordered_map<TypeInfo, std::vector<ImplRecord>, TypeInfoHash> getImplRegistry() const
+        {
+            return implRegistry;
+        }
+
+        std::unordered_map<TypeInfo, std::vector<ImplRecord>, TypeInfoHash> &getImplRegistry() { return implRegistry; }
 
         std::optional<ImplRecord> getImplRecord(const TypeInfo &structType, const TypeInfo &interfaceType) const
         {
