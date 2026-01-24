@@ -118,6 +118,7 @@ def main() -> None:
         if i >= 3:
             print(f'    .....')
             break # 展示前3个
+        i += 1
     
     insVersion: dict = releases[0]
     print(f"Which version do you want to install({insVersion['name']} if empty)(e.g. x.x.x/index)? ", end='')
