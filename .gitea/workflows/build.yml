@@ -43,7 +43,7 @@ jobs:
         run: |
           echo "开始构建Linux版本..."
           xmake f -p linux -a x86_64 -m release -y
-          xmake build -j$(nproc)
+          xmake build Fig -j$(nproc)
           echo "Linux构建成功。"
 
       # 🔧 新增：构建Linux平台安装器
@@ -169,7 +169,7 @@ jobs:
       - name: 构建项目 (Windows Native)
         run: |
           xmake f -p windows -a x86_64 -m release -y
-          xmake build -j $env:NUMBER_OF_PROCESSORS
+          xmake build Fig -j $env:NUMBER_OF_PROCESSORS
           Write-Host 'Windows构建成功。'
 
       # 🔧 新增：构建Windows平台安装器
