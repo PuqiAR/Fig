@@ -5,12 +5,14 @@ Recommend view on Gitea Endpoint
 
 [简体中文](README_ZH-CN.md "Chinese version")
 
-**Fig** is a statically-typed, expression-oriented programming language designed for clarity, safety, and modern development practices. With features inspired by Go, Rust, and JavaScript, Fig aims to provide a productive development experience while maintaining strong type safety.
+**Fig** is a dynamically strongly typed programming language designed for clarity, safety, and modern development practices. With features inspired by Go, Rust, and JavaScript, Fig aims to provide a productive development experience while maintaining strong type safety.
+
+[LanguageTutorial(zh_CN)](docs/zh_CN/01-简介.md "Chinese version")
 
 ## Features
 
 ### 🚀 Core Language Features
-- **Static typing with type inference** - Strong typing with minimal annotations
+- **Dynamic typing with type inference** - Strong typing with minimal annotations
 - **Modern control flow** - Full `for` loop support with proper scoping
 - **First-class functions** - Lambda expressions and closures
 - **Rich data structures** - Structs, lists, maps, and tuples
