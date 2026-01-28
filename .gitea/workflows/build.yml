@@ -43,7 +43,7 @@ jobs:
         run: |
           echo "开始构建Linux版本..."
           xmake f -p linux -a x86_64 -m release -y
-          xmake build Fig -j$(nproc)
+          xmake build -j$(nproc) Fig
           echo "Linux构建成功。"
 
       # 🔧 新增：构建Linux平台安装器
@@ -84,40 +84,40 @@ jobs:
         run: |
           VERSION="${{ env.VERSION }}"
           API="https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}"
-          
+
           echo "正在为Linux版本创建/更新发布 $VERSION ..."
-          
+
           RESPONSE=$(curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{\"tag_name\":\"$VERSION\",\"name\":\"Fig $VERSION\",\"draft\":false,\"prerelease\":false}" \
             "$API/releases" 2>/dev/null || echo '{"id":0}')
-          
+
           RELEASE_ID=$(echo "$RESPONSE" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
-          
+
           if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "0" ]; then
             echo "尝试通过标签获取已有发布的ID..."
             RELEASE_ID=$(curl -sS -H "Authorization: token $GITEA_TOKEN" \
               "$API/releases/tags/$VERSION" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
           fi
-          
+
           if [ -z "$RELEASE_ID" ]; then
             echo "错误：无法获取或创建发布 ID"
             exit 1
           fi
-          
+
           echo "使用发布 ID: $RELEASE_ID 进行上传"
-          
+
           # 上传语言包
           curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @Fig-$VERSION-linux-x86_64.tar.gz \
             "$API/releases/$RELEASE_ID/assets?name=Fig-$VERSION-linux-x86_64.tar.gz"
-          
+
           curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: text/plain" \
             --data-binary @Fig-$VERSION-linux-x86_64.sha256 \
             "$API/releases/$RELEASE_ID/assets?name=Fig-$VERSION-linux-x86_64.sha256"
-          
+
           # 🔧 新增：上传Linux安装器
           if [ -f "Installer/ConsoleInstaller/dist/linux/FigSetup-Linux" ]; then
             echo "正在上传Linux安装器..."
@@ -126,7 +126,7 @@ jobs:
               --data-binary @Installer/ConsoleInstaller/dist/linux/FigSetup-Linux \
               "$API/releases/$RELEASE_ID/assets?name=FigSetup-Linux"
           fi
-          
+
           echo "✅ Linux版本发布完成！"
 
   build-windows-x64:
@@ -169,7 +169,7 @@ jobs:
       - name: 构建项目 (Windows Native)
         run: |
           xmake f -p windows -a x86_64 -m release -y
-          xmake build Fig -j $env:NUMBER_OF_PROCESSORS
+          xmake build -j $env:NUMBER_OF_PROCESSORS Fig
           Write-Host 'Windows构建成功。'
 
       # 🔧 新增：构建Windows平台安装器
@@ -185,7 +185,7 @@ jobs:
       - name: 打包Windows发布文件
         run: |
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          
+
           # 🔧 修改：与发布步骤使用相同的版本号计算逻辑
           if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') {
             $VERSION = $env:INPUT_VERSION
@@ -193,14 +193,14 @@ jobs:
           } else {
             $VERSION = $env:GITHUB_REF_NAME
           }
-          
+
           Write-Host "打包版本: $VERSION"
-          
+
           $PACKAGE_NAME = "Fig-${VERSION}-windows-x86_64"
           Write-Host "打包名称: $PACKAGE_NAME"
-          
+
           New-Item -ItemType Directory -Force -Path $PACKAGE_NAME
-          
+
           # 查找可执行文件
           if (Test-Path 'build\windows\x86_64\release\Fig.exe') {
             Copy-Item 'build\windows\x86_64\release\Fig.exe' $PACKAGE_NAME\
@@ -210,27 +210,27 @@ jobs:
             Write-Host '错误：未找到构建输出文件'
             exit 1
           }
-          
+
           if (Test-Path 'src\Module\Library') {
             Copy-Item -Recurse 'src\Module\Library' $PACKAGE_NAME\
           }
-          
+
           # 压缩文件
           $ZIP_NAME = "$PACKAGE_NAME.zip"
           Compress-Archive -Path $PACKAGE_NAME -DestinationPath $ZIP_NAME
-          
+
           # 生成校验文件
           $Hash = Get-FileHash $ZIP_NAME -Algorithm SHA256
           "$($Hash.Hash)  $ZIP_NAME" | Out-File "$PACKAGE_NAME.sha256" -Encoding UTF8
-          
+
           Write-Host "Windows打包完成: $ZIP_NAME"
-          
+
       - name: 发布Windows版本到Gitea
         env:
           GITEA_TOKEN: ${{ secrets.CI_TOKEN }}
         run: |
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          
+
           # 重新计算版本号（不使用 $env:VERSION）
           if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') {
             $VERSION = $env:INPUT_VERSION
@@ -238,26 +238,26 @@ jobs:
           } else {
             $VERSION = $env:GITHUB_REF_NAME
           }
-          
+
           Write-Host "正在上传Windows版本到发布: $VERSION"
-          
+
           $REPO = $env:GITHUB_REPOSITORY
           $API = "https://git.fig-lang.cn/api/v1/repos/$REPO"
           $TOKEN = $env:GITEA_TOKEN
-          
+
           # 🔧 新增：检查必需的文件是否存在
           $ZIP_FILE = "Fig-$VERSION-windows-x86_64.zip"
           $HASH_FILE = "Fig-$VERSION-windows-x86_64.sha256"
           $INSTALLER_PATH = "Installer\ConsoleInstaller\dist\windows\FigSetup.exe"
-          
+
           if (-not (Test-Path $ZIP_FILE)) {
             Write-Host "❌ 错误：找不到ZIP文件 $ZIP_FILE"
             Get-ChildItem *.zip
             exit 1
           }
-          
+
           Write-Host "正在为Windows版本创建/更新发布 $VERSION ..."
-          
+
           # 🔧 关键修改：直接创建发布，不先检查（与Linux逻辑一致）
           $CREATE_BODY = @{
             tag_name = $VERSION
@@ -265,16 +265,16 @@ jobs:
             draft = $false
             prerelease = $false
           } | ConvertTo-Json -Compress
-          
+
           Write-Host "创建发布请求体: $CREATE_BODY"
-          
+
           # 直接创建发布（Gitea会自动处理重复创建）
           $RESPONSE = Invoke-RestMethod -Method Post -Uri "$API/releases" `
             -Headers @{
               Authorization = "token $TOKEN"
               'Content-Type' = 'application/json'
             } -Body $CREATE_BODY -ErrorAction SilentlyContinue
-          
+
           if (-not $RESPONSE -or -not $RESPONSE.id) {
             # 如果创建失败，尝试通过标签获取已有发布的ID
             Write-Host "创建失败，尝试获取已有发布..."
@@ -282,7 +282,7 @@ jobs:
               -Headers @{Authorization = "token $TOKEN" } `
               -ErrorAction SilentlyContinue
           }
-          
+
           if ($RESPONSE -and $RESPONSE.id) {
             $RELEASE_ID = $RESPONSE.id
             Write-Host "✅ 使用发布 ID: $RELEASE_ID 进行上传"
@@ -290,7 +290,7 @@ jobs:
             Write-Host "❌ 错误：无法获取或创建发布 ID"
             exit 1
           }
-          
+
           # 上传资产
           Write-Host "正在上传 ZIP 文件..."
           Invoke-RestMethod -Method Post -Uri "$API/releases/$RELEASE_ID/assets?name=$ZIP_FILE" `
@@ -298,14 +298,14 @@ jobs:
               Authorization = "token $TOKEN"
               'Content-Type' = 'application/octet-stream'
             } -InFile $ZIP_FILE -ErrorAction SilentlyContinue
-          
+
           Write-Host "正在上传校验文件..."
           Invoke-RestMethod -Method Post -Uri "$API/releases/$RELEASE_ID/assets?name=$HASH_FILE" `
             -Headers @{
               Authorization = "token $TOKEN"
               'Content-Type' = 'text/plain'
             } -InFile $HASH_FILE -ErrorAction SilentlyContinue
-          
+
           # 上传Windows安装器
           if (Test-Path $INSTALLER_PATH) {
             Write-Host "正在上传Windows安装器..."
@@ -317,5 +317,5 @@ jobs:
           } else {
             Write-Host "⚠️  警告：未找到安装器文件 $INSTALLER_PATH"
           }
-          
+
           Write-Host "✅ Windows版本发布完成！"
