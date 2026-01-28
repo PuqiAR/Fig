@@ -131,9 +131,9 @@ namespace Fig::Ast
             return FString(std::format("<Base Ast '{}' at {}:{}>", typeName().toBasicString(), aai.line, aai.column));
         }
 
-        AstAddressInfo getAAI() { return aai; }
+        AstAddressInfo getAAI() const { return aai; }
 
-        AstType getType() { return type; }
+        AstType getType() const { return type; }
     };
 
     class StatementAst : public _AstBase

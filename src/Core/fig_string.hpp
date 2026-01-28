@@ -41,7 +41,7 @@ namespace Fig
 
         FString operator+(const FString &x)
         {
-            return FString(toBasicString() + x.toBasicString());
+            return FString(static_cast<std::u8string>(*this) + static_cast<std::u8string>(x));
         }
         FString operator+(const char8_t *c)
         {

@@ -1,3 +1,4 @@
+#include <Evaluator/Value/function.hpp>
 #include <Evaluator/Value/LvObject.hpp>
 #include <Evaluator/evaluator.hpp>
 #include <Evaluator/evaluator_error.hpp>
@@ -11,7 +12,7 @@ namespace Fig
     {
         const Function &fnStruct = fn;
         Ast::FunctionCallArgs evaluatedArgs;
-        if (fnStruct.isBuiltin)
+        if (fnStruct.type == Function::Builtin || fnStruct.type == Function::MemberType)
         {
             for (const auto &argExpr : fnArgs.argv) { evaluatedArgs.argv.push_back(eval(argExpr, ctx)); }
             if (fnStruct.builtinParamCount != -1 && fnStruct.builtinParamCount != evaluatedArgs.getLength())
@@ -23,7 +24,14 @@ namespace Fig
                                                  evaluatedArgs.getLength()),
                                      fnArgs.argv.back());
             }
-            return fnStruct.builtin(evaluatedArgs.argv);
+            if (fnStruct.type == Function::Builtin) 
+            {
+                return fnStruct.builtin(evaluatedArgs.argv);
+            }
+            else
+            {
+                return fnStruct.mtFn(nullptr, evaluatedArgs.argv); // wrapped member type function (`this` provided by evalMemberExpr)
+            }
         }
 
         // check argument, all types of parameters
@@ -126,7 +134,7 @@ namespace Fig
                 paramName = fnParas.defParas[defParamIndex].first;
                 paramType = TypeInfo(fnParas.defParas[defParamIndex].second.first);
             }
-            AccessModifier argAm = AccessModifier::Const;
+            AccessModifier argAm = AccessModifier::Normal;
             newContext->def(paramName, paramType, argAm, evaluatedArgs.argv[j]);
         }
         goto ExecuteBody;
@@ -138,7 +146,7 @@ namespace Fig
         {
             list.push_back(eval(exp, ctx)); // eval arguments in current scope
         }
-        newContext->def(fnParas.variadicPara, ValueType::List, AccessModifier::Const, std::make_shared<Object>(list));
+        newContext->def(fnParas.variadicPara, ValueType::List, AccessModifier::Normal, std::make_shared<Object>(list));
         goto ExecuteBody;
     }
 
@@ -172,4 +180,4 @@ namespace Fig
         return retVal;
     }
     }
-};
+}; // namespace Fig

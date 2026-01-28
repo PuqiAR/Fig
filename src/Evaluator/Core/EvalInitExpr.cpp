@@ -288,11 +288,13 @@ namespace Fig
                                                 [&argName](const Field &f) { return f.name == argName; });
                     if (fieldIt == structT.fields.end())
                     {
-                        throw EvaluatorError(u8"StructFieldNotFoundError",
-                                             std::format("Field '{}' not found in structure '{}'",
-                                                         argName.toBasicString(),
-                                                         structName.toBasicString()),
-                                             initExpr);
+                        // throw EvaluatorError(u8"StructFieldNotFoundError",
+                        //                      std::format("Field '{}' not found in structure '{}'",
+                        //                                  argName.toBasicString(),
+                        //                                  structName.toBasicString()),
+                        //                      initExpr);
+                        initExpr->initMode = Positional;
+                        return evalInitExpr(initExpr, ctx);
                     }
                     const Field &field = *fieldIt;
                     if (!isTypeMatch(field.type, argVal, ctx))

@@ -3,7 +3,6 @@
 #include <Token/token.hpp>
 #include <Lexer/lexer.hpp>
 
-#include <Core/fig_string.hpp>
 #include <Utils/utils.hpp>
 
 #if 0
@@ -200,6 +199,11 @@ namespace Fig
                 {
                     next();
                     str += u8"\"";
+                }
+                else if (ec == U'r')
+                {
+                    next();
+                    str += u8"\r";
                 }
                 else if (ec == U'\'')
                 {

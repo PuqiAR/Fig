@@ -39,6 +39,7 @@ This software is licensed under the MIT License. See LICENSE.txt for details.
 #include <Utils/utils.hpp>
 #include <Error/errorLog.hpp>
 #include <Core/runtimeTime.hpp>
+#include <Repl/Repl.hpp>
 
 static size_t addressableErrorCount = 0;
 static size_t unaddressableErrorCount = 0;
@@ -54,6 +55,10 @@ int main(int argc, char **argv)
     program.add_argument("source")
         .help("source file to be interpreted")
         .default_value(std::string(""));
+    program.add_argument("-r", "--repl")
+        .help("start repl")
+        .default_value(false)
+        .implicit_value(true);
     // program.add_argument("-v", "--version")
     //     .help("get the version of Fig Interpreter")
     //     .default_value(false)
@@ -74,6 +79,14 @@ int main(int argc, char **argv)
     //     std::print("Fig Interpreter version {}\n", Fig::Core::VERSION);
     //     return 0;
     // }
+
+    if (program.get<bool>("--repl"))
+    {
+        Fig::Repl repl;
+        repl.Start();
+        exit(0);
+    }
+
     Fig::FString sourcePath(program.get<std::string>("source"));
     if (sourcePath.empty())
     {

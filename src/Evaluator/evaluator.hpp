@@ -1,3 +1,4 @@
+#pragma once
 #include <Ast/Expressions/InitExpr.hpp>
 #include <Ast/Statements/ImplementSt.hpp>
 #include <Ast/Statements/InterfaceDefSt.hpp>

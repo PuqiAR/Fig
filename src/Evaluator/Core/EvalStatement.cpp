@@ -13,12 +13,11 @@ namespace Fig
         {
             case ImportSt: {
                 auto i = std::static_pointer_cast<Ast::ImportSt>(stmt);
-                assert(i != nullptr);
                 return evalImportSt(i, ctx);
             }
             case VarDefSt: {
                 auto varDef = std::static_pointer_cast<Ast::VarDefAst>(stmt);
-                assert(varDef != nullptr);
+               
 
                 if (ctx->containsInThisScope(varDef->name))
                 {
@@ -63,7 +62,7 @@ namespace Fig
 
             case FunctionDefSt: {
                 auto fnDef = std::static_pointer_cast<Ast::FunctionDefSt>(stmt);
-                assert(fnDef != nullptr);
+               
 
                 const FString &fnName = fnDef->name;
                 if (ctx->containsInThisScope(fnName))
@@ -90,7 +89,7 @@ namespace Fig
 
             case StructSt: {
                 auto stDef = std::static_pointer_cast<Ast::StructDefSt>(stmt);
-                assert(stDef != nullptr);
+               
 
                 if (ctx->containsInThisScope(stDef->name))
                 {
@@ -149,7 +148,7 @@ namespace Fig
 
             case InterfaceDefSt: {
                 auto ifd = std::static_pointer_cast<Ast::InterfaceDefAst>(stmt);
-                assert(ifd != nullptr);
+               
 
                 const FString &interfaceName = ifd->name;
 
@@ -170,7 +169,7 @@ namespace Fig
 
             case ImplementSt: {
                 auto ip = std::static_pointer_cast<Ast::ImplementAst>(stmt);
-                assert(ip != nullptr);
+               
 
                 TypeInfo structType(ip->structName);
                 TypeInfo interfaceType(ip->interfaceName);
@@ -407,7 +406,7 @@ namespace Fig
 
             case TrySt: {
                 auto tryst = std::static_pointer_cast<Ast::TrySt>(stmt);
-                assert(tryst != nullptr);
+               
 
                 ContextPtr tryCtx = std::make_shared<Context>(
                     FString(std::format("<Try at {}:{}>", tryst->getAAI().line, tryst->getAAI().column)), ctx);
@@ -446,7 +445,7 @@ namespace Fig
 
             case ThrowSt: {
                 auto ts = std::static_pointer_cast<Ast::ThrowSt>(stmt);
-                assert(ts != nullptr);
+               
 
                 ObjectPtr value = eval(ts->value, ctx);
                 if (value->is<ValueType::NullClass>())
@@ -458,7 +457,7 @@ namespace Fig
 
             case ReturnSt: {
                 auto returnSt = std::static_pointer_cast<Ast::ReturnSt>(stmt);
-                assert(returnSt != nullptr);
+               
 
                 ObjectPtr returnValue = Object::getNullInstance(); // default is null
                 if (returnSt->retValue) returnValue = eval(returnSt->retValue, ctx);
@@ -491,14 +490,12 @@ namespace Fig
 
             case ExpressionStmt: {
                 auto exprStmt = std::static_pointer_cast<Ast::ExpressionStmtAst>(stmt);
-                assert(exprStmt != nullptr);
-
                 return StatementResult::normal(eval(exprStmt->exp, ctx));
             }
 
             case BlockStatement: {
                 auto block = std::static_pointer_cast<Ast::BlockStatementAst>(stmt);
-                assert(block != nullptr);
+               
 
                 ContextPtr blockCtx = std::make_shared<Context>(
                     FString(std::format("<Block at {}:{}>", block->getAAI().line, block->getAAI().column)), ctx);

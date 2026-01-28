@@ -35,8 +35,12 @@ namespace Fig
         {
             return LvObject(std::make_shared<VariableSlot>(
                                 member,
-                                std::make_shared<Object>(Function(baseVal->getMemberFunction(member),
-                                                                  baseVal->getMemberFunctionParaCount(member))),
+                                std::make_shared<Object>(Function(
+                                    [baseVal, member](ObjectPtr self, std::vector<ObjectPtr> args) -> ObjectPtr {
+                                        if (self) { return baseVal->getMemberFunction(member)(self, args); }
+                                        return baseVal->getMemberFunction(member)(baseVal, args);
+                                    },
+                                    baseVal->getMemberFunctionParaCount(member))),
                                 ValueType::Function,
                                 AccessModifier::PublicConst),
                             ctx); // fake l-value
@@ -105,7 +109,7 @@ namespace Fig
     }
     LvObject Evaluator::evalIndexExpr(Ast::IndexExpr ie, ContextPtr ctx)
     {
-        LvObject base = evalLv(ie->base, ctx);
+        RvObject base = eval(ie->base, ctx);
         RvObject index = eval(ie->index, ctx);
 
         const TypeInfo &type = base.get()->getTypeInfo();
@@ -125,12 +129,12 @@ namespace Fig
             {
                 throw EvaluatorError(
                     u8"IndexOutOfRangeError",
-                    std::format("Index {} out of list `{}` range", indexVal, base.get()->toString().toBasicString()),
+                    std::format("Index {} out of list `{}` range", indexVal, base->toString().toBasicString()),
                     ie->index);
             }
-            return LvObject(base.get(), indexVal, LvObject::Kind::ListElement, ctx);
+            return LvObject(base, indexVal, LvObject::Kind::ListElement, ctx);
         }
-        else if (type == ValueType::Map) { return LvObject(base.get(), index, LvObject::Kind::MapElement, ctx); }
+        else if (type == ValueType::Map) { return LvObject(base, index, LvObject::Kind::MapElement, ctx); }
         else if (type == ValueType::String)
         {
             if (index->getTypeInfo() != ValueType::Int)
@@ -140,22 +144,22 @@ namespace Fig
                     std::format("Type `String` indices must be `Int`, got '{}'", prettyType(index).toBasicString()),
                     ie->index);
             }
-            FString &string = base.get()->as<ValueType::StringClass>();
+            FString &string = base->as<ValueType::StringClass>();
             ValueType::IntClass indexVal = index->as<ValueType::IntClass>();
             if (indexVal >= string.length())
             {
                 throw EvaluatorError(
                     u8"IndexOutOfRangeError",
-                    std::format("Index {} out of string `{}` range", indexVal, base.get()->toString().toBasicString()),
+                    std::format("Index {} out of string `{}` range", indexVal, base->toString().toBasicString()),
                     ie->index);
             }
-            return LvObject(base.get(), indexVal, LvObject::Kind::StringElement, ctx);
+            return LvObject(base, indexVal, LvObject::Kind::StringElement, ctx);
         }
         else
         {
             throw EvaluatorError(
                 u8"NoSubscriptableError",
-                std::format("`{}` object is not subscriptable", base.declaredType().toString().toBasicString()),
+                std::format("`{}` object is not subscriptable", base->getTypeInfo().toString().toBasicString()),
                 ie->base);
         }
     }
@@ -167,17 +171,17 @@ namespace Fig
         {
             case AstType::VarExpr: {
                 Ast::VarExpr var = std::static_pointer_cast<Ast::VarExprAst>(exp);
-                assert(var != nullptr);
+
                 return evalVarExpr(var, ctx);
             }
             case AstType::MemberExpr: {
                 Ast::MemberExpr me = std::static_pointer_cast<Ast::MemberExprAst>(exp);
-                assert(me != nullptr);
+
                 return evalMemberExpr(me, ctx);
             }
             case AstType::IndexExpr: {
                 Ast::IndexExpr ie = std::static_pointer_cast<Ast::IndexExprAst>(exp);
-                assert(ie != nullptr);
+
                 return evalIndexExpr(ie, ctx);
             }
             default: {
@@ -188,4 +192,4 @@ namespace Fig
             }
         }
     }
-};
+}; // namespace Fig

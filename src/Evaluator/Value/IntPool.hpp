@@ -30,6 +30,11 @@ namespace Fig
             if (val >= CACHE_MIN && val <= CACHE_MAX) { return cache[val - CACHE_MIN]; }
             return std::make_shared<Object>(val);
         }
+        Object createIntCopy(ValueType::IntClass val) const
+        {
+            if (val >= CACHE_MIN && val <= CACHE_MAX) { return *cache[val - CACHE_MIN]; }
+            return Object(val);
+        }
 
         static const IntPool &getInstance()
         {

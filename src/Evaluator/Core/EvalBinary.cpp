@@ -1,3 +1,4 @@
+#include "Evaluator/Value/value.hpp"
 #include <Evaluator/Value/LvObject.hpp>
 #include <Evaluator/Value/IntPool.hpp>
 #include <Evaluator/evaluator.hpp>
@@ -84,11 +85,19 @@ namespace Fig
             }
             case Operator::And: {
                 ObjectPtr lhs = eval(lexp, ctx);
+                if (lhs->is<bool>() && !isBoolObjectTruthy(lhs))
+                {
+                    return Object::getFalseInstance(); // short-circuit
+                }
                 ObjectPtr rhs = eval(rexp, ctx);
                 return std::make_shared<Object>(*lhs && *rhs);
             };
             case Operator::Or: {
                 ObjectPtr lhs = eval(lexp, ctx);
+                if (lhs->is<bool>() && isBoolObjectTruthy(lhs))
+                {
+                    return Object::getTrueInstance();
+                }
                 ObjectPtr rhs = eval(rexp, ctx);
                 return std::make_shared<Object>(*lhs || *rhs);
             };

@@ -11,27 +11,27 @@ namespace Fig
         {
             case AstType::ValueExpr: {
                 auto val = std::static_pointer_cast<Ast::ValueExprAst>(exp);
-                assert(val != nullptr);
+               
                 return val->val;
             }
             case AstType::VarExpr: {
                 auto varExpr = std::static_pointer_cast<Ast::VarExprAst>(exp);
-                assert(varExpr != nullptr);
+               
                 return evalVarExpr(varExpr, ctx).get(); // LvObject -> RvObject
             }
             case AstType::BinaryExpr: {
                 auto bin = std::static_pointer_cast<Ast::BinaryExprAst>(exp);
-                assert(bin != nullptr);
+               
                 return evalBinary(bin, ctx);
             }
             case AstType::UnaryExpr: {
                 auto un = std::static_pointer_cast<Ast::UnaryExprAst>(exp);
-                assert(un != nullptr);
+               
                 return evalUnary(un, ctx);
             }
             case AstType::TernaryExpr: {
                 auto te = std::static_pointer_cast<Ast::TernaryExprAst>(exp);
-                assert(te != nullptr);
+               
                 return evalTernary(te, ctx);
             }
             case AstType::MemberExpr:
@@ -39,8 +39,7 @@ namespace Fig
 
             case AstType::FunctionCall: {
                 auto fnCall = std::static_pointer_cast<Ast::FunctionCallExpr>(exp);
-                assert(fnCall != nullptr);
-
+               
                 Ast::Expression callee = fnCall->callee;
                 ObjectPtr fnObj = eval(callee, ctx);
                 if (fnObj->getTypeInfo() != ValueType::Function)
@@ -58,19 +57,19 @@ namespace Fig
                 auto fnNameOpt = ctx->getFunctionName(fnId);
                 if (!fnNameOpt && fn.closureContext) fnNameOpt = fn.closureContext->getFunctionName(fnId);
 
-                const FString &fnName = (fnNameOpt ? *fnNameOpt : u8"<anonymous>");
+                const FString &fnName = (fnNameOpt ? *fnNameOpt : u8"<anonymous> or builtin-type member function");
 
                 return evalFunctionCall(fn, fnCall->arg, fnName, ctx);
             }
             case AstType::FunctionLiteralExpr: {
                 auto fnLiteral = std::static_pointer_cast<Ast::FunctionLiteralExprAst>(exp);
-                assert(fnLiteral != nullptr);
+               
 
                 Ast::BlockStatement body = nullptr;
                 if (fnLiteral->isExprMode())
                 {
                     Ast::Expression exprBody = fnLiteral->getExprBody();
-                    assert(exprBody != nullptr);
+                   
 
                     const Ast::AstAddressInfo &aai = exprBody->getAAI();
                     Ast::Return st = std::make_shared<Ast::ReturnSt>(exprBody);
@@ -83,7 +82,7 @@ namespace Fig
                 else
                 {
                     body = fnLiteral->getBlockBody();
-                    assert(body != nullptr);
+                   
                 }
                 Function fn(fnLiteral->paras, ValueType::Any, body, ctx
                             /*
@@ -94,13 +93,13 @@ namespace Fig
             }
             case AstType::InitExpr: {
                 auto initExpr = std::static_pointer_cast<Ast::InitExprAst>(exp);
-                assert(initExpr != nullptr);
+               
                 return evalInitExpr(initExpr, ctx);
             }
 
             case AstType::ListExpr: {
                 auto lstExpr = std::static_pointer_cast<Ast::ListExprAst>(exp);
-                assert(lstExpr != nullptr);
+               
 
                 List list;
                 for (auto &exp : lstExpr->val) { list.push_back(eval(exp, ctx)); }
@@ -109,7 +108,7 @@ namespace Fig
 
             case AstType::MapExpr: {
                 auto mapExpr = std::static_pointer_cast<Ast::MapExprAst>(exp);
-                assert(mapExpr != nullptr);
+               
 
                 Map map;
                 for (auto &[key, value] : mapExpr->val) { map[eval(key, ctx)] = eval(value, ctx); }
