@@ -12,6 +12,7 @@
 #include <cassert>
 #include <iostream>
 #include <memory>
+#include <unordered_set>
 #include <variant>
 #include <cmath>
 #include <string>
@@ -87,9 +88,8 @@ namespace Fig
                                          Module,
                                          InterfaceType>;
 
-
-
-        static std::unordered_map<TypeInfo, std::unordered_map<FString, BuiltinTypeMemberFn>, TypeInfoHash> getMemberTypeFunctions()
+        static std::unordered_map<TypeInfo, std::unordered_map<FString, BuiltinTypeMemberFn>, TypeInfoHash>
+        getMemberTypeFunctions()
         {
             static const std::unordered_map<TypeInfo, std::unordered_map<FString, BuiltinTypeMemberFn>, TypeInfoHash>
                 memberTypeFunctions{
@@ -241,9 +241,8 @@ namespace Fig
             return memberTypeFunctions;
         }
 
-
-
-        static std::unordered_map<TypeInfo, std::unordered_map<FString, int>, TypeInfoHash> getMemberTypeFunctionsParas()
+        static std::unordered_map<TypeInfo, std::unordered_map<FString, int>, TypeInfoHash>
+        getMemberTypeFunctionsParas()
         {
             static const std::unordered_map<TypeInfo, std::unordered_map<FString, int>, TypeInfoHash>
                 memberTypeFunctionsParas{
@@ -425,7 +424,7 @@ namespace Fig
             return toString();
         }
 
-        FString toString() const
+        FString toString(std::unordered_set<const Object *> &visited) const
         {
             if (is<ValueType::NullClass>()) return FString(u8"null");
             if (is<ValueType::IntClass>()) return FString(std::to_string(as<ValueType::IntClass>()));
@@ -445,13 +444,16 @@ namespace Fig
                                            static_cast<const void *>(&as<StructInstance>())));
             if (is<List>())
             {
+                if (visited.contains(this)) { return u8"[...]"; }
+                visited.insert(this);
+
                 FString output(u8"[");
                 const List &list = as<List>();
                 bool first_flag = true;
                 for (auto &ele : list)
                 {
                     if (!first_flag) output += u8", ";
-                    output += ele.value->toString();
+                    output += ele.value->toString(visited);
                     first_flag = false;
                 }
                 output += u8"]";
@@ -459,13 +461,16 @@ namespace Fig
             }
             if (is<Map>())
             {
+                if (visited.contains(this)) { return u8"{...}"; }
+                visited.insert(this);
+
                 FString output(u8"{");
                 const Map &map = as<Map>();
                 bool first_flag = true;
                 for (auto &[key, value] : map)
                 {
                     if (!first_flag) output += u8", ";
-                    output += key.value->toString() + FString(u8" : ") + value->toString();
+                    output += key.value->toString(visited) + FString(u8" : ") + value->toString(visited);
                     first_flag = false;
                 }
                 output += u8"}";
@@ -484,6 +489,12 @@ namespace Fig
                                            static_cast<const void *>(&as<InterfaceType>())));
             }
             return FString(u8"<error>");
+        }
+
+        FString toString() const
+        {
+            std::unordered_set<const Object *> visited{};
+            return toString(visited);
         }
 
     private:
@@ -612,7 +623,7 @@ namespace Fig
         friend Object operator!(const Object &v)
         {
             if (!v.is<ValueType::BoolClass>())
-                throw ValueError(
+                 throw ValueError(
                     FString(std::format("Logical NOT requires bool: '{}'", v.getTypeInfo().name.toBasicString())));
             return Object(!v.as<ValueType::BoolClass>());
         }

@@ -16,15 +16,20 @@ namespace Fig
                        std::source_location loc = std::source_location::current())
         {
             message = msg;
-            line = ast->getAAI().line;
-            column = ast->getAAI().column;
+
 
             src_loc = std::move(loc);
 
             typeName = std::move(_typeName);
 
-            sourcePath = *ast->getAAI().sourcePath;
-            sourceLines = *ast->getAAI().sourceLines;
+            if (ast != nullptr)
+            {
+                line = ast->getAAI().line;
+                column = ast->getAAI().column;
+                sourcePath = *ast->getAAI().sourcePath;
+                sourceLines = *ast->getAAI().sourceLines;
+            }
+
         }
         EvaluatorError(FString _typeName,
                        std::string_view msg,

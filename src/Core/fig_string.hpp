@@ -38,6 +38,7 @@ namespace Fig
     {
     public:
         using std::u8string::u8string;
+        using std::u8string::operator=;
 
         FString operator+(const FString &x)
         {

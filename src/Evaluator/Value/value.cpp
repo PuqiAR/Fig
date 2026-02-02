@@ -1,3 +1,4 @@
+#include <Evaluator/Value/interface.hpp>
 #include <Evaluator/Value/structType.hpp>
 #include <Evaluator/Value/value_forward.hpp>
 #include <Evaluator/Value/Type.hpp>
@@ -82,6 +83,11 @@ namespace Fig
         if (t == ValueType::StructType)
         {
             return obj->as<StructType>().type;
+        }
+
+        if (t == ValueType::InterfaceType)
+        {
+            return obj->as<InterfaceType>().type;
         }
 
         if (t == ValueType::StructInstance) return obj->as<StructInstance>().parentType;

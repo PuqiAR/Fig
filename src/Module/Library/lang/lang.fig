@@ -31,6 +31,44 @@ public interface Error
     getErrorMessage() -> String;
 }
 
+// Operation interface
+
+public interface Operation
+{
+// math
+    Add(T, T) -> T;
+    Sub(T, T) -> T;
+    Mul(T, T) -> T;
+    Div(T, T) -> T;
+    Mod(T, T) -> T;
+    Pow(T, T) -> T;
+
+// logic
+    Neg(T) -> T;
+    Not(T) -> T;
+
+    And(T, T) -> T;
+    Or(T, T) -> T;
+
+// comparision
+    Equal(T, T) -> T;
+    NotEqual(T, T) -> T;
+    LessThan(T, T) -> T;
+    LessEqual(T, T) -> T;
+    GreaterThan(T, T) -> T;
+    GreaterEqual(T, T) -> T;
+    Is(T, T) -> T;
+
+// Bit
+    BitNot(T) -> T;
+
+    BitAnd(T, T) -> T;
+    BitOr(T, T) -> T;
+    BitXor(T, T) -> T;
+    ShiftLeft(T, T) -> T;
+    ShiftRight(T, T) -> T:
+}
+
 public struct Any {}
 public struct Int {}
 public struct Null {}

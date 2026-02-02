@@ -1,3 +1,4 @@
+#include "Ast/Expressions/VarExpr.hpp"
 #include <Ast/Statements/ErrorFlow.hpp>
 #include <Ast/Statements/ImplementSt.hpp>
 #include <Ast/astBase.hpp>
@@ -184,7 +185,7 @@ namespace Fig
             if (isThis(TokenType::Assign)) // =
             {
                 next();
-                dp.push_back({pname, {ValueType::Any.name, parseExpression(0, TokenType::Comma)}});
+                dp.push_back({pname, {makeAst<Ast::VarExprAst>(u8"Any"), parseExpression(0, TokenType::Comma)}});
                 if (isThis(TokenType::Comma))
                 {
                     next(); // only skip `,` when it's there
@@ -193,13 +194,11 @@ namespace Fig
             else if (isThis(TokenType::Colon)) // :
             {
                 next(); // skip `:`
-                expect(TokenType::Identifier, FString(u8"Type name"));
-                FString ti(currentToken().getValue());
-                next();                        // skip type name
+                Ast::Expression type_exp = parseExpression(0, TokenType::Comma, TokenType::RightParen, TokenType::Assign);
                 if (isThis(TokenType::Assign)) // =
                 {
                     next(); // skip `=`
-                    dp.push_back({pname, {ti, parseExpression(0, TokenType::Comma)}});
+                    dp.push_back({pname, {type_exp, parseExpression(0, TokenType::Comma)}});
                     if (isThis(TokenType::Comma))
                     {
                         next(); // only skip `,` when it's there
@@ -207,7 +206,7 @@ namespace Fig
                 }
                 else
                 {
-                    pp.push_back({pname, ti});
+                    pp.push_back({pname, type_exp});
                     if (isThis(TokenType::Comma))
                     {
                         next(); // only skip `,` when it's there
@@ -228,7 +227,7 @@ namespace Fig
             }
             else
             {
-                pp.push_back({pname, ValueType::Any.name});
+                pp.push_back({pname, makeAst<Ast::VarExprAst>(u8"Any")});
                 if (isThis(TokenType::Comma))
                 {
                     next(); // only skip `,` when it's there
@@ -1020,14 +1019,14 @@ namespace Fig
         return makeAst<Ast::ImportSt>(path);
     }
 
-    Ast::Expression Parser::parseExpression(Precedence bp, TokenType stop, TokenType stop2)
+    Ast::Expression Parser::parseExpression(Precedence bp, TokenType stop, TokenType stop2, TokenType stop3)
     {
         Ast::Expression lhs;
         Ast::Operator op;
 
         Token tok = currentToken();
         if (tok == EOFTok) throwAddressableError<SyntaxError>(FString(u8"Unexpected end of expression"));
-        if (tok.getType() == stop || tok.getType() == stop2)
+        if (tok.getType() == stop || tok.getType() == stop2 || tok.getType() == stop3)
         {
             if (lhs == nullptr) throwAddressableError<SyntaxError>(FString(u8"Expected expression"));
             return lhs;
@@ -1089,7 +1088,7 @@ namespace Fig
         while (true)
         {
             tok = currentToken();
-            if (tok.getType() == stop || tok.getType() == stop2 || tok == EOFTok) break;
+            if (tok.getType() == stop || tok.getType() == stop2 || tok.getType() == stop3 || tok == EOFTok) break;
 
             /* Postfix */
 

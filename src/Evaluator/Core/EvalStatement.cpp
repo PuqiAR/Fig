@@ -1,8 +1,16 @@
+#include "Ast/AccessModifier.hpp"
+#include "Ast/Expressions/FunctionCall.hpp"
+#include "Ast/astBase.hpp"
+#include "Ast/functionParameters.hpp"
+#include "Core/fig_string.hpp"
+#include "Evaluator/Core/StatementResult.hpp"
+#include "Evaluator/Value/value.hpp"
 #include <Evaluator/Value/LvObject.hpp>
 #include <Evaluator/evaluator.hpp>
 #include <Evaluator/evaluator_error.hpp>
 
 #include <Utils/utils.hpp>
+#include <unordered_map>
 
 namespace Fig
 {
@@ -17,7 +25,6 @@ namespace Fig
             }
             case VarDefSt: {
                 auto varDef = std::static_pointer_cast<Ast::VarDefAst>(stmt);
-               
 
                 if (ctx->containsInThisScope(varDef->name))
                 {
@@ -62,7 +69,6 @@ namespace Fig
 
             case FunctionDefSt: {
                 auto fnDef = std::static_pointer_cast<Ast::FunctionDefSt>(stmt);
-               
 
                 const FString &fnName = fnDef->name;
                 if (ctx->containsInThisScope(fnName))
@@ -79,7 +85,7 @@ namespace Fig
                     returnType = actualType(returnTypeValue);
                 }
 
-                Function fn(fnDef->paras, returnType, fnDef->body, ctx);
+                Function fn(fnName, fnDef->paras, returnType, fnDef->body, ctx);
                 ctx->def(fnName,
                          ValueType::Function,
                          (fnDef->isPublic ? AccessModifier::PublicConst : AccessModifier::Const),
@@ -89,7 +95,6 @@ namespace Fig
 
             case StructSt: {
                 auto stDef = std::static_pointer_cast<Ast::StructDefSt>(stmt);
-               
 
                 if (ctx->containsInThisScope(stDef->name))
                 {
@@ -148,7 +153,6 @@ namespace Fig
 
             case InterfaceDefSt: {
                 auto ifd = std::static_pointer_cast<Ast::InterfaceDefAst>(stmt);
-               
 
                 const FString &interfaceName = ifd->name;
 
@@ -169,7 +173,6 @@ namespace Fig
 
             case ImplementSt: {
                 auto ip = std::static_pointer_cast<Ast::ImplementAst>(stmt);
-               
 
                 TypeInfo structType(ip->structName);
                 TypeInfo interfaceType(ip->interfaceName);
@@ -216,7 +219,148 @@ namespace Fig
                         std::format("Variable `{}` is not a struct type", ip->structName.toBasicString()),
                         ip);
                 }
+
                 auto &implementMethods = ip->methods;
+
+                if (ip->interfaceName == u8"Operation")
+                {
+                    // 运算符重载
+                    /*
+                    impl Operation for xxx
+                    {
+                        add(l, r) {...}
+                    }
+                    */
+                    using enum Ast::Operator;
+                    static const std::unordered_map<FString, std::pair<Ast::Operator, size_t>> magic_name_to_op = {
+                        // 算术
+                        {u8"Add", {Ast::Operator::Add, 2}},
+                        {u8"Sub", {Ast::Operator::Subtract, 2}},
+                        {u8"Mul", {Ast::Operator::Multiply, 2}},
+                        {u8"Div", {Ast::Operator::Divide, 2}},
+                        {u8"Mod", {Ast::Operator::Modulo, 2}},
+                        {u8"Pow", {Ast::Operator::Power, 2}},
+
+                        // 逻辑（一元）
+                        {u8"Neg", {Ast::Operator::Subtract, 1}}, // 一元负号
+                        {u8"Not", {Ast::Operator::Not, 1}},
+
+                        // 逻辑（二元）
+                        {u8"And", {Ast::Operator::And, 2}},
+                        {u8"Or", {Ast::Operator::Or, 2}},
+
+                        // 比较
+                        {u8"Equal", {Ast::Operator::Equal, 2}},
+                        {u8"NotEqual", {Ast::Operator::NotEqual, 2}},
+                        {u8"LessThan", {Ast::Operator::Less, 2}},
+                        {u8"LessEqual", {Ast::Operator::LessEqual, 2}},
+                        {u8"GreaterThan", {Ast::Operator::Greater, 2}},
+                        {u8"GreaterEqual", {Ast::Operator::GreaterEqual, 2}},
+                        {u8"Is", {Ast::Operator::Is, 2}},
+
+                        // 位运算（一元）
+                        {u8"BitNot", {Ast::Operator::BitNot, 1}},
+
+                        // 位运算（二元）
+                        {u8"BitAnd", {Ast::Operator::BitAnd, 2}},
+                        {u8"BitOr", {Ast::Operator::BitOr, 2}},
+                        {u8"BitXor", {Ast::Operator::BitXor, 2}},
+                        {u8"ShiftLeft", {Ast::Operator::ShiftLeft, 2}},
+                        {u8"ShiftRight", {Ast::Operator::ShiftRight, 2}},
+                    };
+                    for (auto &implMethod : implementMethods)
+                    {
+                        const FString &opName = implMethod.name;
+                        if (!magic_name_to_op.contains(opName))
+                        {
+                            // ... 现在忽略
+                            // 未来可能报错
+
+                            continue;
+                        }
+
+                        auto [op, expectArgCnt] = magic_name_to_op.at(opName);
+
+                        //                                  type          op     isUnary(1-->true, 2-->false)
+                        if (ctx->hasOperatorImplemented(structType, op, (expectArgCnt == 1 ? true : false)))
+                        {
+                            throw EvaluatorError(
+                                u8"DuplicateImplementError",
+                                std::format("{} has already implement by another interface", opName.toBasicString()),
+                                ip);
+                        }
+
+                        size_t paraCnt = implMethod.paras.posParas.size(); // 必须为位置参数!
+                        if (paraCnt != expectArgCnt || implMethod.paras.size() != expectArgCnt)
+                        {
+                            // 特化报错，更详细易读
+                            throw EvaluatorError(u8"InterfaceSignatureMismatch",
+                                                 std::format("Operator {} for {} arg count must be {}, got {}",
+                                                             opName.toBasicString(),
+                                                             structLv.name().toBasicString(),
+                                                             expectArgCnt,
+                                                             paraCnt),
+                                                 ip);
+                        }
+
+                        FString opFnName(u8"Operation." + prettyType(structTypeObj) + u8"." + opName);
+
+                        ContextPtr fnCtx = std::make_shared<Context>(
+                            FString(std::format("<Function {}>", opFnName.toBasicString())), ctx);
+
+                        const auto &fillOpFnParas = [this, structType, implMethod, opFnName, fnCtx, ctx, paraCnt](
+                                                        const std::vector<ObjectPtr> &args) {
+                            const Ast::FunctionParameters &paras = implMethod.paras;
+                            for (size_t i = 0; i < paraCnt; ++i)
+                            {
+                                const TypeInfo &paraType = actualType(eval(paras.posParas[i].second, ctx));
+                                if (paraType != ValueType::Any && paraType != structType)
+                                {
+                                    throw EvaluatorError(
+                                        u8"ParameterTypeError",
+                                        std::format("Invalid op fn parameter type '{}' of `{}`, must be `{}`",
+                                                    paraType.toString().toBasicString(),
+                                                    paras.posParas[i].first.toBasicString(),
+                                                    structType.toString().toBasicString()),
+                                        paras.posParas[i].second);
+                                }
+                                fnCtx->def(paras.posParas[i].first, paraType, AccessModifier::Normal, args[i]);
+                            }
+                        };
+
+                        if (paraCnt == 1)
+                        {
+                            ctx->registerUnaryOperator(structType, op, [=, this](const ObjectPtr &value) -> ObjectPtr {
+                                fillOpFnParas({value});
+                                return executeFunction(Function(opFnName,
+                                                                implMethod.paras, // parameters
+                                                                structType,       // return type --> struct type
+                                                                implMethod.body,  // body
+                                                                ctx               // closure context
+                                                                ),
+                                                       Ast::FunctionCallArgs{.argv = {value}},
+                                                       fnCtx);
+                            });
+                        }
+                        else
+                        {
+                            ctx->registerBinaryOperator(
+                                structType, op, [=, this](const ObjectPtr &lhs, const ObjectPtr &rhs) {
+                                    fillOpFnParas({lhs, rhs});
+                                    return executeFunction(Function(opFnName,
+                                                                    implMethod.paras, // parameters
+                                                                    structType,       // return type --> struct type
+                                                                    implMethod.body,  // body
+                                                                    ctx               // closure context
+                                                                    ),
+                                                           Ast::FunctionCallArgs{.argv = {lhs, rhs}},
+                                                           fnCtx);
+                                });
+                        }
+                    }
+                    return StatementResult::normal();
+                }
+
                 InterfaceType &interface = interfaceObj->as<InterfaceType>();
 
                 // ===== interface implementation validation =====
@@ -291,7 +435,7 @@ namespace Fig
                     ObjectPtr returnTypeValue = eval(ifMethod.returnType, ctx);
 
                     record.implMethods[name] =
-                        Function(implMethod.paras, actualType(returnTypeValue), implMethod.body, ctx);
+                        Function(implMethod.name, implMethod.paras, actualType(returnTypeValue), implMethod.body, ctx);
                 }
 
                 for (auto &m : interface.methods)
@@ -406,7 +550,6 @@ namespace Fig
 
             case TrySt: {
                 auto tryst = std::static_pointer_cast<Ast::TrySt>(stmt);
-               
 
                 ContextPtr tryCtx = std::make_shared<Context>(
                     FString(std::format("<Try at {}:{}>", tryst->getAAI().line, tryst->getAAI().column)), ctx);
@@ -445,7 +588,6 @@ namespace Fig
 
             case ThrowSt: {
                 auto ts = std::static_pointer_cast<Ast::ThrowSt>(stmt);
-               
 
                 ObjectPtr value = eval(ts->value, ctx);
                 if (value->is<ValueType::NullClass>())
@@ -457,7 +599,6 @@ namespace Fig
 
             case ReturnSt: {
                 auto returnSt = std::static_pointer_cast<Ast::ReturnSt>(stmt);
-               
 
                 ObjectPtr returnValue = Object::getNullInstance(); // default is null
                 if (returnSt->retValue) returnValue = eval(returnSt->retValue, ctx);
@@ -495,7 +636,6 @@ namespace Fig
 
             case BlockStatement: {
                 auto block = std::static_pointer_cast<Ast::BlockStatementAst>(stmt);
-               
 
                 ContextPtr blockCtx = std::make_shared<Context>(
                     FString(std::format("<Block at {}:{}>", block->getAAI().line, block->getAAI().column)), ctx);
@@ -507,4 +647,4 @@ namespace Fig
                     FString(std::format("Feature stmt {} unsupported yet", magic_enum::enum_name(stmt->getType()))));
         }
     }
-};
+}; // namespace Fig

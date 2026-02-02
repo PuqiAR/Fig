@@ -28,6 +28,7 @@ namespace Fig::Builtins
                                                                           Ast::FunctionParameters({}, {}),
                                                                           std::make_shared<Ast::VarExprAst>(u8"String"),
                                                                           nullptr)}))},
+                {u8"Operation", std::make_shared<Object>(InterfaceType(getOperationInterfaceTypeInfo(), {}))},
 
             {u8"Any", std::make_shared<Object>(StructType(ValueType::Any, nullptr, {}, true))},
             {u8"Int", std::make_shared<Object>(StructType(ValueType::Int, nullptr, {}, true))},

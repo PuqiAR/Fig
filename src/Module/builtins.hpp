@@ -7,22 +7,15 @@
 #include <Evaluator/Value/value.hpp>
 #include <Core/runtimeTime.hpp>
 
-
 #include <unordered_map>
 #include <functional>
 #include <vector>
-
 
 namespace Fig
 {
     namespace Builtins
     {
 
-        inline static const TypeInfo &getErrorInterfaceTypeInfo()
-        {
-            static const TypeInfo ErrorInterfaceTypeInfo(u8"Error", true);
-            return ErrorInterfaceTypeInfo;
-        }
         /*
             // error's interface like:
             interface Error
@@ -33,14 +26,32 @@ namespace Fig
             }
         */
 
+        inline static const TypeInfo &getErrorInterfaceTypeInfo()
+        {
+            static const TypeInfo ErrorInterfaceTypeInfo(u8"Error", true);
+            return ErrorInterfaceTypeInfo;
+        }
+
+        /*
+            interface Operation
+            {
+                add(..., ...) -> ...;
+            }
+        
+        */
+
+        inline static const TypeInfo &getOperationInterfaceTypeInfo() 
+        {
+            static const TypeInfo OperationInterfaceTypeInfo(u8"Operation", true);
+            return OperationInterfaceTypeInfo;
+        }
+
         const std::unordered_map<FString, ObjectPtr> &getBuiltinValues();
 
         using BuiltinFunction = std::function<ObjectPtr(const std::vector<ObjectPtr> &)>;
 
-
         const std::unordered_map<FString, int> &getBuiltinFunctionArgCounts();
         const std::unordered_map<FString, BuiltinFunction> &getBuiltinFunctions();
-
 
         inline bool isBuiltinFunction(const FString &name)
         {

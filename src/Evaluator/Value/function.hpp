@@ -16,6 +16,7 @@ namespace Fig
     {
     public:
         std::size_t id;
+        FString name;
 
         enum FnType
         {
@@ -52,11 +53,13 @@ namespace Fig
             new (&body) Ast::BlockStatement();
         }
 
-        Function(Ast::FunctionParameters _paras,
+        Function(const FString &_name,
+                 Ast::FunctionParameters _paras,
                  TypeInfo _retType,
                  Ast::BlockStatement _body,
                  ContextPtr _closureContext) :
             id(nextId()), // 分配唯一 ID
+            name(_name),
             paras(std::move(_paras)),
             retType(std::move(_retType)),
             body(std::move(_body)),
@@ -65,25 +68,22 @@ namespace Fig
             type = Normal;
         }
 
-        Function(std::function<std::shared_ptr<Object>(const std::vector<std::shared_ptr<Object>> &)> fn, int argc) :
-            id(nextId()), type(Builtin), builtin(fn), builtinParamCount(argc)
+        Function(const FString &_name, std::function<std::shared_ptr<Object>(const std::vector<std::shared_ptr<Object>> &)> fn, int argc) :
+            id(nextId()), name(_name), type(Builtin), builtin(fn), builtinParamCount(argc)
         {
             type = Builtin;
         }
 
-        Function(std::function<std::shared_ptr<Object>(std::shared_ptr<Object>,
+        Function(const FString &_name, std::function<std::shared_ptr<Object>(std::shared_ptr<Object>,
                                                        const std::vector<std::shared_ptr<Object>> &)> fn,
                  int argc) :
-            id(nextId()), type(MemberType), mtFn(fn), builtinParamCount(argc)
+            id(nextId()), name(_name), type(MemberType), mtFn(fn), builtinParamCount(argc)
         {
             type = MemberType;
         }
 
         // ===== Copy / Move =====
-        Function(const Function &other)
-        {
-            copyFrom(other);
-        }
+        Function(const Function &other) { copyFrom(other); }
         Function &operator=(const Function &other)
         {
             if (this != &other)
@@ -94,10 +94,7 @@ namespace Fig
             return *this;
         };
 
-        ~Function()
-        {
-            destroy();
-        }
+        ~Function() { destroy(); }
 
         // ===== Comparison =====
         bool operator==(const Function &other) const noexcept { return id == other.id; }
@@ -125,6 +122,7 @@ namespace Fig
 
         void copyFrom(const Function &other)
         {
+            name = other.name;
             type = other.type;
             id = nextId(); // 每个复制都生成新的ID
             builtinParamCount = other.builtinParamCount;

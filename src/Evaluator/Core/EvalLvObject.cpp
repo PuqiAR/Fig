@@ -1,3 +1,4 @@
+#include "Evaluator/Value/value.hpp"
 #include <Evaluator/Value/LvObject.hpp>
 #include <Evaluator/evaluator.hpp>
 #include <Evaluator/evaluator_error.hpp>
@@ -36,6 +37,7 @@ namespace Fig
             return LvObject(std::make_shared<VariableSlot>(
                                 member,
                                 std::make_shared<Object>(Function(
+                                    member,
                                     [baseVal, member](ObjectPtr self, std::vector<ObjectPtr> args) -> ObjectPtr {
                                         if (self) { return baseVal->getMemberFunction(member)(self, args); }
                                         return baseVal->getMemberFunction(member)(baseVal, args);
@@ -52,7 +54,8 @@ namespace Fig
             // e.g. impl xxx for Int
 
             auto &fn = ctx->getImplementedMethod(baseVal->getTypeInfo(), member);
-            Function boundFn(fn.paras,
+            Function boundFn(member,
+                             fn.paras,
                              fn.retType,
                              fn.body,
                              ctx // current context
@@ -74,7 +77,8 @@ namespace Fig
         if (ctx->hasMethodImplemented(si.parentType, member))
         {
             auto &fn = ctx->getImplementedMethod(si.parentType, member);
-            Function boundFn(fn.paras,
+            Function boundFn(member,
+                             fn.paras,
                              fn.retType,
                              fn.body,
                              si.localContext // create a new function and set closure context
@@ -92,7 +96,7 @@ namespace Fig
         else if (ctx->hasDefaultImplementedMethod(si.parentType, member))
         {
             const auto &ifm = ctx->getDefaultImplementedMethod(si.parentType, member);
-            Function fn(ifm.paras, actualType(eval(ifm.returnType, ctx)), ifm.defaultBody, ctx);
+            Function fn(member, ifm.paras, actualType(eval(ifm.returnType, ctx)), ifm.defaultBody, ctx);
 
             return LvObject(std::make_shared<VariableSlot>(
                                 member, std::make_shared<Object>(fn), ValueType::Function, AccessModifier::PublicConst),

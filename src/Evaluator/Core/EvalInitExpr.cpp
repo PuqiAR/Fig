@@ -1,3 +1,4 @@
+#include "Evaluator/Value/value.hpp"
 #include <Evaluator/Value/LvObject.hpp>
 #include <Evaluator/evaluator.hpp>
 #include <Evaluator/evaluator_error.hpp>
@@ -347,16 +348,13 @@ namespace Fig
         // load struct method
         for (auto &[id, fn] : stDefCtx->getFunctions())
         {
-            auto funcNameOpt = stDefCtx->getFunctionName(id);
-            assert(funcNameOpt.has_value());
-
-            const FString &funcName = *funcNameOpt;
-            auto funcSlot = stDefCtx->get(funcName);
-
+            const FString &funcName = fn.name;
+            const auto &funcSlot = stDefCtx->get(funcName);
+            
             instanceCtx->def(funcName,
                              ValueType::Function,
                              funcSlot->am,
-                             std::make_shared<Object>(Function(fn.paras, fn.retType, fn.body, instanceCtx)));
+                             std::make_shared<Object>(Function(funcName, fn.paras, fn.retType, fn.body, instanceCtx)));
         }
 
         return std::make_shared<Object>(StructInstance(structT.type, instanceCtx));

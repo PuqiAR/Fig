@@ -1,4 +1,5 @@
 #pragma once
+#include <Ast/Expressions/FunctionCall.hpp>
 #include <Ast/Expressions/InitExpr.hpp>
 #include <Ast/Statements/ImplementSt.hpp>
 #include <Ast/Statements/InterfaceDefSt.hpp>
@@ -24,15 +25,9 @@ namespace Fig
         FString sourcePath;
         std::vector<FString> sourceLines;
 
-        void SetSourcePath(const FString &sp)
-        {
-            sourcePath = sp;
-        }
+        void SetSourcePath(const FString &sp) { sourcePath = sp; }
 
-        void SetSourceLines(const std::vector<FString> &sl)
-        {
-            sourceLines = sl;
-        }
+        void SetSourceLines(const std::vector<FString> &sl) { sourceLines = sl; }
 
         void SetGlobalContext(ContextPtr ctx)
         {
@@ -40,11 +35,7 @@ namespace Fig
             global = ctx;
         }
 
-        void CreateGlobalContext()
-        {
-            global = std::make_shared<Context>(
-                FString(u8"<Global>"));
-        }
+        void CreateGlobalContext() { global = std::make_shared<Context>(FString(u8"<Global>")); }
 
         void RegisterBuiltins() // only function
         {
@@ -53,12 +44,8 @@ namespace Fig
             for (auto &[name, fn] : Builtins::getBuiltinFunctions())
             {
                 int argc = Builtins::getBuiltinFunctionParamCount(name);
-                Function f(fn, argc);
-                global->def(
-                    name,
-                    ValueType::Function,
-                    AccessModifier::Const,
-                    std::make_shared<Object>(f));
+                Function f(name, fn, argc);
+                global->def(name, ValueType::Function, AccessModifier::Const, std::make_shared<Object>(f));
             }
         }
 
@@ -68,11 +55,7 @@ namespace Fig
 
             for (auto &[name, val] : Builtins::getBuiltinValues())
             {
-                global->def(
-                    name,
-                    val->getTypeInfo(),
-                    AccessModifier::Const,
-                    val);
+                global->def(name, val->getTypeInfo(), AccessModifier::Const, val);
             }
         }
 
@@ -86,12 +69,16 @@ namespace Fig
         LvObject evalLv(Ast::Expression, ContextPtr); // for access: a.b / index a[b]
 
         /* Right-value eval*/
-        RvObject evalInitExpr(Ast::InitExpr, ContextPtr); // only allows evalUnary to call
+        RvObject evalInitExpr(Ast::InitExpr, ContextPtr);   // only allows evalUnary to call
         RvObject evalBinary(Ast::BinaryExpr, ContextPtr);   // normal binary expr: +, -, *....
         RvObject evalUnary(Ast::UnaryExpr, ContextPtr);     // unary expr
         RvObject evalTernary(Ast::TernaryExpr, ContextPtr); // ternary expr
 
-        RvObject evalFunctionCall(const Function &, const Ast::FunctionArguments &, const FString &, ContextPtr); // function call
+        RvObject executeFunction(const Function &fn, const Ast::FunctionCallArgs &, ContextPtr); // fn, fn context
+
+        RvObject evalFunctionCall(const Ast::FunctionCall &,
+                                  ContextPtr); // function call
+
         RvObject eval(Ast::Expression, ContextPtr);
 
         StatementResult evalBlockStatement(Ast::BlockStatement, ContextPtr); // block

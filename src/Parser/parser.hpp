@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Token/token.hpp"
 #include <Ast/astBase.hpp>
 #include <Ast/ast.hpp>
 #include <Lexer/lexer.hpp>
@@ -322,7 +323,7 @@ namespace Fig
         Ast::Import __parseImport(); // entry: current is Token::Import
 
         Ast::Statement __parseStatement(bool = true); // entry: (idk)
-        Ast::Expression parseExpression(Precedence, TokenType = TokenType::Semicolon, TokenType = TokenType::Semicolon);
+        Ast::Expression parseExpression(Precedence, TokenType = TokenType::Semicolon, TokenType = TokenType::Semicolon, TokenType = TokenType::Semicolon);
         std::vector<Ast::AstBase> parseAll();
     };
 }; // namespace Fig

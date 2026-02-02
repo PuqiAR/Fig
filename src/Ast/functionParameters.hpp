@@ -17,8 +17,10 @@ namespace Fig::Ast
                 func test2(dp1 = 10, dp2:String = "default parameter 2")
         */
 
-        using PosParasType = std::vector<std::pair<FString, FString>>;
-        using DefParasType = std::vector<std::pair<FString, std::pair<FString, Expression>>>;
+        using PosParasType = std::vector<std::pair<FString, Expression>>;
+        //                                          name       type exp
+        using DefParasType = std::vector<std::pair<FString, std::pair<Expression, Expression>>>;
+        //                                          name                type exp     default value
 
         PosParasType posParas;
         DefParasType defParas; // default parameters
@@ -61,9 +63,9 @@ namespace Fig::Ast
                 for (auto &p : posParas)
                 {
                     out += p.first;
-                    if (!p.second.empty())
+                    if (p.second != nullptr)
                     {
-                        out += FString(u8":" + p.second);
+                        out += FString(u8":" + p.second->toString());
                     }
                     out += u8",";
                 }
@@ -75,9 +77,9 @@ namespace Fig::Ast
                 for (auto &p : defParas)
                 {
                     out += p.first;
-                    if (!p.second.first.empty())
+                    if (p.second.first != nullptr)
                     {
-                        out += FString(u8":" + p.second.first);
+                        out += FString(u8":" + p.second.first->toString());
                     }
                     if (p.second.second != nullptr)
                     {

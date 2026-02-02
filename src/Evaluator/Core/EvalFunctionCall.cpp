@@ -1,3 +1,6 @@
+#include "Ast/functionParameters.hpp"
+#include "Evaluator/Value/value.hpp"
+#include <Ast/Expressions/FunctionCall.hpp>
 #include <Evaluator/Value/function.hpp>
 #include <Evaluator/Value/LvObject.hpp>
 #include <Evaluator/evaluator.hpp>
@@ -5,41 +8,74 @@
 
 namespace Fig
 {
-    RvObject Evaluator::evalFunctionCall(const Function &fn,
-                                         const Ast::FunctionArguments &fnArgs,
-                                         const FString &fnName,
-                                         ContextPtr ctx)
+    RvObject Evaluator::executeFunction(const Function &fn,
+                                        const Ast::FunctionCallArgs &args,
+                                        ContextPtr fnCtx) // new context for fn, already filled paras
     {
-        const Function &fnStruct = fn;
+        // const FString &fnName = fn.name;
+        if (fn.type == Function::Builtin || fn.type == Function::MemberType)
+        {
+            if (fn.type == Function::Builtin) { return fn.builtin(args.argv); }
+            else
+            {
+                return fn.mtFn(nullptr,
+                               args.argv); // wrapped member type function (`this` provided by evalMemberExpr)
+            }
+        }
+        // else: normal fn, args is needless
+        for (const auto &stmt : fn.body->stmts)
+        {
+            StatementResult sr = evalStatement(stmt, fnCtx);
+            if (sr.isError())
+            {
+                throw EvaluatorError(u8"UncaughtExceptionError",
+                                     std::format("Uncaught exception: {}", sr.result->toString().toBasicString()),
+                                     stmt);
+            }
+            if (!sr.isNormal())
+            {
+                return sr.result;
+            }
+        }
+        return Object::getNullInstance();
+    }
+    RvObject Evaluator::evalFunctionCall(const Ast::FunctionCall &call, ContextPtr ctx)
+    {
+        RvObject fnObj = eval(call->callee, ctx);
+        if (fnObj->getTypeInfo() != ValueType::Function)
+        {
+            throw EvaluatorError(u8"ObjectNotCallable",
+                                 std::format("Object `{}` isn't callable", fnObj->toString().toBasicString()),
+                                 call->callee);
+        }
+
+        const Function &fn = fnObj->as<Function>();
+
+        const FString &fnName = fn.name;
+        const Ast::FunctionArguments &fnArgs = call->arg;
+
         Ast::FunctionCallArgs evaluatedArgs;
-        if (fnStruct.type == Function::Builtin || fnStruct.type == Function::MemberType)
+        if (fn.type == Function::Builtin || fn.type == Function::MemberType)
         {
             for (const auto &argExpr : fnArgs.argv) { evaluatedArgs.argv.push_back(eval(argExpr, ctx)); }
-            if (fnStruct.builtinParamCount != -1 && fnStruct.builtinParamCount != evaluatedArgs.getLength())
+            if (fn.builtinParamCount != -1 && fn.builtinParamCount != evaluatedArgs.getLength())
             {
                 throw EvaluatorError(u8"BuiltinArgumentMismatchError",
                                      std::format("Builtin function '{}' expects {} arguments, but {} were provided",
                                                  fnName.toBasicString(),
-                                                 fnStruct.builtinParamCount,
+                                                 fn.builtinParamCount,
                                                  evaluatedArgs.getLength()),
                                      fnArgs.argv.back());
             }
-            if (fnStruct.type == Function::Builtin) 
-            {
-                return fnStruct.builtin(evaluatedArgs.argv);
-            }
-            else
-            {
-                return fnStruct.mtFn(nullptr, evaluatedArgs.argv); // wrapped member type function (`this` provided by evalMemberExpr)
-            }
+            return executeFunction(fn, evaluatedArgs, nullptr);
         }
 
         // check argument, all types of parameters
-        Ast::FunctionParameters fnParas = fnStruct.paras;
+        Ast::FunctionParameters fnParas = fn.paras;
 
         // create new context for function call
         auto newContext = std::make_shared<Context>(FString(std::format("<Function {}()>", fnName.toBasicString())),
-                                                    fnStruct.closureContext);
+                                                    fn.closureContext);
 
         if (fnParas.variadic)
             goto VariadicFilling;
@@ -60,8 +96,8 @@ namespace Fig
         size_t i;
         for (i = 0; i < fnParas.posParas.size(); i++)
         {
-            TypeInfo expectedType(fnParas.posParas[i].second); // look up type info, if exists a type with the
-                                                               // name, use it, else throw
+            const TypeInfo &expectedType = actualType(eval(fnParas.posParas[i].second, ctx)); // look up type info, if exists a type
+                                                                                  // with the name, use it, else throw
             ObjectPtr argVal = eval(fnArgs.argv[i], ctx);
             TypeInfo actualType = argVal->getTypeInfo();
             if (!isTypeMatch(expectedType, argVal, ctx))
@@ -80,7 +116,7 @@ namespace Fig
         for (; i < fnArgs.getLength(); i++)
         {
             size_t defParamIndex = i - fnParas.posParas.size();
-            TypeInfo expectedType(fnParas.defParas[defParamIndex].second.first);
+            const TypeInfo &expectedType = actualType(eval(fnParas.defParas[defParamIndex].second.first, ctx));
 
             ObjectPtr defaultVal = eval(fnParas.defParas[defParamIndex].second.second, ctx);
             if (!isTypeMatch(expectedType, defaultVal, ctx))
@@ -126,13 +162,13 @@ namespace Fig
             if (j < fnParas.posParas.size())
             {
                 paramName = fnParas.posParas[j].first;
-                paramType = TypeInfo(fnParas.posParas[j].second);
+                paramType = actualType(eval(fnParas.posParas[j].second, ctx));
             }
             else
             {
                 size_t defParamIndex = j - fnParas.posParas.size();
                 paramName = fnParas.defParas[defParamIndex].first;
-                paramType = TypeInfo(fnParas.defParas[defParamIndex].second.first);
+                paramType = actualType(eval(fnParas.defParas[defParamIndex].second.first, ctx));
             }
             AccessModifier argAm = AccessModifier::Normal;
             newContext->def(paramName, paramType, argAm, evaluatedArgs.argv[j]);
@@ -152,30 +188,16 @@ namespace Fig
 
     ExecuteBody: {
         // execute function body
-        ObjectPtr retVal = Object::getNullInstance();
-        for (const auto &stmt : fnStruct.body->stmts)
-        {
-            StatementResult sr = evalStatement(stmt, newContext);
-            if (sr.isError())
-            {
-                throw EvaluatorError(u8"UncaughtExceptionError",
-                                     std::format("Uncaught exception: {}", sr.result->toString().toBasicString()),
-                                     stmt);
-            }
-            if (!sr.isNormal())
-            {
-                retVal = sr.result;
-                break;
-            }
-        }
-        if (!isTypeMatch(fnStruct.retType, retVal, ctx))
+        ObjectPtr retVal = executeFunction(fn, evaluatedArgs, newContext);
+
+        if (!isTypeMatch(fn.retType, retVal, ctx))
         {
             throw EvaluatorError(u8"ReturnTypeMismatchError",
                                  std::format("Function '{}' expects return type '{}', but got type '{}'",
                                              fnName.toBasicString(),
-                                             fnStruct.retType.toString().toBasicString(),
+                                             fn.retType.toString().toBasicString(),
                                              prettyType(retVal).toBasicString()),
-                                 fnStruct.body);
+                                 fn.body);
         }
         return retVal;
     }

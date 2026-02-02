@@ -39,27 +39,7 @@ namespace Fig
 
             case AstType::FunctionCall: {
                 auto fnCall = std::static_pointer_cast<Ast::FunctionCallExpr>(exp);
-               
-                Ast::Expression callee = fnCall->callee;
-                ObjectPtr fnObj = eval(callee, ctx);
-                if (fnObj->getTypeInfo() != ValueType::Function)
-                {
-                    throw EvaluatorError(u8"ObjectNotCallable",
-                                         std::format("Object `{}` isn't callable", fnObj->toString().toBasicString()),
-                                         callee);
-                }
-                const Function &fn = fnObj->as<Function>();
-                size_t fnId = fn.id;
-                // const auto &fnNameOpt = ctx->getFunctionName(fnId);
-                // const FString &fnName = (fnNameOpt ? *fnNameOpt :
-                // u8"<anonymous>");
-
-                auto fnNameOpt = ctx->getFunctionName(fnId);
-                if (!fnNameOpt && fn.closureContext) fnNameOpt = fn.closureContext->getFunctionName(fnId);
-
-                const FString &fnName = (fnNameOpt ? *fnNameOpt : u8"<anonymous> or builtin-type member function");
-
-                return evalFunctionCall(fn, fnCall->arg, fnName, ctx);
+                return evalFunctionCall(fnCall, ctx);
             }
             case AstType::FunctionLiteralExpr: {
                 auto fnLiteral = std::static_pointer_cast<Ast::FunctionLiteralExprAst>(exp);
@@ -84,7 +64,7 @@ namespace Fig
                     body = fnLiteral->getBlockBody();
                    
                 }
-                Function fn(fnLiteral->paras, ValueType::Any, body, ctx
+                Function fn(FString(std::format("<LambdaFn>")),fnLiteral->paras, ValueType::Any, body, ctx
                             /*
                                 pass the ctx(fnLiteral eval context) as closure context
                             */

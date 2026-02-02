@@ -1,15 +1,17 @@
 #pragma once
 
-#include "Evaluator/Value/function.hpp"
-#include <Ast/Statements/InterfaceDefSt.hpp>
-#include <Evaluator/Value/interface.hpp>
-#include <Evaluator/Value/Type.hpp>
 #include <algorithm>
 #include <cstddef>
+#include <functional>
 #include <unordered_map>
 #include <iostream>
 #include <memory>
 
+#include <Ast/astBase.hpp>
+#include <Ast/Statements/InterfaceDefSt.hpp>
+#include <Evaluator/Value/function.hpp>
+#include <Evaluator/Value/interface.hpp>
+#include <Evaluator/Value/Type.hpp>
 #include <Evaluator/Context/context_forward.hpp>
 #include <Core/fig_string.hpp>
 #include <Evaluator/Value/value.hpp>
@@ -26,6 +28,35 @@ namespace Fig
         std::unordered_map<FString, Function> implMethods;
     };
 
+    struct OperationRecord
+    {
+        using UnaryOpFn = std::function<ObjectPtr(const ObjectPtr &)>;        
+        using BinaryOpFn = std::function<ObjectPtr(const ObjectPtr &, const ObjectPtr &)>;
+
+        std::unordered_map<Ast::Operator, UnaryOpFn> unOpRec;
+        std::unordered_map<Ast::Operator, BinaryOpFn> binOpRec;
+
+        bool hasUnaryOp(Ast::Operator op) const
+        {
+            return unOpRec.contains(op);
+        }
+
+        bool hasBinaryOp(Ast::Operator op) const
+        {
+            return binOpRec.contains(op);
+        }
+
+        const UnaryOpFn &getUnaryOpFn(Ast::Operator op) const
+        {
+            return unOpRec.at(op);
+        }
+
+        const BinaryOpFn &getBinaryOpFn(Ast::Operator op) const 
+        {
+            return binOpRec.at(op);
+        }
+    };
+
     class Context : public std::enable_shared_from_this<Context>
     {
     private:
@@ -37,7 +68,7 @@ namespace Fig
 
         // implRegistry <Struct, ordered list of ImplRecord>
         std::unordered_map<TypeInfo, std::vector<ImplRecord>, TypeInfoHash> implRegistry;
-
+        std::unordered_map<TypeInfo, OperationRecord, TypeInfoHash> opRegistry;
     public:
         ContextPtr parent;
 
@@ -54,6 +85,7 @@ namespace Fig
         {
             variables.insert(c.variables.begin(), c.variables.end());
             implRegistry.insert(c.implRegistry.begin(), c.implRegistry.end());
+            opRegistry.insert(c.opRegistry.begin(), c.opRegistry.end());
             // structTypeNames.insert(c.structTypeNames.begin(),
             // c.structTypeNames.end());
         }
@@ -360,6 +392,72 @@ namespace Fig
 
             assert(false); // not found
             throw "";      // ignore warning
+        }
+
+        bool hasOperatorImplemented(const TypeInfo &type, Ast::Operator op, bool isUnary = false) const
+        {
+            auto it = opRegistry.find(type);
+            if (it != opRegistry.end())
+            {
+                const OperationRecord &rec = it->second;
+                if (isUnary)
+                    return rec.hasUnaryOp(op);
+                else
+                    return rec.hasBinaryOp(op);
+            }
+
+            if (parent) return parent->hasOperatorImplemented(type, op, isUnary);
+            return false;
+        }
+
+        std::optional<OperationRecord::UnaryOpFn> getUnaryOperatorFn(const TypeInfo &type, Ast::Operator op) const
+        {
+            auto it = opRegistry.find(type);
+            if (it != opRegistry.end())
+            {
+                const OperationRecord &rec = it->second;
+                if (rec.hasUnaryOp(op)) return rec.getUnaryOpFn(op);
+            }
+
+            if (parent) return parent->getUnaryOperatorFn(type, op);
+            return std::nullopt;
+        }
+
+        std::optional<OperationRecord::BinaryOpFn> getBinaryOperatorFn(const TypeInfo &type, Ast::Operator op) const
+        {
+            auto it = opRegistry.find(type);
+            if (it != opRegistry.end())
+            {
+                const OperationRecord &rec = it->second;
+                if (rec.hasBinaryOp(op)) return rec.getBinaryOpFn(op);
+            }
+
+            if (parent) return parent->getBinaryOperatorFn(type, op);
+            return std::nullopt;
+        }
+
+        void registerUnaryOperator(const TypeInfo &type, Ast::Operator op, OperationRecord::UnaryOpFn fn)
+        {
+            opRegistry[type].unOpRec[op] = std::move(fn);
+        }
+
+        void registerBinaryOperator(const TypeInfo &type, Ast::Operator op, OperationRecord::BinaryOpFn fn)
+        {
+            opRegistry[type].binOpRec[op] = std::move(fn);
+        }
+
+        bool removeUnaryOperator(const TypeInfo &type, Ast::Operator op)
+        {
+            auto it = opRegistry.find(type);
+            if (it != opRegistry.end()) return it->second.unOpRec.erase(op) > 0;
+            return false;
+        }
+
+        bool removeBinaryOperator(const TypeInfo &type, Ast::Operator op)
+        {
+            auto it = opRegistry.find(type);
+            if (it != opRegistry.end()) return it->second.binOpRec.erase(op) > 0;
+            return false;
         }
 
         void printStackTrace(std::ostream &os = std::cerr, int indent = 0) const
