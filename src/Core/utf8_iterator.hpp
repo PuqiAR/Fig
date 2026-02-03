@@ -58,7 +58,7 @@ namespace Fig
             switch (len)
             {
                 case 1:
-                    code_point = char_data_[0];
+                    code_point = static_cast<char32_t>(char_data_[0]);
                     break;
                 case 2:
                     code_point = ((char_data_[0] & 0x1F) << 6) | (char_data_[1] & 0x3F);
