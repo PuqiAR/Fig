@@ -35,6 +35,12 @@ Recommend view on Gitea Endpoint
 1. Clone the repository:
 
 ```bash
+git clone https://git.fig-lang.cn/PuqiAR/Fig.git
+# Recommend
+```
+or
+
+```bash
 git clone https://github.com/PuqiAR/Fig.git
 ```
 

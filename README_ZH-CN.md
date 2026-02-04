@@ -27,8 +27,15 @@
 1. 克隆存储库：
 
 ```bash
+git clone https://git.fig-lang.cn/PuqiAR/Fig.git
+# 推荐
+```
+
+或
+```bash
 git clone https://github.com/PuqiAR/Fig.git
 ```
+
 
 2. 切换到项目目录：
 
