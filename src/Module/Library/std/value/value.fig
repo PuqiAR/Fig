@@ -7,7 +7,7 @@
 
 import _builtins;
 
-public func type(object: Any) -> String
+public func _type(object: Any) -> String
 {
     return __fvalue_type(object);
 }

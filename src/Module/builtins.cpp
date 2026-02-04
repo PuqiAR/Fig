@@ -1,10 +1,10 @@
-#include "Ast/Expressions/BinaryExpr.hpp"
-#include "Ast/Expressions/FunctionCall.hpp"
-#include "Ast/Expressions/ValueExpr.hpp"
-#include "Ast/Expressions/VarExpr.hpp"
-#include "Ast/Statements/ControlSt.hpp"
-#include "Ast/astBase.hpp"
-#include "Ast/functionParameters.hpp"
+#include <Ast/Expressions/BinaryExpr.hpp>
+#include <Ast/Expressions/FunctionCall.hpp>
+#include <Ast/Expressions/ValueExpr.hpp>
+#include <Ast/Expressions/VarExpr.hpp>
+#include <Ast/Statements/ControlSt.hpp>
+#include <Ast/astBase.hpp>
+#include <Ast/functionParameters.hpp>
 #include <Evaluator/Context/context.hpp>
 #include <Core/fig_string.hpp>
 #include <Ast/AccessModifier.hpp>
@@ -75,6 +75,16 @@ namespace Fig::Builtins
             {u8"Map", std::make_shared<Object>(StructType(ValueType::Map, nullptr, {}, true))},
             // Type `StructType` `StructInstance` `Module` `InterfaceType`
             // Not allowed to call constructor!
+
+            {u8"type", std::make_shared<Object>(Function(
+                u8"type",
+                [](const std::vector<ObjectPtr> &_args) -> ObjectPtr
+                {
+                    const ObjectPtr &arg = _args[0];
+                    return std::make_shared<Object>(prettyType(arg));
+                },
+                1
+            ))},
         };
         return builtinValues;
     }

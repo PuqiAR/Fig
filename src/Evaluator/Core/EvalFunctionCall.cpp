@@ -64,7 +64,7 @@ namespace Fig
                                                  fnName.toBasicString(),
                                                  fn.builtinParamCount,
                                                  evaluatedArgs.getLength()),
-                                     fnArgs.argv.back());
+                                     (fnArgs.getLength() > 0 ? fnArgs.argv.back() : call));
             }
             return executeFunction(fn, evaluatedArgs, nullptr);
         }
