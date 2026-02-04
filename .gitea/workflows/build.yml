@@ -95,58 +95,68 @@ jobs:
           COMMIT_MSG="${{ env.COMMIT_MSG }}"
           API="https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}"
           
-          echo "正在为Linux版本创建/更新发布 $VERSION ..."
+          echo "正在检查版本 $VERSION 的发布状态..."
           
-          # 确保正确转义
+          # 准备 JSON 数据
           VERSION="$VERSION" COMMIT_MSG="$COMMIT_MSG" python3 -c "import json, os; print(json.dumps({'tag_name': os.environ.get('VERSION', ''), 'name': 'Fig ' + os.environ.get('VERSION', ''), 'body': os.environ.get('COMMIT_MSG', ''), 'draft': False, 'prerelease': False}))" > release_body.json
           
-          RESPONSE=$(curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d @release_body.json \
-            "$API/releases" 2>/dev/null || echo '{"id":0}')
+          # 1. 尝试获取已有发布
+          RESPONSE_TAG=$(curl -sS -H "Authorization: token $GITEA_TOKEN" "$API/releases/tags/$VERSION" 2>/dev/null || echo '{"id":0}')
+          RELEASE_ID=$(echo "$RESPONSE_TAG" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
           
-          RELEASE_ID=$(echo "$RESPONSE" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
-          
-          if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "0" ]; then
-            echo "尝试通过标签获取已有发布的ID..."
-            RESPONSE_TAG=$(curl -sS -H "Authorization: token $GITEA_TOKEN" "$API/releases/tags/$VERSION")
-            RELEASE_ID=$(echo "$RESPONSE_TAG" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
+          if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "0" ]; then
+            echo "✅ 找到已有发布 (ID: $RELEASE_ID)，正在更新说明..."
+            curl -sS -X PATCH -H "Authorization: token $GITEA_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d @release_body.json \
+              "$API/releases/$RELEASE_ID" > /dev/null
+          else
+            echo "未找到已有发布，准备创建新发布..."
+            RESPONSE=$(curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d @release_body.json \
+              "$API/releases" 2>/dev/null || echo '{"id":0}')
             
-            # 发布存在，更新它以包含最新的提交消息
-            if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "0" ]; then
-              echo "更新已有发布的说明..."
-              curl -sS -X PATCH -H "Authorization: token $GITEA_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d @release_body.json \
-                "$API/releases/$RELEASE_ID" > /dev/null
+            RELEASE_ID=$(echo "$RESPONSE" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
+            
+            if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "0" ]; then
+               # 再次尝试获取，防止并发冲突
+               RESPONSE_TAG=$(curl -sS -H "Authorization: token $GITEA_TOKEN" "$API/releases/tags/$VERSION" 2>/dev/null || echo '{"id":0}')
+               RELEASE_ID=$(echo "$RESPONSE_TAG" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
             fi
           fi
           
-          if [ -z "$RELEASE_ID" ]; then
-            echo "错误：无法获取或创建发布 ID"
+          if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "0" ]; then
+            echo "❌ 错误：无法获取或创建发布 ID"
             exit 1
           fi
           
-          echo "使用发布 ID: $RELEASE_ID 进行上传"
+          echo "✅ 使用发布 ID: $RELEASE_ID 进行上传"
           
-          # 上传语言包
+          # 上传资产
+          PACKAGE_ZIP="Fig-$VERSION-linux-x86_64.tar.gz"
+          PACKAGE_SHA="Fig-$VERSION-linux-x86_64.sha256"
+          
+          echo "正在上传 $PACKAGE_ZIP ..."
           curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/octet-stream" \
-            --data-binary @Fig-$VERSION-linux-x86_64.tar.gz \
-            "$API/releases/$RELEASE_ID/assets?name=Fig-$VERSION-linux-x86_64.tar.gz"
+            --data-binary "@$PACKAGE_ZIP" \
+            "$API/releases/$RELEASE_ID/assets?name=$PACKAGE_ZIP" > /dev/null
           
+          echo "正在上传 $PACKAGE_SHA ..."
           curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: text/plain" \
-            --data-binary @Fig-$VERSION-linux-x86_64.sha256 \
-            "$API/releases/$RELEASE_ID/assets?name=Fig-$VERSION-linux-x86_64.sha256"
+            --data-binary "@$PACKAGE_SHA" \
+            "$API/releases/$RELEASE_ID/assets?name=$PACKAGE_SHA" > /dev/null
           
-          # 🔧 新增：上传Linux安装器
-          if [ -f "Installer/ConsoleInstaller/dist/linux/FigSetup-Linux" ]; then
+          # 🔧 上传Linux安装器
+          INSTALLER="Installer/ConsoleInstaller/dist/linux/FigSetup-Linux"
+          if [ -f "$INSTALLER" ]; then
             echo "正在上传Linux安装器..."
             curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
               -H "Content-Type: application/octet-stream" \
-              --data-binary @Installer/ConsoleInstaller/dist/linux/FigSetup-Linux \
-              "$API/releases/$RELEASE_ID/assets?name=FigSetup-Linux"
+              --data-binary "@$INSTALLER" \
+              "$API/releases/$RELEASE_ID/assets?name=FigSetup-Linux" > /dev/null
           fi
           
           echo "✅ Linux版本发布完成！"
@@ -259,10 +269,9 @@ jobs:
           $VERSION = $env:VERSION
           $COMMIT_MSG = $env:COMMIT_MSG
           
-          # 如果环境变量获取失败，尝试直接使用上下文变量
           if (-not $VERSION) {
             $VERSION = "${{ github.ref_name }}"
-            Write-Host "⚠️  警告：从环境变量获取 VERSION 失败，尝试回退到 github.ref_name: $VERSION"
+            Write-Host "⚠️  警告：从环境变量获取 VERSION 失败，回退到 github.ref_name: $VERSION"
           }
           
           if (-not $VERSION) {
@@ -270,30 +279,23 @@ jobs:
             exit 1
           }
           
-          if (-not $COMMIT_MSG) {
-            Write-Host "⚠️  警告：从环境变量获取 COMMIT_MSG 失败"
-          }
-          
-          Write-Host "正在上传Windows版本到发布: $VERSION"
-          
           $REPO = $env:GITHUB_REPOSITORY
           $API = "https://git.fig-lang.cn/api/v1/repos/$REPO"
           $TOKEN = $env:GITEA_TOKEN
+          $HEADERS = @{
+            Authorization = "token $TOKEN"
+            'Content-Type' = 'application/json'
+          }
           
-          # 🔧 新增：检查必需的文件是否存在
           $ZIP_FILE = "Fig-$VERSION-windows-x86_64.zip"
           $HASH_FILE = "Fig-$VERSION-windows-x86_64.sha256"
           $INSTALLER_PATH = "Installer\ConsoleInstaller\dist\windows\FigSetup.exe"
           
           if (-not (Test-Path $ZIP_FILE)) {
             Write-Host "❌ 错误：找不到ZIP文件 $ZIP_FILE"
-            Get-ChildItem *.zip
             exit 1
           }
           
-          Write-Host "正在为Windows版本创建/更新发布 $VERSION ..."
-          
-          # 🔧 关键修改：直接创建发布，不先检查（与Linux逻辑一致）
           $CREATE_BODY = @{
             tag_name = $VERSION
             name = "Fig $VERSION"
@@ -302,66 +304,62 @@ jobs:
             prerelease = $false
           } | ConvertTo-Json -Compress
           
-          Write-Host "创建发布请求体: $CREATE_BODY"
+          Write-Host "正在检查版本 $VERSION 的发布状态..."
+          $RELEASE_ID = $null
           
-          # 直接创建发布（Gitea会自动处理重复创建）
-          $RESPONSE = Invoke-RestMethod -Method Post -Uri "$API/releases" `
-            -Headers @{
-              Authorization = "token $TOKEN"
-              'Content-Type' = 'application/json'
-            } -Body $CREATE_BODY -ErrorAction SilentlyContinue
+          try {
+            $EXISTING = Invoke-RestMethod -Uri "$API/releases/tags/$VERSION" -Headers $HEADERS -ErrorAction Stop
+            if ($EXISTING -and $EXISTING.id) {
+              $RELEASE_ID = $EXISTING.id
+              Write-Host "✅ 找到已有发布 (ID: $RELEASE_ID)，正在更新..."
+              Invoke-RestMethod -Method Patch -Uri "$API/releases/$RELEASE_ID" -Headers $HEADERS -Body $CREATE_BODY -ErrorAction Stop | Out-Null
+            }
+          } catch {
+            Write-Host "未找到已有发布，准备创建新发布..."
+          }
           
-          if (-not $RESPONSE -or -not $RESPONSE.id) {
-            # 如果创建失败，尝试通过标签获取已有发布的ID
-            Write-Host "创建失败，尝试获取已有发布..."
-            $RESPONSE = Invoke-RestMethod -Uri "$API/releases/tags/$VERSION" `
-              -Headers @{Authorization = "token $TOKEN" } `
-              -ErrorAction SilentlyContinue
-            
-            # 发布存在，更新它以包含最新的提交消息
-            if ($RESPONSE -and $RESPONSE.id) {
-              Write-Host "更新已有发布的说明..."
-              Invoke-RestMethod -Method Patch -Uri "$API/releases/$($RESPONSE.id)" `
-                -Headers @{
-                  Authorization = "token $TOKEN"
-                  'Content-Type' = 'application/json'
-                } -Body $CREATE_BODY -ErrorAction SilentlyContinue | Out-Null
+          if (-not $RELEASE_ID) {
+            try {
+              Write-Host "正在创建新发布: $VERSION ..."
+              $RESPONSE = Invoke-RestMethod -Method Post -Uri "$API/releases" -Headers $HEADERS -Body $CREATE_BODY -ErrorAction Stop
+              $RELEASE_ID = $RESPONSE.id
+              Write-Host "✅ 发布创建成功 (ID: $RELEASE_ID)"
+            } catch {
+              $err = $_.Exception.Message
+              Write-Host "❌ 创建发布失败: $err"
+              # 最后一次尝试：再次尝试按标签获取，防止由于并发导致的冲突
+              try {
+                $RETRY = Invoke-RestMethod -Uri "$API/releases/tags/$VERSION" -Headers $HEADERS -ErrorAction Stop
+                $RELEASE_ID = $RETRY.id
+                Write-Host "✅ 重试获取发布成功 (ID: $RELEASE_ID)"
+              } catch {
+                Write-Host "❌ 无法获取或创建发布 ID"
+                exit 1
+              }
             }
           }
           
-          if ($RESPONSE -and $RESPONSE.id) {
-            $RELEASE_ID = $RESPONSE.id
-            Write-Host "✅ 使用发布 ID: $RELEASE_ID 进行上传"
-          } else {
-            Write-Host "❌ 错误：无法获取或创建发布 ID"
-            exit 1
+          # 上传资产
+          Write-Host "正在上传文件..."
+          $ASSETS = @(
+            @{ Name = $ZIP_FILE; Path = $ZIP_FILE; ContentType = "application/octet-stream" },
+            @{ Name = $HASH_FILE; Path = $HASH_FILE; ContentType = "text/plain" }
+          )
+          
+          if (Test-Path $INSTALLER_PATH) {
+            $ASSETS += @{ Name = "FigSetup.exe"; Path = $INSTALLER_PATH; ContentType = "application/octet-stream" }
           }
           
-          # 上传资产
-          Write-Host "正在上传 ZIP 文件..."
-          Invoke-RestMethod -Method Post -Uri "$API/releases/$RELEASE_ID/assets?name=$ZIP_FILE" `
-            -Headers @{
-              Authorization = "token $TOKEN"
-              'Content-Type' = 'application/octet-stream'
-            } -InFile $ZIP_FILE -ErrorAction SilentlyContinue
-          
-          Write-Host "正在上传校验文件..."
-          Invoke-RestMethod -Method Post -Uri "$API/releases/$RELEASE_ID/assets?name=$HASH_FILE" `
-            -Headers @{
-              Authorization = "token $TOKEN"
-              'Content-Type' = 'text/plain'
-            } -InFile $HASH_FILE -ErrorAction SilentlyContinue
-          
-          # 上传Windows安装器
-          if (Test-Path $INSTALLER_PATH) {
-            Write-Host "正在上传Windows安装器..."
-            Invoke-RestMethod -Method Post -Uri "$API/releases/$RELEASE_ID/assets?name=FigSetup.exe" `
-              -Headers @{
-                Authorization = "token $TOKEN"
-                'Content-Type' = 'application/octet-stream'
-              } -InFile $INSTALLER_PATH -ErrorAction SilentlyContinue
-          } else {
-            Write-Host "⚠️  警告：未找到安装器文件 $INSTALLER_PATH"
+          foreach ($asset in $ASSETS) {
+            Write-Host "正在上传 $($asset.Name) ..."
+            try {
+              # 如果资产已存在，Gitea 可能会报错，这里简单处理
+              Invoke-RestMethod -Method Post -Uri "$API/releases/$RELEASE_ID/assets?name=$($asset.Name)" `
+                -Headers @{ Authorization = "token $TOKEN"; 'Content-Type' = $asset.ContentType } `
+                -InFile $asset.Path -ErrorAction SilentlyContinue | Out-Null
+            } catch {
+              Write-Host "⚠️ 上传 $($asset.Name) 失败，可能已存在。"
+            }
           }
           
           Write-Host "✅ Windows版本发布完成！"
