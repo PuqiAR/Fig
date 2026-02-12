@@ -1,0 +1,84 @@
+import std.io;
+import std.time;
+import std.value;
+
+func benchmark(fn: Function, arg: Any) -> Null
+{
+    io.println("Testing fn:", fn, "with arg:", arg);
+    const start := time.now();
+    
+    const result := fn(arg);
+    
+    const end := time.now();
+    const duration := new time.Time{
+        end.since(start)
+    };
+    io.println("=" * 50);
+    io.println("fn returns:", result, "\n");
+    io.println("Cost:", duration.toSeconds(), "s");
+    io.println("     ", duration.toMillis(), "ms");
+}
+
+var memo := {};
+
+func fib_memo(x)
+{
+    if memo.contains(x)
+    {
+        return memo.get(x);
+    }
+    if x <= 1
+    {
+        memo[x] = x;
+        return x;
+    }
+    var result := fib_memo(x - 1) + fib_memo(x - 2);
+    memo[x] = result;
+    return result;
+}
+
+func fib_iter(n)
+{
+    var a := 0;
+    var b := 1;
+    for var i := 0; i < n; i = i + 1
+    {
+        var temp := a + b;
+        a = b;
+        b = temp;
+    }
+    return a;
+}
+
+func fib(x)
+{
+    if x <= 1
+    {
+        return x;
+    }
+    return fib(x - 1) + fib(x - 2);
+}
+
+func fib_tail(n, a=0, b=1) {
+    if n == 0 { return a; }
+    if n == 1 { return b; }
+    return fib_tail(n-1, b, a+b);
+}
+
+const n := 30;
+
+io.println("! fib(" + value.string_from(n) + "):");
+benchmark(fib, n);
+io.print("\n\n");
+
+io.println("! fib_memo(" + value.string_from(n) + "):");
+benchmark(fib_memo, n);
+io.print("\n\n");
+
+io.println("! fib_iter(" + value.string_from(n) + "):");
+benchmark(fib_iter, n);
+io.print("\n\n");
+
+io.println("! fib_tail(" + value.string_from(n) + "):");
+benchmark(fib_tail, n);
+io.print("\n\n");

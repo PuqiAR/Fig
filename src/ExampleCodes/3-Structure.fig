@@ -1,0 +1,30 @@
+import std.io;
+
+struct Point
+{
+    x: Int; // type specifiers are optional
+    y: Int; // type specifiers are optional
+
+    // x and y are private fields, can only reached by internal context
+
+    public func toString() -> String
+    {
+        return "(" + (x as String) + "," + (y as String) + ")";
+    } 
+    // public func toString() {} is ok
+}
+
+// make points
+
+var p1 := new Point{1, 2};
+io.println(p1.toString()); // (1,2)
+
+var p2 := new Point{x: 2, y: 3};
+io.println(p2.toString()); // (2,3)
+
+var x := 114;
+var y := 514;
+
+var p3 := new Point{y, x}; // shorthand mode, can be unordered, auto match field and variable!
+//                 = Point{x: x, y: y}
+io.println(p3.toString()); // (114,514)

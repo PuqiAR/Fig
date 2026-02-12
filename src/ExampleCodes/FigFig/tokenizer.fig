@@ -1,0 +1,102 @@
+/*
+Example code: FigFig
+
+Tokenizer.fig
+Copyright (C) 2020-2026 PuqiAR
+
+*/
+
+import token {Token, TokenType};
+
+func list_contains(lst: List, value: Any) -> Bool
+{
+    for var i := 0; i < lst.length(); i += 1
+    {
+        if lst[i] == value
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+func isspace(c: String) -> Bool
+{
+    return c == " " || c == "\n" || c == "\t";
+}
+
+func isalpha(c: String) -> Bool
+{
+    const alb := [
+        "a", "b", "c", "d",
+        "e", "f", "g", "h",
+        "i", "j", "k", "l",
+        "m", "n", "o", "p",
+        "q", "r", "s", "t",
+        "u", "v", "w", "x",
+        "y", "z",
+        "A", "B", "C", "D",
+        "E", "F", "G", "H",
+        "I", "J", "K", "L",
+        "M", "N", "O", "P",
+        "Q", "R", "S", "T",
+        "U", "V", "W", "X",
+        "Y", "Z"
+    ];
+    return list_contains(alb, c);
+}
+
+
+public struct Tokenizer
+{
+    src: String = "";
+    idx: Int = 0;
+
+    func next() -> Null 
+    {
+        idx += 1;
+    }
+
+    func hasNext() -> Bool 
+    {
+        return idx < src.length();
+    }
+
+    func produce() -> String
+    {
+        const tmp := src[idx];
+        idx += 1;
+        return tmp;
+    }
+
+    func current() -> String
+    {
+        return src[idx];
+    }
+
+    public func TokenizeAll() -> List
+    {
+        var output := [];
+
+        const push := func (tok: Token) => output.push(tok);
+
+        while hasNext()
+        {
+            while hasNext() && isspace(current())
+            {
+                next();
+            }
+            if isalpha(current())
+            {
+                var identi := "";
+                while hasNext() && isalpha(current())
+                {
+                    identi += produce();
+                }
+                push(new Token{identi, TokenType.Identifier});
+            }
+        }
+
+        return output;
+    }
+}

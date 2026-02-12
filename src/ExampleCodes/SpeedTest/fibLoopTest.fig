@@ -1,0 +1,27 @@
+import std.io;
+import std.value;
+
+var callCnt:Int = 0;
+func fib(x:Int) -> Int
+{
+    callCnt = callCnt + 1;
+    if (x <= 1)
+    {
+        return x;
+    }
+    return fib(x-1) + fib(x-2);
+} 
+
+var fibx:Int;
+io.print("input an index of fib ");
+fibx = value.int_parse(io.read());
+
+var cnt:Int = 0;
+io.println("test forever"); 
+while (true)
+{
+    cnt = cnt + 1;
+    io.println("test ", cnt,",result: ", fib(fibx));
+    io.println("func `fib` called ", callCnt);
+    callCnt = 0;
+}

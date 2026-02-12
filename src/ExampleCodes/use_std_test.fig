@@ -1,0 +1,29 @@
+import std.io;
+import std.test;
+
+var ascii_string_test := new test.Test{
+    "ascii_string_test",
+    func () => io.println("Hello," + " world!"),
+    2
+};
+
+var unicode_string_test := new test.Test{
+    "unicode_string_test",
+    func () => io.println("你好," + " 世界!"),
+    2
+};
+
+var unicode_string_inserting_test := new test.Test{
+    "unicode_string_inserting_test",
+    func (){
+        var str := "我是你的粑粑";
+        str.insert(1, "不");
+        return str;
+    },
+    "我不是你的粑粑"
+};
+
+var tests := [ascii_string_test, unicode_string_test, unicode_string_inserting_test];
+
+var tester := new test.Tester{tests};
+tester.TestAll();

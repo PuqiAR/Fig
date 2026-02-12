@@ -1,0 +1,31 @@
+/*
+Example code: FigFig
+
+Token.fig
+Copyright (C) 2020-2026 PuqiAR
+
+*/
+struct _TokenTypes
+{
+    public EOF = -1;
+    public Identifier = 0;
+
+    public StringLiteral = 1;
+    public NumberLiteral = 2;
+    public True = 3;
+    public False = 4;
+    public Null = 5;
+    
+    public Plus = 6;
+    public Minus = 7;
+    public Asterisk = 8;
+    public Slash = 9;
+}
+
+public const TokenType := new _TokenTypes{};
+
+public struct Token
+{
+    public literal: String = "";
+    public type: Int = TokenType.EOF;
+} 

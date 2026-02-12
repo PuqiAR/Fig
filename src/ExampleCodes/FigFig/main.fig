@@ -1,0 +1,15 @@
+import std.io;
+
+import token {Token, TokenType};
+import tokenizer {Tokenizer};
+
+const src := "abc egaD";
+const tokenizer := new Tokenizer{src};
+
+const result := tokenizer.TokenizeAll();
+
+for var i := 0; i < result.length(); i += 1
+{
+    const tok := result[i];
+    io.printf("{}: {}\n", tok.literal, tok.type);
+}

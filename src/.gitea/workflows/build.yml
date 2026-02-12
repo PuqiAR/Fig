@@ -1,0 +1,365 @@
+name: Release Build
+on:
+  push:
+    tags: ["*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号 (例如: v1.0.0)"
+        required: true
+        default: "dev-build"
+
+jobs:
+  build-linux-x64:
+    runs-on: ubuntu
+    container:
+      image: git.fig-lang.cn/puqiar/fig-ci:base-latest
+      options: --network=host
+
+    steps:
+      - name: 验证构建环境
+        run: |
+          echo "=== 环境验证开始 ==="
+          xmake --version
+          clang++ --version | head -1
+          echo "=== 环境验证通过 ==="
+
+      - name: 检出代码
+        run: |
+          git clone https://git.fig-lang.cn/${{ github.repository }} .
+          git checkout ${{ github.ref }}
+
+      - name: 设置版本和提交信息
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          echo "构建版本: $VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+          # 拿提交消息
+          COMMIT_MSG=$(git log -3 --pretty=%B)
+          echo "COMMIT_MSG<<EOF" >> $GITHUB_ENV
+          echo "$COMMIT_MSG" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: 构建项目 (Linux)
+        run: |
+          echo "开始构建Linux版本..."
+          xmake f -p linux -a x86_64 -m release -y
+          xmake build -j$(nproc) Fig
+          echo "Linux构建成功。"
+
+      # 🔧 新增：构建Linux平台安装器
+      - name: 构建Linux安装器
+        run: |
+          echo "开始构建Linux安装器..."
+
+          cd Installer/ConsoleInstaller
+
+          python3 -m venv venv
+          . venv/bin/activate
+
+          pip config set global.index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+
+          # 安装依赖并构建
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          python3 -m PyInstaller -F -n FigSetup-Linux --distpath ./dist/linux main.py
+          echo "Linux安装器构建完成"
+
+      - name: 打包Linux发布文件
+        run: |
+          VERSION="${{ env.VERSION }}"
+          PACKAGE_NAME="Fig-${VERSION}-linux-x86_64"
+          mkdir -p "${PACKAGE_NAME}"
+          cp build/linux/x86_64/release/Fig "${PACKAGE_NAME}/"
+          if [ -d "src/Module/Library" ]; then
+            cp -r src/Module/Library "${PACKAGE_NAME}/"
+            echo "已包含Library目录。"
+          fi
+          tar -czf "${PACKAGE_NAME}.tar.gz" "${PACKAGE_NAME}"
+          sha256sum "${PACKAGE_NAME}.tar.gz" > "${PACKAGE_NAME}.sha256"
+          echo "Linux打包完成: ${PACKAGE_NAME}.tar.gz"
+
+      - name: 发布Linux版本到Gitea
+        env:
+          GITEA_TOKEN: ${{ secrets.CI_TOKEN }}
+        run: |
+          VERSION="${{ env.VERSION }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="${{ github.ref_name }}"
+          fi
+          COMMIT_MSG="${{ env.COMMIT_MSG }}"
+          API="https://git.fig-lang.cn/api/v1/repos/${{ github.repository }}"
+          
+          echo "正在检查版本 $VERSION 的发布状态..."
+          
+          # 准备 JSON 数据
+          VERSION="$VERSION" COMMIT_MSG="$COMMIT_MSG" python3 -c "import json, os; print(json.dumps({'tag_name': os.environ.get('VERSION', ''), 'name': 'Fig ' + os.environ.get('VERSION', ''), 'body': os.environ.get('COMMIT_MSG', ''), 'draft': False, 'prerelease': False}))" > release_body.json
+          
+          # 1. 尝试获取已有发布
+          RESPONSE_TAG=$(curl -sS -H "Authorization: token $GITEA_TOKEN" "$API/releases/tags/$VERSION" 2>/dev/null || echo '{"id":0}')
+          RELEASE_ID=$(echo "$RESPONSE_TAG" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
+          
+          if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "0" ]; then
+            echo "✅ 找到已有发布 (ID: $RELEASE_ID)，正在更新说明..."
+            curl -sS -X PATCH -H "Authorization: token $GITEA_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d @release_body.json \
+              "$API/releases/$RELEASE_ID" > /dev/null
+          else
+            echo "未找到已有发布，准备创建新发布..."
+            RESPONSE=$(curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d @release_body.json \
+              "$API/releases" 2>/dev/null || echo '{"id":0}')
+            
+            RELEASE_ID=$(echo "$RESPONSE" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
+            
+            if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "0" ]; then
+               # 再次尝试获取，防止并发冲突
+               RESPONSE_TAG=$(curl -sS -H "Authorization: token $GITEA_TOKEN" "$API/releases/tags/$VERSION" 2>/dev/null || echo '{"id":0}')
+               RELEASE_ID=$(echo "$RESPONSE_TAG" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
+            fi
+          fi
+          
+          if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "0" ]; then
+            echo "❌ 错误：无法获取或创建发布 ID"
+            exit 1
+          fi
+          
+          echo "✅ 使用发布 ID: $RELEASE_ID 进行上传"
+          
+          # 上传资产
+          PACKAGE_ZIP="Fig-$VERSION-linux-x86_64.tar.gz"
+          PACKAGE_SHA="Fig-$VERSION-linux-x86_64.sha256"
+          
+          echo "正在上传 $PACKAGE_ZIP ..."
+          curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary "@$PACKAGE_ZIP" \
+            "$API/releases/$RELEASE_ID/assets?name=$PACKAGE_ZIP" > /dev/null
+          
+          echo "正在上传 $PACKAGE_SHA ..."
+          curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: text/plain" \
+            --data-binary "@$PACKAGE_SHA" \
+            "$API/releases/$RELEASE_ID/assets?name=$PACKAGE_SHA" > /dev/null
+          
+          # 🔧 上传Linux安装器
+          INSTALLER="Installer/ConsoleInstaller/dist/linux/FigSetup-Linux"
+          if [ -f "$INSTALLER" ]; then
+            echo "正在上传Linux安装器..."
+            curl -sS -X POST -H "Authorization: token $GITEA_TOKEN" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$INSTALLER" \
+              "$API/releases/$RELEASE_ID/assets?name=FigSetup-Linux" > /dev/null
+          fi
+          
+          echo "✅ Linux版本发布完成！"
+
+  build-windows-x64:
+    runs-on: windows
+
+    steps:
+      - name: 验证Windows工具链
+        run: |
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          # 检查 xmake
+          if (Get-Command xmake -ErrorAction SilentlyContinue) {
+            Write-Host '✅ xmake 已安装'
+            xmake --version
+          } else { Write-Host '警告: xmake 未找到' }
+          # 检查 clang++
+          if (Get-Command clang++ -ErrorAction SilentlyContinue) {
+            Write-Host '✅ clang++ 已安装'
+            clang++ --version
+          } else { Write-Host '警告: clang++ 未找到' }
+
+      - name: 检出代码
+        run: |
+          $env:Path = "C:\Program Files\Git\cmd;$env:Path"
+          git clone https://git.fig-lang.cn/$env:GITHUB_REPOSITORY .
+          git checkout ${{ github.ref }}
+
+      - name: 设置版本和提交信息
+        run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') {
+            $VERSION = $env:INPUT_VERSION
+            if (-not $VERSION) { $VERSION = $env:VERSION_INPUT }
+            if (-not $VERSION) { $VERSION = "dev-build" }
+          } else {
+            $VERSION = "${{ github.ref_name }}"
+          }
+          Write-Host "构建版本: $VERSION"
+          
+          # 确保无 BOM 的 UTF8
+          [System.IO.File]::AppendAllText($env:GITHUB_ENV, "VERSION=$VERSION`n")
+          
+          # 提交消息
+          $COMMIT_MSG = git log -3 --pretty=%B
+          [System.IO.File]::AppendAllText($env:GITHUB_ENV, "COMMIT_MSG<<EOF`n$COMMIT_MSG`nEOF`n")
+
+      - name: 构建项目 (Windows Native)
+        run: |
+          xmake f -p windows -a x86_64 -m release -y
+          xmake build -j $env:NUMBER_OF_PROCESSORS Fig
+          Write-Host 'Windows构建成功。'
+
+      # 🔧 新增：构建Windows平台安装器
+      - name: 构建Windows安装器
+        run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          Write-Host "开始构建Windows安装器..."
+          cd Installer\ConsoleInstaller
+          pip install -r requirements.txt
+          pyinstaller -F -i logo.ico -n FigSetup --distpath .\dist\windows main.py
+          Write-Host "Windows安装器构建完成"
+
+      - name: 打包Windows发布文件
+        run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          
+          $VERSION = $env:VERSION
+          if (-not $VERSION) {
+            $VERSION = "${{ github.ref_name }}"
+            Write-Host "⚠️  警告：从环境变量获取 VERSION 失败，回退到 github.ref_name: $VERSION"
+          }
+          Write-Host "打包版本: $VERSION"
+          
+          $PACKAGE_NAME = "Fig-${VERSION}-windows-x86_64"
+          Write-Host "打包名称: $PACKAGE_NAME"
+          
+          New-Item -ItemType Directory -Force -Path $PACKAGE_NAME
+          
+          # 查找可执行文件
+          if (Test-Path 'build\windows\x86_64\release\Fig.exe') {
+            Copy-Item 'build\windows\x86_64\release\Fig.exe' $PACKAGE_NAME\
+          } elseif (Test-Path 'build\windows\x86_64\release\Fig') {
+            Copy-Item 'build\windows\x86_64\release\Fig' $PACKAGE_NAME\Fig.exe
+          } else {
+            Write-Host '错误：未找到构建输出文件'
+            exit 1
+          }
+          
+          if (Test-Path 'src\Module\Library') {
+            Copy-Item -Recurse 'src\Module\Library' $PACKAGE_NAME\
+          }
+          
+          # 压缩文件
+          $ZIP_NAME = "$PACKAGE_NAME.zip"
+          Compress-Archive -Path $PACKAGE_NAME -DestinationPath $ZIP_NAME
+          
+          # 生成校验文件
+          $Hash = Get-FileHash $ZIP_NAME -Algorithm SHA256
+          "$($Hash.Hash)  $ZIP_NAME" | Out-File "$PACKAGE_NAME.sha256" -Encoding UTF8
+          
+          Write-Host "Windows打包完成: $ZIP_NAME"
+          
+      - name: 发布Windows版本到Gitea
+        env:
+          GITEA_TOKEN: ${{ secrets.CI_TOKEN }}
+        run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          
+          $VERSION = $env:VERSION
+          $COMMIT_MSG = $env:COMMIT_MSG
+          
+          if (-not $VERSION) {
+            $VERSION = "${{ github.ref_name }}"
+            Write-Host "⚠️  警告：从环境变量获取 VERSION 失败，回退到 github.ref_name: $VERSION"
+          }
+          
+          if (-not $VERSION) {
+            Write-Host "❌ 错误：版本号仍然为空，无法创建发布。"
+            exit 1
+          }
+          
+          $REPO = $env:GITHUB_REPOSITORY
+          $API = "https://git.fig-lang.cn/api/v1/repos/$REPO"
+          $TOKEN = $env:GITEA_TOKEN
+          $HEADERS = @{
+            Authorization = "token $TOKEN"
+            'Content-Type' = 'application/json'
+          }
+          
+          $ZIP_FILE = "Fig-$VERSION-windows-x86_64.zip"
+          $HASH_FILE = "Fig-$VERSION-windows-x86_64.sha256"
+          $INSTALLER_PATH = "Installer\ConsoleInstaller\dist\windows\FigSetup.exe"
+          
+          if (-not (Test-Path $ZIP_FILE)) {
+            Write-Host "❌ 错误：找不到ZIP文件 $ZIP_FILE"
+            exit 1
+          }
+          
+          $CREATE_BODY = @{
+            tag_name = $VERSION
+            name = "Fig $VERSION"
+            body = $COMMIT_MSG
+            draft = $false
+            prerelease = $false
+          } | ConvertTo-Json -Compress
+          
+          Write-Host "正在检查版本 $VERSION 的发布状态..."
+          $RELEASE_ID = $null
+          
+          try {
+            $EXISTING = Invoke-RestMethod -Uri "$API/releases/tags/$VERSION" -Headers $HEADERS -ErrorAction Stop
+            if ($EXISTING -and $EXISTING.id) {
+              $RELEASE_ID = $EXISTING.id
+              Write-Host "✅ 找到已有发布 (ID: $RELEASE_ID)，正在更新..."
+              Invoke-RestMethod -Method Patch -Uri "$API/releases/$RELEASE_ID" -Headers $HEADERS -Body $CREATE_BODY -ErrorAction Stop | Out-Null
+            }
+          } catch {
+            Write-Host "未找到已有发布，准备创建新发布..."
+          }
+          
+          if (-not $RELEASE_ID) {
+            try {
+              Write-Host "正在创建新发布: $VERSION ..."
+              $RESPONSE = Invoke-RestMethod -Method Post -Uri "$API/releases" -Headers $HEADERS -Body $CREATE_BODY -ErrorAction Stop
+              $RELEASE_ID = $RESPONSE.id
+              Write-Host "✅ 发布创建成功 (ID: $RELEASE_ID)"
+            } catch {
+              $err = $_.Exception.Message
+              Write-Host "❌ 创建发布失败: $err"
+              # 最后一次尝试：再次尝试按标签获取，防止由于并发导致的冲突
+              try {
+                $RETRY = Invoke-RestMethod -Uri "$API/releases/tags/$VERSION" -Headers $HEADERS -ErrorAction Stop
+                $RELEASE_ID = $RETRY.id
+                Write-Host "✅ 重试获取发布成功 (ID: $RELEASE_ID)"
+              } catch {
+                Write-Host "❌ 无法获取或创建发布 ID"
+                exit 1
+              }
+            }
+          }
+          
+          # 上传资产
+          Write-Host "正在上传文件..."
+          $ASSETS = @(
+            @{ Name = $ZIP_FILE; Path = $ZIP_FILE; ContentType = "application/octet-stream" },
+            @{ Name = $HASH_FILE; Path = $HASH_FILE; ContentType = "text/plain" }
+          )
+          
+          if (Test-Path $INSTALLER_PATH) {
+            $ASSETS += @{ Name = "FigSetup.exe"; Path = $INSTALLER_PATH; ContentType = "application/octet-stream" }
+          }
+          
+          foreach ($asset in $ASSETS) {
+            Write-Host "正在上传 $($asset.Name) ..."
+            try {
+              # 如果资产已存在，Gitea 可能会报错，这里简单处理
+              Invoke-RestMethod -Method Post -Uri "$API/releases/$RELEASE_ID/assets?name=$($asset.Name)" `
+                -Headers @{ Authorization = "token $TOKEN"; 'Content-Type' = $asset.ContentType } `
+                -InFile $asset.Path -ErrorAction SilentlyContinue | Out-Null
+            } catch {
+              Write-Host "⚠️ 上传 $($asset.Name) 失败，可能已存在。"
+            }
+          }
+          
+          Write-Host "✅ Windows版本发布完成！"

@@ -1,0 +1,94 @@
+import std.io;
+
+interface Document
+{
+    getDepth() -> Int; // return type is necessary
+    getName() -> String;
+
+    /*  toString() -> String
+        {
+            // default implementation
+        }
+    */
+}
+
+struct File
+{
+    public depth: Int;
+    public name: String;
+}
+
+impl Document for File
+{
+    getDepth()
+    {
+        return depth;
+    }
+    getName()
+    {
+        return name;
+    }
+}
+
+struct Folder
+{
+    public depth: Int;
+    public name: String;
+    public childs: List = [];
+}
+
+impl Document for Folder
+{
+    getDepth()
+    {
+        return depth;
+    }
+
+    getName()
+    {
+        return name;
+    }
+}
+
+const root_folder := new Folder{
+    0,
+    "root",
+    [
+        new File{
+            1,
+            "joyo.txt"
+        },
+        new Folder{
+            2,
+            "joyoyo",
+            [
+                new File{
+                    3,
+                    "JOYO2.txt"
+                },
+                new Folder{
+                    3,
+                    "joyoyoyo"
+                    
+                },
+            ]
+        }
+    ]
+}; 
+
+func print_directory(root: Document)
+{
+io.print(" " * root.getDepth());
+io.println(root.getDepth(), root.getName());
+if root is Folder
+{
+    for var i := 0; i < root.childs.length(); i += 1
+    {
+        var child := root.childs[i];
+        print_directory(child);
+    }
+    
+}
+}
+
+print_directory(root_folder);

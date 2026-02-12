@@ -1,0 +1,13 @@
+import std.io;
+
+func fib(x:Int) -> Int
+{
+    if (x <= 1)
+    {
+        return x;
+    }
+    return fib(x-1) + fib(x-2);
+}
+
+var result := fib(25);
+io.println("result: ", result);

@@ -1,0 +1,16 @@
+import std.io;
+
+func greeting(name:String) -> String
+{
+    return "Hello " + name + "!";
+}
+
+io.println(greeting("Fig"));
+
+func adder(x)
+{
+    return func (n) => x + n; // closure
+}
+
+const add2 = adder(2);
+io.println(add2(3));
