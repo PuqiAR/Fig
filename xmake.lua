@@ -1,0 +1,39 @@
+add_rules("mode.debug", "mode.release")
+add_rules("plugin.compile_commands.autoupdate", {outputdir = ".vscode"})
+
+set_policy("run.autobuild", false)
+
+if is_plat("linux") then
+    -- Linux: clang + libc++
+    set_toolchains("clang")
+    add_cxxflags("-stdlib=libc++")
+    add_ldflags("-stdlib=libc++")
+elseif is_plat("windows") then
+    -- 1. CI cross (Linux -> Windows)
+    -- 2. local dev (Windows + llvm-mingw)
+    set_toolchains("mingw") -- llvm-mingw
+    add_ldflags("-Wl,--stack,268435456")
+    -- set_toolchains("clang")
+    -- static lib
+    -- add_ldflags("-target x86_64-w64-mingw32", "-static")
+    -- add_cxxflags("-stdlib=libc++")
+    -- add_ldflags("-stdlib=libc++")
+end
+
+set_languages("c++23")
+add_includedirs("src")
+
+add_defines("__FCORE_COMPILE_TIME=\"" .. os.date("%Y-%m-%d %H:%M:%S") .. "\"")
+
+target("StringTest")
+    add_files("src/Deps/String/StringTest.cpp")
+    
+target("Fig")
+    add_files("src/Core/*.cpp")
+    add_files("src/Token/Token.cpp")
+    
+    add_files("src/Error/Error.cpp")
+
+    add_files("src/Lexer/Lexer.cpp")
+    
+    add_files("src/main.cpp")
