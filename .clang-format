@@ -6,13 +6,13 @@ Language: Cpp
 AccessModifierOffset: -4
 
 # 开括号(开圆括号、开尖括号、开方括号)后的对齐: Align, DontAlign, AlwaysBreak(总是在开括号后换行)
-AlignAfterOpenBracket: Align
+AlignAfterOpenBracket: DontAlign
 
 # 连续赋值时，对齐所有等号
-AlignConsecutiveAssignments: false
+AlignConsecutiveAssignments: true
 
 # 连续声明时，对齐所有声明的变量名
-AlignConsecutiveDeclarations: false
+AlignConsecutiveDeclarations: true
 
 # 右对齐逃脱换行(使用反斜杠换行)的反斜杠
 AlignEscapedNewlines: Right
@@ -109,7 +109,6 @@ BreakStringLiterals: false
 
 # 每行字符的限制，0表示没有限制
 ColumnLimit: 120
-
 CompactNamespaces: true
 
 # 构造函数的初始化列表要么都在同一行，要么都各自一行
@@ -157,7 +156,7 @@ PointerAlignment: Right
 ReflowComments: true
 
 # 允许排序#include
-SortIncludes: false
+SortIncludes: true
 
 # 允许排序 using 声明
 SortUsingDeclarations: false
