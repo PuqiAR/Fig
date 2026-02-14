@@ -35,12 +35,27 @@ target("LexerTest")
     add_files("src/Lexer/Lexer.cpp")
 
     add_files("src/Lexer/LexerTest.cpp")
+
+target("ParserTest")
+    add_files("src/Core/*.cpp")
+    add_files("src/Token/Token.cpp")
+    add_files("src/Error/Error.cpp")
+    add_files("src/Lexer/Lexer.cpp")
+
+    add_files("src/Ast/Operator.cpp")
+    add_files("src/Parser/ExprParser.cpp")
+    add_files("src/Parser/Parser.cpp")
+
+    add_files("src/Parser/ParserTest.cpp")
+
 target("Fig")
     add_files("src/Core/*.cpp")
     add_files("src/Token/Token.cpp")
-    
     add_files("src/Error/Error.cpp")
-
     add_files("src/Lexer/Lexer.cpp")
+
+    add_files("src/Ast/Operator.cpp")
+    add_files("src/Parser/ExprParser.cpp")
+    add_files("src/Parser/Parser.cpp")
     
     add_files("src/main.cpp")

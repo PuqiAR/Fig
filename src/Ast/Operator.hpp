@@ -35,22 +35,31 @@ namespace Fig
         Greater,      // 大于 >
         LessEqual,    // 小于等于 <=
         GreaterEqual, // 大于等于 >=
-        
-        Is,           // is操作符
+
+        Is, // is操作符
 
         LogicalAnd, // 逻辑与 && / and
         LogicalOr,  // 逻辑或 || / or
 
         Power, // 幂运算 **
 
-        Assign, // 赋值(修改) =
+        Assign,        // 赋值(修改) =
+        AddAssign,     // +=
+        SubAssign,    // -=
+        MultiplyAssign, // *=
+        DivideAssign,    // /=
+        ModuloAssign,  // %=
+        BitXorAssign,    // ^=
 
         // 位运算
-        BitAnd, // 按位与 &
-        BitOr,  // 按位或 |
+        BitAnd,     // 按位与 &
+        BitOr,      // 按位或 |
         BitXor,     // 异或 ^
         ShiftLeft,  // 左移
         ShiftRight, // 右移
+
+        // 成员访问
+        MemberAccess, // .
     };
 
     using BindingPower = unsigned int;
@@ -61,5 +70,13 @@ namespace Fig
     HashMap<UnaryOperator, BindingPower> &GetUnaryOpBindingPowerMap();
     HashMap<BinaryOperator, BindingPower> &GetBinaryOpBindingPowerMap();
 
+    BindingPower GetUnaryOpRBp(UnaryOperator);
+
+    BindingPower GetBinaryOpLBp(BinaryOperator);
+    BindingPower GetBinaryOpRBp(BinaryOperator);
+
     bool IsTokenOp(TokenType type, bool binary = true);
+
+    UnaryOperator TokenToUnaryOp(const Token &);
+    BinaryOperator TokenToBinaryOp(const Token &);
 }; // namespace Fig

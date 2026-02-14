@@ -6,7 +6,9 @@
 */
 
 #pragma once
+
 #include <Ast/Base.hpp>
+#include <Deps/Deps.hpp>
 
 namespace Fig
 {
@@ -24,6 +26,11 @@ namespace Fig
             type = AstType::IdentiExpr;
             name = std::move(_name);
             location = std::move(_loc);
+        }
+
+        virtual String toString() const override
+        {
+            return std::format("<IdentiExpr: {}>", name);
         }
     };
 };

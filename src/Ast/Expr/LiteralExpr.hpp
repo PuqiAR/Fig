@@ -10,6 +10,8 @@
 #include <Ast/Base.hpp>
 #include <Token/Token.hpp>
 
+#include <Deps/Deps.hpp>
+
 namespace Fig
 {
     struct LiteralExpr final : Expr
@@ -20,9 +22,15 @@ namespace Fig
         {
             type = AstType::LiteralExpr;
         }
-        LiteralExpr(const Token& token) : token(token) 
+        LiteralExpr(const Token& token, SourceLocation _location) : token(token) 
         {
             type = AstType::LiteralExpr;
+            location = std::move(_location);
+        }
+
+        virtual String toString() const override
+        {
+            return std::format("<LiteralExpr: {}>", magic_enum::enum_name(token.type));
         }
     };
 }; // namespace Fig

@@ -36,19 +36,21 @@ namespace Fig
 
     const char *ErrorTypeToString(ErrorType type)
     {
+        using enum ErrorType;
         switch (type)
         {
-            case ErrorType::UnusedSymbol: return "UnusedSymbol";
+            case UnusedSymbol: return "UnusedSymbol";
 
-            case ErrorType::MayBeNull: return "MaybeNull";
+            case MayBeNull: return "MaybeNull";
 
-            case ErrorType::UnterminatedString: return "UnterminatedString";
-            case ErrorType::UnterminatedComments: return "UnterminatedComments";
-            case ErrorType::InvalidNumberLiteral: return "InvalidNumberLiteral";
-            case ErrorType::InvalidCharacter: return "InvalidCharacter";
-            case Fig::ErrorType::InvalidSymbol: return "InvalidSymbol";
+            case UnterminatedString: return "UnterminatedString";
+            case UnterminatedComments: return "UnterminatedComments";
+            case InvalidNumberLiteral: return "InvalidNumberLiteral";
+            case InvalidCharacter: return "InvalidCharacter";
+            case InvalidSymbol: return "InvalidSymbol";
 
-            case ErrorType::SyntaxError: return "SyntaxError";
+            case ExpectedExpression: return "ExpectedExpression";
+            case SyntaxError: return "SyntaxError";
 
             // default: return "Some one forgot to add case to `ErrorTypeToString`";
         }

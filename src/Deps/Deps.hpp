@@ -13,7 +13,12 @@
 #include <Deps/String/CharUtils.hpp>
 #include <Deps/String/String.hpp>
 
+#include <cstddef>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <expected>
+#include <format>
 
 namespace Fig
 {

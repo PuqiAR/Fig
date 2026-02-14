@@ -153,8 +153,9 @@ namespace Fig
             fileName = std::move(_fileName);
         }
 
-        SourceLocation makeSourceLocation(const SourcePosition &current_pos)
+        SourceLocation makeSourceLocation(SourcePosition current_pos)
         {
+            current_pos.tok_length = 1;
             return SourceLocation(
                 current_pos, fileName, "[internal lexer]", String(magic_enum::enum_name(state).data()));
         }

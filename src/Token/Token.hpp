@@ -111,12 +111,14 @@ namespace Fig
         NotEqual,        // !=
         LessEqual,       // <=
         GreaterEqual,    // >=
+
         PlusEqual,       // +=
         MinusEqual,      // -=
         AsteriskEqual,   // *=
         SlashEqual,      // /=
         PercentEqual,    // %=
         CaretEqual,      // ^=
+        
         DoublePlus,      // ++
         DoubleMinus,     // --
         DoubleAmpersand, // &&
@@ -149,6 +151,18 @@ namespace Fig
         {
             return type == TokenType::LiteralNull || type == TokenType::LiteralTrue || type == TokenType::LiteralFalse
                    || type == TokenType::LiteralNumber || type == TokenType::LiteralString;
+        }
+
+        Token &operator=(const Token &other)
+        {
+            if (this == &other)
+            {
+                return *this;
+            }
+            index = other.index;
+            length = other.length;
+            type = other.type;
+            return *this;
         }
     };
 } // namespace Fig
