@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Deps/Deps.hpp>
-#include <format>
 
 namespace Fig
 {

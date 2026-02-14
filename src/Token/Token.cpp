@@ -2,7 +2,7 @@
 
 namespace Fig
 {
-    const HashMap<String, TokenType> Token::symbolMap = {
+    const HashMap<String, TokenType> Token::punctMap = {
         // 三字符
         {String("..."), TokenType::TripleDot},
         // 双字符
@@ -83,5 +83,8 @@ namespace Fig
         {String("throw"), TokenType::Throw},
         {String("Finally"), TokenType::Finally},
         {String("as"), TokenType::As},
+        {String("true"), TokenType::LiteralTrue},
+        {String("false"), TokenType::LiteralFalse},
+        {String("null"), TokenType::LiteralNull},
     };
 };

@@ -28,6 +28,13 @@ add_defines("__FCORE_COMPILE_TIME=\"" .. os.date("%Y-%m-%d %H:%M:%S") .. "\"")
 target("StringTest")
     add_files("src/Deps/String/StringTest.cpp")
     
+target("LexerTest")
+    add_files("src/Core/*.cpp")
+    add_files("src/Token/Token.cpp")
+    add_files("src/Error/Error.cpp")
+    add_files("src/Lexer/Lexer.cpp")
+
+    add_files("src/Lexer/LexerTest.cpp")
 target("Fig")
     add_files("src/Core/*.cpp")
     add_files("src/Token/Token.cpp")

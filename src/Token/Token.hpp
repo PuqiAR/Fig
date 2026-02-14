@@ -54,11 +54,13 @@ namespace Fig
         // TypeBool,   // Bool
         // TypeDouble, // Double
 
-        /* Literal Types (not keyword)*/
+        /* Literal Types */
         LiteralNumber, // number (int,float...)
         LiteralString, // string
-        LiteralBool,   // bool (true/false)
-        LiteralNull,   // null (Null unique instance)
+
+        LiteralTrue,  // true  <-- keyword
+        LiteralFalse, // false <-- keyword
+        LiteralNull,  // null (Null unique instance) <-- keyword
 
         /* Punct */
         Plus,       // +
@@ -121,12 +123,12 @@ namespace Fig
     class Token final
     {
     public:
-        static const HashMap<String, TokenType> symbolMap;
+        static const HashMap<String, TokenType> punctMap;
         static const HashMap<String, TokenType> keywordMap;
 
-        const size_t index, length;
+        size_t index, length;
         //      源文件中的下标 Token长度
-        const TokenType type;
+        TokenType type;
 
         Token() : index(0), length(0), type(TokenType::Illegal) {};
         Token(size_t _index, size_t _length, TokenType _type) : index(_index), length(_length), type(_type) {}
@@ -138,8 +140,8 @@ namespace Fig
         bool isIdentifier() const { return type == TokenType::Identifier; }
         bool isLiteral() const
         {
-            return type == TokenType::LiteralNull || type == TokenType::LiteralBool || type == TokenType::LiteralNumber
-                   || type == TokenType::LiteralString;
+            return type == TokenType::LiteralNull || type == TokenType::LiteralTrue || type == TokenType::LiteralFalse
+                   || type == TokenType::LiteralNumber || type == TokenType::LiteralString;
         }
     };
 } // namespace Fig

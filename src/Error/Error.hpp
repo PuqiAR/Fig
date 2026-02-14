@@ -20,6 +20,11 @@ namespace Fig
         MayBeNull = 1001,
 
         UnterminatedString = 2001,
+        UnterminatedComments,
+        InvalidNumberLiteral,
+        InvalidCharacter,
+        InvalidSymbol,
+
         SyntaxError,
     };
 

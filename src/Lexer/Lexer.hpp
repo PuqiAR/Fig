@@ -10,6 +10,7 @@
 #include <Deps/Deps.hpp>
 #include <Token/Token.hpp>
 #include <Core/SourceLocations.hpp>
+#include <Error/Error.hpp>
 
 namespace Fig
 {
@@ -25,13 +26,13 @@ namespace Fig
         SourceReader()
         {
             index = 0;
-            pos.line = pos.column = 0;
+            pos.line = pos.column = 1;
         }
         SourceReader(const String &_source) // copy
         {
             source = _source;
             index = 0;
-            pos.line = pos.column = 0;
+            pos.line = pos.column = 1;
         }
 
         SourcePosition &currentPosition() { return pos; }
@@ -42,7 +43,16 @@ namespace Fig
             return source[index];
         }
 
-        inline bool hasNext() const { return index < source.length(); }
+        inline char32_t currentIf() const
+        {
+            if (index >= source.length())
+            {
+                return U'\0';
+            }
+            return source[index];
+        }
+
+        inline bool hasNext() const { return index < source.length() - 1; }
 
         inline char32_t peek() const
         {
@@ -66,10 +76,10 @@ namespace Fig
 
         inline void next()
         {
-            assert(hasNext() && "SrcReader: next failed, need more runes");
-            ++index;
+            char32_t consumed = currentIf();
 
-            if (current() == U'\n')
+            ++index;
+            if (consumed == U'\n')
             {
                 ++pos.line;
                 pos.column = 1;
@@ -80,18 +90,38 @@ namespace Fig
             }
         }
 
+        inline void skip(size_t n)
+        {
+            for (size_t i = 0; i < n; ++i) { next(); }
+        }
+
         inline size_t currentIndex() const { return index; }
 
-        inline bool isAtEnd() const { return index == source.length() - 1; }
+        inline bool isAtEnd() const { return index >= source.length(); }
     };
 
     class Lexer
     {
     public:
-        enum State : uint8_t
+        enum class State : uint8_t
         {
-            Normal,
-            Error
+            Error,
+            Standby,
+            End,
+
+            ScanComments,          // 单行注释
+            ScanMultilineComments, // 多行注释
+            ScanIdentifier,        // 关键字也算
+
+            ScanDec,      // 十进制数字, 如 1.2 31, 3.14e+3, 1_000_0000
+            ScanBin,      // 二进制数字, 如 0b0001 / 0B0001
+            ScanHex,      // 十六进制数字, 如 0xABCD / 0XabCd
+            ScanStringDQ, // 双引号字符串, 如 "hello, world!"
+            ScanStringSQ, // 单引号字符串, 如 'hello'
+            ScanBool,     // 布尔字面量, true / false
+            ScanNull,     // 空值字面量, null
+
+            ScanPunct, // 符号
         };
 
     private:
@@ -99,17 +129,22 @@ namespace Fig
         SourceReader rd;
 
     protected:
-        Token scanComments();
-        Token scanIdentifierOrKeyword();
+        Result<Token, Error> scanComments();
+        Result<Token, Error> scanMultilineComments();
 
-        Token scanNumberLiteral();
-        Token scanStringLiteral();
-        Token scanBoolLiteral();
-        Token scanLiteralNull();
+        Result<Token, Error> scanIdentifierOrKeyword();
 
-        Token scanPunct();
+        Result<Token, Error> scanNumberLiteral();
+        Result<Token, Error> scanStringLiteral(); // 支持多行
+        // Result<Token, Error> scanBoolLiteral(); 由 scanIdentifier...扫描
+        // Result<Token, Error> scanLiteralNull(); 由 scanIdentifier...扫描
+
+        Result<Token, Error> scanPunct();
+
+        void skipWhitespaces();
+
     public:
-        State state = Normal;
+        State state = State::Standby;
 
         Lexer() {}
         Lexer(const String &source, String _fileName)
@@ -118,6 +153,12 @@ namespace Fig
             fileName = std::move(_fileName);
         }
 
-        Token NextToken();
+        SourceLocation makeSourceLocation(const SourcePosition &current_pos)
+        {
+            return SourceLocation(
+                current_pos, fileName, "[internal lexer]", String(magic_enum::enum_name(state).data()));
+        }
+
+        Result<Token, Error> NextToken();
     };
 }; // namespace Fig

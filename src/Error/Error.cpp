@@ -36,8 +36,14 @@ namespace Fig
             case ErrorType::MayBeNull: return "MaybeNull";
 
             case ErrorType::UnterminatedString: return "UnterminatedString";
+            case ErrorType::UnterminatedComments: return "UnterminatedComments";
+            case ErrorType::InvalidNumberLiteral: return "InvalidNumberLiteral";
+            case ErrorType::InvalidCharacter: return "InvalidCharacter";
+            case Fig::ErrorType::InvalidSymbol: return "InvalidSymbol";
+
             case ErrorType::SyntaxError: return "SyntaxError";
-            default: return "Some one forgot to add case to `ErrorTypeToString`";
+
+            // default: return "Some one forgot to add case to `ErrorTypeToString`";
         }
     }
 
@@ -76,8 +82,9 @@ namespace Fig
 
         const SourceLocation &location = error.location;
 
-        err << TC::DarkGray << "  ┌─> " << TC::Cyan << location.fileName << " " << TC::DarkGray << location.sp.line
-            << ":" << location.sp.column << '\n';
+        err << TC::DarkGray << "  ┌─> Fn " << TC::Cyan << '\'' << location.packageName << '.' << location.functionName
+            << '\'' << " " << location.fileName << " (" << TC::DarkGray << location.sp.line << ":" << location.sp.column
+            << TC::Cyan << ')' << TC::Reset << '\n';
         err << TC::DarkGray << "  │" << '\n' << "  │" << TC::Reset << '\n';
 
         // 尝试打印上3行 下2行

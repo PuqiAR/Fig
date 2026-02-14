@@ -17,7 +17,8 @@ namespace Fig::Deps
         {
             for (size_t i = 0; i < n; ++i)
             {
-                if (static_cast<unsigned char>(data[i]) >= 128) return false;
+                if (static_cast<unsigned char>(data[i]) >= 128)
+                    return false;
             }
             return true;
         }
@@ -26,7 +27,8 @@ namespace Fig::Deps
         {
             for (size_t i = 0; i < n; ++i)
             {
-                if (data[i] >= 128) return false;
+                if (data[i] >= 128)
+                    return false;
             }
             return true;
         }
@@ -100,8 +102,14 @@ namespace Fig::Deps
             _length = other._length;
             mode = other.mode;
 
-            if (mode == Mode::ASCII_SSO) { memcpy(sso, other.sso, sizeof(unsigned char) * _length); }
-            else if (mode == Mode::ASCII_HEP) { new (&ascii) std::vector<unsigned char>(other.ascii); }
+            if (mode == Mode::ASCII_SSO)
+            {
+                memcpy(sso, other.sso, sizeof(unsigned char) * _length);
+            }
+            else if (mode == Mode::ASCII_HEP)
+            {
+                new (&ascii) std::vector<unsigned char>(other.ascii);
+            }
             else
             {
                 new (&utf32) std::vector<u32>(other.utf32);
@@ -134,24 +142,33 @@ namespace Fig::Deps
             {
                 // pass
             }
-            if (mode == Mode::ASCII_HEP) { ascii.~vector(); }
-            if (mode == Mode::UTF32_HEP) { utf32.~vector(); }
+            if (mode == Mode::ASCII_HEP)
+            {
+                ascii.~vector();
+            }
+            if (mode == Mode::UTF32_HEP)
+            {
+                utf32.~vector();
+            }
         }
 
         void ensure_utf32()
         {
-            if (mode == Mode::UTF32_HEP) return;
+            if (mode == Mode::UTF32_HEP)
+                return;
 
             std::vector<u32> tmp;
             tmp.reserve(_length);
 
             if (mode == Mode::ASCII_SSO)
             {
-                for (size_t i = 0; i < _length; ++i) tmp.push_back(static_cast<u32>(sso[i]));
+                for (size_t i = 0; i < _length; ++i)
+                    tmp.push_back(static_cast<u32>(sso[i]));
             }
             else // ASCII_HEP
             {
-                for (unsigned char c : ascii) tmp.push_back(static_cast<u32>(c));
+                for (unsigned char c : ascii)
+                    tmp.push_back(static_cast<u32>(c));
             }
 
             destroy();
@@ -166,7 +183,8 @@ namespace Fig::Deps
 
             std::vector<unsigned char> tmp;
             tmp.reserve(_length);
-            for (size_t i = 0; i < _length; ++i) tmp.push_back(sso[i]);
+            for (size_t i = 0; i < _length; ++i)
+                tmp.push_back(sso[i]);
 
             mode = Mode::ASCII_HEP;
             new (&ascii) std::vector<unsigned char>(std::move(tmp));
@@ -223,7 +241,8 @@ namespace Fig::Deps
         {
             assert(data);
             size_t n = 0;
-            while (data[n] != 0) ++n;
+            while (data[n] != 0)
+                ++n;
             init(data, n);
         }
 
@@ -236,7 +255,8 @@ namespace Fig::Deps
             if (n <= SSO_SIZE && StringUtils::is_pure_ascii(data, n))
             {
                 mode = Mode::ASCII_SSO;
-                for (size_t i = 0; i < n; ++i) sso[i] = static_cast<unsigned char>(data[i]);
+                for (size_t i = 0; i < n; ++i)
+                    sso[i] = static_cast<unsigned char>(data[i]);
                 return;
             }
 
@@ -245,7 +265,8 @@ namespace Fig::Deps
                 mode = Mode::ASCII_HEP;
                 new (&ascii) std::vector<unsigned char>();
                 ascii.reserve(n);
-                for (size_t i = 0; i < n; ++i) ascii.push_back(static_cast<unsigned char>(data[i]));
+                for (size_t i = 0; i < n; ++i)
+                    ascii.push_back(static_cast<unsigned char>(data[i]));
                 return;
             }
 
@@ -255,10 +276,19 @@ namespace Fig::Deps
         }
 
     public:
-        size_t length() const noexcept { return _length; }
-        size_t size() const noexcept { return _length; }
+        size_t length() const noexcept
+        {
+            return _length;
+        }
+        size_t size() const noexcept
+        {
+            return _length;
+        }
 
-        bool empty() const noexcept { return _length == 0; }
+        bool empty() const noexcept
+        {
+            return _length == 0;
+        }
         void reserve(size_t n)
         {
             if (mode == Mode::ASCII_HEP)
@@ -274,7 +304,10 @@ namespace Fig::Deps
             {
                 // pass
             }
-            if (mode == Mode::ASCII_HEP) { ascii.clear(); }
+            if (mode == Mode::ASCII_HEP)
+            {
+                ascii.clear();
+            }
             else
             {
                 utf32.clear();
@@ -283,34 +316,71 @@ namespace Fig::Deps
 
         void shrink_to_fit() noexcept
         {
-            if (mode == Mode::ASCII_HEP) { ascii.shrink_to_fit(); }
+            if (mode == Mode::ASCII_HEP)
+            {
+                ascii.shrink_to_fit();
+            }
             else
             {
                 utf32.shrink_to_fit();
             }
         }
 
-        ~String() noexcept { destroy(); }
+        ~String() noexcept
+        {
+            destroy();
+        }
         String() noexcept
         {
             mode = Mode::ASCII_SSO;
             _length = 0;
         }
-        String(const String &other) noexcept { copyfrom(other); }
-        String(String &&other) noexcept { movefrom(std::move(other)); }
-        String(const char *str) { init(str); }
-        String(const char32_t *str) { init(str); }
-        String(const std::string &s) { init(s.data(), s.size()); }
+        String(const String &other) noexcept
+        {
+            copyfrom(other);
+        }
+        String(String &&other) noexcept
+        {
+            movefrom(std::move(other));
+        }
+        String(const char *str)
+        {
+            init(str);
+        }
+        String(const char32_t *str)
+        {
+            init(str);
+        }
+        String(char32_t c)
+        {
+            init("");
+            push_back(c);
+        }
+        String(char c)
+        {
+            init("");
+            push_back(static_cast<char32_t>(c));
+        }
+        String(const std::string &s)
+        {
+            init(s.data(), s.size());
+        }
 
         static String fromPureAscii(const char *str)
         {
             String string;
             string._length = std::strlen(str);
-            if (string._length <= SSO_SIZE) { memcpy(string.sso, str, string._length); }
+            if (string._length <= SSO_SIZE)
+            {
+                memcpy(string.sso, str, string._length);
+            }
             else
             {
                 string.ascii.reserve(string._length);
-                for (size_t i = 0; i < string._length; ++i) { string.ascii.push_back(str[i]); }
+                for (size_t i = 0; i < string._length; ++i)
+                {
+                    string.ascii.push_back(str[i]);
+                }
             }
 
             return string;
@@ -328,13 +398,15 @@ namespace Fig::Deps
 
         String &operator=(String &&other) noexcept
         {
-            if (this != &other) movefrom(std::move(other));
+            if (this != &other)
+                movefrom(std::move(other));
             return *this;
         }
 
         String &operator+=(const String &rhs)
         {
-            if (rhs._length == 0) return *this;
+            if (rhs._length == 0)
+                return *this;
 
             // 两边都是 ASCII
             bool this_ascii = (mode == Mode::ASCII_SSO || mode == Mode::ASCII_HEP);
@@ -356,7 +428,8 @@ namespace Fig::Deps
                     return *this;
                 }
 
-                if (mode == Mode::ASCII_SSO) promote_sso_ascii_to_heap();
+                if (mode == Mode::ASCII_SSO)
+                    promote_sso_ascii_to_heap();
 
                 // 追加
                 if (rhs.mode == Mode::ASCII_SSO)
@@ -377,11 +450,13 @@ namespace Fig::Deps
 
                 if (mode == Mode::ASCII_SSO)
                 {
-                    for (size_t i = 0; i < _length; ++i) tmp.push_back(static_cast<u32>(sso[i]));
+                    for (size_t i = 0; i < _length; ++i)
+                        tmp.push_back(static_cast<u32>(sso[i]));
                 }
                 else // ASCII_HEP
                 {
-                    for (unsigned char c : ascii) tmp.push_back(static_cast<u32>(c));
+                    for (unsigned char c : ascii)
+                        tmp.push_back(static_cast<u32>(c));
                 }
 
                 destroy();
@@ -389,14 +464,19 @@ namespace Fig::Deps
                 new (&utf32) std::vector<u32>(std::move(tmp));
             }
 
-            if (rhs.mode == Mode::UTF32_HEP) { utf32.insert(utf32.end(), rhs.utf32.begin(), rhs.utf32.end()); }
+            if (rhs.mode == Mode::UTF32_HEP)
+            {
+                utf32.insert(utf32.end(), rhs.utf32.begin(), rhs.utf32.end());
+            }
             else if (rhs.mode == Mode::ASCII_SSO)
             {
-                for (size_t i = 0; i < rhs._length; ++i) utf32.push_back(static_cast<u32>(rhs.sso[i]));
+                for (size_t i = 0; i < rhs._length; ++i)
+                    utf32.push_back(static_cast<u32>(rhs.sso[i]));
             }
             else // ASCII_HEP
             {
-                for (unsigned char c : rhs.ascii) utf32.push_back(static_cast<u32>(c));
+                for (unsigned char c : rhs.ascii)
+                    utf32.push_back(static_cast<u32>(c));
             }
 
             _length = utf32.size();
@@ -425,7 +505,8 @@ namespace Fig::Deps
                     return;
                 }
 
-                if (mode == Mode::ASCII_SSO) promote_sso_ascii_to_heap();
+                if (mode == Mode::ASCII_SSO)
+                    promote_sso_ascii_to_heap();
 
                 if (mode == Mode::ASCII_HEP)
                 {
@@ -477,7 +558,8 @@ namespace Fig::Deps
 
         String &append(size_t count, u32 cp)
         {
-            for (size_t i = 0; i < count; ++i) push_back(cp);
+            for (size_t i = 0; i < count; ++i)
+                push_back(cp);
             return *this;
         }
 
@@ -523,7 +605,10 @@ namespace Fig::Deps
             // UTF32_HEP -> UTF-8 encode
             for (u32 cp : utf32)
             {
-                if (cp <= 0x7F) { out.push_back(static_cast<char>(cp)); }
+                if (cp <= 0x7F)
+                {
+                    out.push_back(static_cast<char>(cp));
+                }
                 else if (cp <= 0x7FF)
                 {
                     out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
@@ -547,18 +632,24 @@ namespace Fig::Deps
 
             return out;
         }
-        friend std::ostream &operator<<(std::ostream &os, const String &s) { return os << s.toStdString(); }
+        friend std::ostream &operator<<(std::ostream &os, const String &s)
+        {
+            return os << s.toStdString();
+        }
 
         friend bool operator==(const String &a, const String &b) noexcept
         {
-            if (a._length != b._length) return false;
+            if (a._length != b._length)
+                return false;
 
             // 同模式
             if (a.mode == b.mode)
             {
-                if (a.mode == Mode::ASCII_SSO) return std::memcmp(a.sso, b.sso, a._length) == 0;
+                if (a.mode == Mode::ASCII_SSO)
+                    return std::memcmp(a.sso, b.sso, a._length) == 0;
 
-                if (a.mode == Mode::ASCII_HEP) return a.ascii == b.ascii;
+                if (a.mode == Mode::ASCII_HEP)
+                    return a.ascii == b.ascii;
 
                 return a.utf32 == b.utf32;
             }
@@ -582,18 +673,23 @@ namespace Fig::Deps
             if (ascii_str.mode == Mode::ASCII_SSO)
             {
                 for (size_t i = 0; i < ascii_str._length; ++i)
-                    if (static_cast<u32>(ascii_str.sso[i]) != utf32_str.utf32[i]) return false;
+                    if (static_cast<u32>(ascii_str.sso[i]) != utf32_str.utf32[i])
+                        return false;
             }
             else
             {
                 for (size_t i = 0; i < ascii_str._length; ++i)
-                    if (static_cast<u32>(ascii_str.ascii[i]) != utf32_str.utf32[i]) return false;
+                    if (static_cast<u32>(ascii_str.ascii[i]) != utf32_str.utf32[i])
+                        return false;
             }
 
             return true;
         }
 
-        friend bool operator!=(const String &a, const String &b) noexcept { return !(a == b); }
+        friend bool operator!=(const String &a, const String &b) noexcept
+        {
+            return !(a == b);
+        }
         // std::hash
         friend struct std::hash<String>;
 
@@ -602,34 +698,41 @@ namespace Fig::Deps
         {
             assert(i < _length);
 
-            if (mode == Mode::ASCII_SSO) return static_cast<u32>(sso[i]);
-            if (mode == Mode::ASCII_HEP) return static_cast<u32>(ascii[i]);
+            if (mode == Mode::ASCII_SSO)
+                return static_cast<u32>(sso[i]);
+            if (mode == Mode::ASCII_HEP)
+                return static_cast<u32>(ascii[i]);
             return utf32[i];
         }
         u32 at(size_t i) const
         {
-            if (i >= _length) throw std::out_of_range("String::at");
+            if (i >= _length)
+                throw std::out_of_range("String::at");
             return (*this)[i];
         }
 
         bool starts_with(const String &prefix) const
         {
-            if (prefix._length > _length) return false;
+            if (prefix._length > _length)
+                return false;
 
             for (size_t i = 0; i < prefix._length; ++i)
-                if ((*this)[i] != prefix[i]) return false;
+                if ((*this)[i] != prefix[i])
+                    return false;
 
             return true;
         }
 
         bool ends_with(const String &suffix) const
         {
-            if (suffix._length > _length) return false;
+            if (suffix._length > _length)
+                return false;
 
             size_t offset = _length - suffix._length;
 
             for (size_t i = 0; i < suffix._length; ++i)
-                if ((*this)[offset + i] != suffix[i]) return false;
+                if ((*this)[offset + i] != suffix[i])
+                    return false;
 
             return true;
         }
@@ -639,27 +742,32 @@ namespace Fig::Deps
             if (mode == Mode::ASCII_SSO)
             {
                 for (size_t i = 0; i < _length; ++i)
-                    if (sso[i] == cp) return true;
+                    if (sso[i] == cp)
+                        return true;
                 return false;
             }
 
             if (mode == Mode::ASCII_HEP)
             {
-                if (cp >= 128) return false;
+                if (cp >= 128)
+                    return false;
                 for (unsigned char c : ascii)
-                    if (c == cp) return true;
+                    if (c == cp)
+                        return true;
                 return false;
             }
 
             for (u32 c : utf32)
-                if (c == cp) return true;
+                if (c == cp)
+                    return true;
 
             return false;
         }
 
         String substr(size_t pos, size_t count = size_t(-1)) const
         {
-            if (pos >= _length) return String();
+            if (pos >= _length)
+                return String();
 
             size_t len = (_length - pos < count) ? (_length - pos) : count;
 
@@ -710,7 +818,8 @@ namespace Fig::Deps
 
         String &erase(size_t pos, size_t count = size_t(-1))
         {
-            if (pos >= _length) return *this;
+            if (pos >= _length)
+                return *this;
 
             size_t len = (_length - pos < count) ? (_length - pos) : count;
 
@@ -735,8 +844,10 @@ namespace Fig::Deps
 
         String &insert(size_t pos, const String &other)
         {
-            if (pos > _length) pos = _length;
-            if (other._length == 0) return *this;
+            if (pos > _length)
+                pos = _length;
+            if (other._length == 0)
+                return *this;
 
             bool this_ascii = (mode != Mode::UTF32_HEP);
             bool other_ascii = (other.mode != Mode::UTF32_HEP);
@@ -759,7 +870,8 @@ namespace Fig::Deps
                     return *this;
                 }
 
-                if (mode == Mode::ASCII_SSO) promote_sso_ascii_to_heap();
+                if (mode == Mode::ASCII_SSO)
+                    promote_sso_ascii_to_heap();
 
                 if (other.mode == Mode::ASCII_SSO)
                     ascii.insert(ascii.begin() + pos, other.sso, other.sso + other._length);
@@ -794,17 +906,21 @@ namespace Fig::Deps
             {
                 u32 a = (*this)[i];
                 u32 b = other[i];
-                if (a != b) return (a < b) ? -1 : 1;
+                if (a != b)
+                    return (a < b) ? -1 : 1;
             }
 
-            if (_length == other._length) return 0;
+            if (_length == other._length)
+                return 0;
             return (_length < other._length) ? -1 : 1;
         }
 
         size_t find(const String &needle, size_t pos = 0) const
         {
-            if (needle._length == 0) return pos <= _length ? pos : size_t(-1);
-            if (needle._length > _length || pos >= _length) return size_t(-1);
+            if (needle._length == 0)
+                return pos <= _length ? pos : size_t(-1);
+            if (needle._length > _length || pos >= _length)
+                return size_t(-1);
 
             size_t limit = _length - needle._length;
 
@@ -812,9 +928,11 @@ namespace Fig::Deps
             {
                 size_t j = 0;
                 for (; j < needle._length; ++j)
-                    if ((*this)[i + j] != needle[j]) break;
+                    if ((*this)[i + j] != needle[j])
+                        break;
 
-                if (j == needle._length) return i;
+                if (j == needle._length)
+                    return i;
             }
 
             return size_t(-1);
@@ -822,16 +940,20 @@ namespace Fig::Deps
 
         size_t rfind(const String &needle) const
         {
-            if (needle._length == 0) return _length;
-            if (needle._length > _length) return size_t(-1);
+            if (needle._length == 0)
+                return _length;
+            if (needle._length > _length)
+                return size_t(-1);
 
             for (size_t i = _length - needle._length + 1; i-- > 0;)
             {
                 size_t j = 0;
                 for (; j < needle._length; ++j)
-                    if ((*this)[i + j] != needle[j]) break;
+                    if ((*this)[i + j] != needle[j])
+                        break;
 
-                if (j == needle._length) return i;
+                if (j == needle._length)
+                    return i;
             }
 
             return size_t(-1);
@@ -839,7 +961,8 @@ namespace Fig::Deps
 
         String &replace(size_t pos, size_t len, const String &repl)
         {
-            if (pos >= _length) return *this;
+            if (pos >= _length)
+                return *this;
 
             size_t erase_len = (_length - pos < len) ? (_length - pos) : len;
 
@@ -865,7 +988,8 @@ namespace Fig::Deps
                     return *this;
                 }
 
-                if (mode == Mode::ASCII_SSO) promote_sso_ascii_to_heap();
+                if (mode == Mode::ASCII_SSO)
+                    promote_sso_ascii_to_heap();
 
                 ascii.erase(ascii.begin() + pos, ascii.begin() + pos + erase_len);
 
@@ -948,7 +1072,10 @@ namespace std
     struct std::formatter<Fig::Deps::String, char>
     {
         // 不支持自定义格式说明符
-        constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+        constexpr auto parse(std::format_parse_context &ctx)
+        {
+            return ctx.begin();
+        }
 
         template <typename FormatContext>
         auto format(const Fig::Deps::String &s, FormatContext &ctx) const

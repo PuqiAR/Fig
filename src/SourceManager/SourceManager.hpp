@@ -52,5 +52,10 @@ namespace Fig
         {
             return source.substr(_index_start, _length);
         }
+
+        const String &GetSource() const
+        {
+            return source;
+        }
     };
 };
