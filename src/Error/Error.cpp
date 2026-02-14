@@ -1,3 +1,10 @@
+/*!
+    @file src/Error/Error.cpp
+    @brief 错误报告实现
+    @author PuqiAR (im@puqiar.top)
+    @date 2026-02-14
+*/
+
 #include <Core/Core.hpp>
 #include <Error/Error.hpp>
 

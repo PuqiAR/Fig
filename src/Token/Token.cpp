@@ -1,3 +1,9 @@
+/*!
+    @file src/Token/Token.cpp
+    @brief Token实现
+    @author PuqiAR (im@puqiar.top)
+    @date 2026-02-14
+*/
 #include <Token/Token.hpp>
 
 namespace Fig
@@ -87,4 +93,4 @@ namespace Fig
         {String("false"), TokenType::LiteralFalse},
         {String("null"), TokenType::LiteralNull},
     };
-};
+}; // namespace Fig

@@ -1,3 +1,10 @@
+/*!
+    @file src/SourceManager/SourceManager.hpp
+    @brief 源代码管理
+    @author PuqiAR (im@puqiar.top)
+    @date 2026-02-14
+*/
+
 #pragma once
 
 #include <Deps/Deps.hpp>

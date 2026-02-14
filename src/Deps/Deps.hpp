@@ -1,3 +1,10 @@
+/*!
+    @file src/Deps/Deps.hpp
+    @brief 依赖库集合
+    @author PuqiAR (im@puqiar.top)
+    @date 2026-02-13
+*/
+
 #pragma once
 
 #include <Core/CoreInfos.hpp>

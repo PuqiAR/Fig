@@ -1,3 +1,10 @@
+/*!
+    @file src/Error/Error.hpp
+    @brief Error定义
+    @author PuqiAR (im@puqiar.top)
+    @date 2026-02-13
+*/
+
 #pragma once
 
 #include <Deps/Deps.hpp>

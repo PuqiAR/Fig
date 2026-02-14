@@ -1,3 +1,10 @@
+/*!
+    @file src/Deps/String/StringTest.cpp
+    @brief String类测试代码
+    @author PuqiAR (im@puqiar.top)
+    @date 2026-02-13
+*/
+
 #include <cassert>
 #include <iostream>
 #include "String.hpp"

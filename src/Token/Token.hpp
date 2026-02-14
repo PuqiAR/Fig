@@ -1,3 +1,10 @@
+/*!
+    @file src/Token/Token.hpp
+    @brief Token定义
+    @author PuqiAR (im@puqiar.top)
+    @date 2026-02-14
+*/
+
 #pragma once
 
 #include <cstdint>

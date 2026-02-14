@@ -1,3 +1,10 @@
+/*!
+    @file src/Deps/String/String.hpp
+    @brief UTF32/Pure ASCII + SSO优化的字符串实现
+    @author PuqiAR (im@puqiar.top)
+    @date 2026-02-13
+*/
+
 #pragma once
 
 #include <cstdint>

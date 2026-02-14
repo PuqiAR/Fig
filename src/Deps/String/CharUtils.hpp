@@ -1,3 +1,10 @@
+/*!
+    @file src/Deps/String/CharUtils.hpp
+    @brief char32_t type实现
+    @author PuqiAR (im@puqiar.top)
+    @date 2026-02-13
+*/
+
 #pragma once
 
 namespace Fig::Deps

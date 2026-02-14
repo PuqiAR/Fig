@@ -1,3 +1,9 @@
+/*!
+    @file src/Lexer/Lexer.cpp
+    @brief 词法分析器(materialized lexeme)实现
+    @author PuqiAR (im@puqiar.top)
+    @date 2026-02-14
+*/
 #include <Lexer/Lexer.hpp>
 
 namespace Fig

@@ -1,3 +1,10 @@
+/*!
+    @file src/Deps/HashMap/HashMap.hpp
+    @brief 依赖库HashMap定义
+    @author PuqiAR (im@puqiar.top)
+    @date 2026-02-13
+*/
+
 #pragma once
 
 #include <unordered_map>
