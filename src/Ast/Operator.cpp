@@ -51,7 +51,7 @@ namespace Fig
             {TokenType::PercentEqual, BinaryOperator::ModuloAssign},
             {TokenType::CaretEqual, BinaryOperator::BitXorAssign},
 
-            {TokenType::Pipe, BinaryOperator::BitAnd},
+            {TokenType::Pipe, BinaryOperator::BitOr},
             {TokenType::Ampersand, BinaryOperator::BitAnd},
             {TokenType::ShiftLeft, BinaryOperator::ShiftLeft},
             {TokenType::ShiftRight, BinaryOperator::ShiftRight},
@@ -137,22 +137,21 @@ namespace Fig
 
     BindingPower GetBinaryOpRBp(BinaryOperator op)
     {
-        /*
-            右结合，左绑定力 >= 右
-            a = b = c
-            a = (b = c)
-            a.b.c
-        */
         switch (op)
         {
-            case BinaryOperator::Assign: return GetBinaryOpLBp(op);
-            case BinaryOperator::AddAssign: return GetBinaryOpLBp(op);
-            case BinaryOperator::SubAssign: return GetBinaryOpLBp(op);
-            case BinaryOperator::MultiplyAssign: return GetBinaryOpLBp(op);
-            case BinaryOperator::DivideAssign: return GetBinaryOpLBp(op);
-            case BinaryOperator::ModuloAssign: return GetBinaryOpLBp(op);
-            case BinaryOperator::BitXorAssign: return GetBinaryOpLBp(op);
-            case BinaryOperator::Power: return GetBinaryOpLBp(op);
+            /*
+                右结合，左绑定力 >= 右
+                a = b = c
+                a = (b = c)
+            */
+            case BinaryOperator::Assign:
+            case BinaryOperator::AddAssign:
+            case BinaryOperator::SubAssign:
+            case BinaryOperator::MultiplyAssign:
+            case BinaryOperator::DivideAssign:
+            case BinaryOperator::ModuloAssign:
+            case BinaryOperator::BitXorAssign:
+            case BinaryOperator::Power: return GetBinaryOpLBp(op) - 1;
 
             default:
                 /*

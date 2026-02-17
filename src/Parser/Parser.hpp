@@ -34,7 +34,7 @@ namespace Fig
 
         bool isEOF = false;
 
-        const Token &nextToken()
+        Token nextToken()
         {
             assert(!isEOF && "nextToken: eof but called nextToken");
             if (index + 1 < buffer.size())
@@ -57,12 +57,16 @@ namespace Fig
             return token;
         }
 
-        inline const Token &prevToken()
+        inline Token prevToken()
         {
+            if (buffer.size() < 2)
+            {
+                return currentToken();
+            }
             return buffer[buffer.size() - 2];
         }
 
-        inline const Token &currentToken()
+        inline Token currentToken()
         {
             if (buffer.empty())
             {
@@ -70,8 +74,8 @@ namespace Fig
             }
             return buffer.back();
         }
-
-        const Token &peekToken(size_t lookahead = 1)
+        
+        Token peekToken(size_t lookahead = 1)
         {
             assert(!isEOF && "peekToken: eof but called peekToken");
 

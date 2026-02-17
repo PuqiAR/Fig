@@ -122,12 +122,12 @@ namespace Fig
 
         while (true)
         {
-            token = currentToken();
             if (shouldTerminate())
             {
                 return lhs;
             }
 
+            token = currentToken();
             if (IsTokenOp(token.type /* isBinary = true */)) // 是否为二元运算符
             {
                 BinaryOperator op  = TokenToBinaryOp(token);
@@ -136,7 +136,7 @@ namespace Fig
                 {
                     // 前操作数的右绑定力比当前操作数的左绑定力大
                     // lhs被吸走
-                    return lhs;
+                    break;
                 }
 
                 const auto &result = parseInfixExpr(lhs);
@@ -154,6 +154,7 @@ namespace Fig
                 return lhs;
             }
         }
+        return lhs;
     }
 
 }; // namespace Fig
