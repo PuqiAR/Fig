@@ -15,4 +15,6 @@ namespace Fig::CoreIO
     std::ostream &GetStdErr();
     std::ostream &GetStdLog();
     std::istream &GetStdCin();
-};
+
+    void InitConsoleIO();
+}; // namespace Fig::CoreIO

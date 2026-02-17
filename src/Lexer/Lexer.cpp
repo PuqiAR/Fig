@@ -152,18 +152,21 @@ namespace Fig
 
         SourcePosition startPos = rd.currentPosition();
 
+
+        Token tok(rd.currentIndex(), 1, TokenType::LiteralString); // "
         rd.next(); // skip " / '
-        Token tok(rd.currentIndex(), 0, TokenType::LiteralString);
 
         while (true)
         {
             if (state == State::ScanStringDQ && rd.current() == U'"')
             {
+                tok.length ++;
                 rd.next(); // skip '"'
                 break;
             }
             else if (state == State::ScanStringSQ && rd.current() == U'\'')
             {
+                tok.length ++;
                 rd.next(); // skip `'`
                 break;
             }
@@ -230,7 +233,7 @@ namespace Fig
         while (!rd.isAtEnd())
         {
             char32_t current = rd.current();
-            if (current == EOF || !CharUtils::isAsciiSpace(current)) // 检查 EOF
+            if (!CharUtils::isAsciiSpace(current)) // 检查 EOF
                 break;
             rd.next();
         }
@@ -240,11 +243,7 @@ namespace Fig
     {
         if (rd.isAtEnd())
         {
-            return Token(rd.currentIndex(), 0, TokenType::EndOfFile);
-        }
-        if (rd.current() == U'\0')
-        {
-            return Token(rd.currentIndex(), 1, TokenType::EndOfFile);
+            return Token(rd.getEOFIndex(), 1, TokenType::EndOfFile);
         }
         if (rd.current() == U'/' && rd.peekIf() == U'/')
         {

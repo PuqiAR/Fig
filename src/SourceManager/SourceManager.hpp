@@ -60,6 +60,9 @@ namespace Fig
                 source += line + '\n';
                 lines.push_back(String(line));
             }
+            if (!source.empty() && source.back() == U'\n')
+                source.pop_back();
+
             if (lines.empty())
             {
                 lines.push_back(String()); // 填充一个空的

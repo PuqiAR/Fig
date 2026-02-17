@@ -373,26 +373,6 @@ namespace Fig::Deps
             init(s.data(), s.size());
         }
 
-        static String fromPureAscii(const char *str)
-        {
-            String string;
-            string._length = std::strlen(str);
-            if (string._length <= SSO_SIZE)
-            {
-                memcpy(string.sso, str, string._length);
-            }
-            else
-            {
-                string.ascii.reserve(string._length);
-                for (size_t i = 0; i < string._length; ++i)
-                {
-                    string.ascii.push_back(str[i]);
-                }
-            }
-
-            return string;
-        }
-
         String &operator=(const String &other)
         {
             if (this != &other)

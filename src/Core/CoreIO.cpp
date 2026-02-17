@@ -8,6 +8,10 @@
 #include <Core/CoreIO.hpp>
 #include <Core/CoreInfos.hpp>
 
+#ifdef _WIN32
+    #include <windows.h>
+#endif
+
 namespace Fig::CoreIO
 {
 #if defined(_WIN32) || defined(__APPLE__) || defined (__linux__) || defined (__unix__)
@@ -34,4 +38,10 @@ namespace Fig::CoreIO
 #else
     // link
 #endif
+
+    void InitConsoleIO()
+    {
+        SetConsoleCP(CP_UTF8);
+        SetConsoleOutputCP(CP_UTF8);
+    }
 };

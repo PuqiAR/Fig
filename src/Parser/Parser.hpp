@@ -121,6 +121,10 @@ namespace Fig
 
             ParsingInfixExpr,
             ParsingPrefixExpr,
+
+            ParsingIndexExpr,
+            ParsingCallExpr,
+
         } state;
 
         Parser(Lexer &_lexer, SourceManager &_srcManager, String _fileName) :
@@ -148,15 +152,19 @@ namespace Fig
         Result<InfixExpr *, Error>  parseInfixExpr(Expr *);  // 由 parseExpression递归调用, 当前token为op
         Result<PrefixExpr *, Error> parsePrefixExpr(); // 由 parseExpression递归调用, 当前token为op
 
-        std::unordered_set<TokenType> getTerminators(); // 返回当前state的终止条件(终止符)
-        bool shouldTerminate(); // 通过state判断该不该终止表达式解析
+        Result<IndexExpr *, Error> parseIndexExpr(Expr *); // 由 parseExpression调用, 当前token为 `[`
+        Result<CallExpr *, Error> parseCallExpr(Expr *); // 由 parseExpression调用, 当前token为 `(`
 
-        Result<Expr *, Error> parseExpression(BindingPower = 0);
+        std::unordered_set<TokenType> getTerminators(); // 返回固定的终止符
+        bool shouldTerminate(); // 判断是否终结
+
+        // Result<Expr *, Error> parseExpression(BindingPower = 0);
 
         /* Statements */
         
     public:
 
+        Result<Expr *, Error> parseExpression(BindingPower = 0);
         DynArray<AstNode *> parseAll();
     };
 }; // namespace Fig

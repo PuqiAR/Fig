@@ -141,6 +141,7 @@ namespace Fig
         err << "❓ " << TC::DarkGray << "Thrower: " << error.thrower_loc.function_name() << " ("
             << error.thrower_loc.file_name() << ":" << error.thrower_loc.line() << ")" << TC::Reset << "\n";
         err << "💡 " << TC::Blue << "Suggestion: " << error.suggestion << TC::Reset;
+        err << '\n';
     }
 
     void ReportError(const Error &error, const SourceManager &srcManager)

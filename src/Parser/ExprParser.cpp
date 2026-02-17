@@ -61,16 +61,95 @@ namespace Fig
         return node;
     }
 
-    std::unordered_set<TokenType> Parser::getTerminators() // 返回当前state的终止条件(终止符)
+    Result<IndexExpr *, Error> Parser::parseIndexExpr(Expr *base) // 由 parseExpression调用, 当前token为 `[`
     {
-        using enum State;
+        state                       = State::ParsingIndexExpr;
+        const Token &lbracket_token = consumeToken(); // consume `[`
+        const auto  &index_result   = parseExpression();
 
-        static const std::unordered_set<TokenType> baseTerminators = {TokenType::EndOfFile, TokenType::Semicolon};
-
-        switch (state)
+        if (!index_result)
         {
-            default: return baseTerminators;
+            return std::unexpected(index_result.error());
         }
+
+        if (currentToken().type != TokenType::RightBracket) // `]`
+        {
+            return std::unexpected(
+                Error(ErrorType::SyntaxError, "unclosed brackets", "insert `]`", makeSourcelocation(lbracket_token)));
+        }
+        consumeToken(); // consume `]`
+
+        IndexExpr *indexExpr = new IndexExpr(base, *index_result);
+        return indexExpr;
+    }
+
+    Result<CallExpr *, Error> Parser::parseCallExpr(Expr *callee) // 由 parseExpression调用, 当前token为 `(`
+    {
+        state                     = State::ParsingCallExpr;
+        const Token &lparen_token = consumeToken(); // consume `(`
+
+        FnCallArgs callArgs;
+
+        // 空参数列表
+        if (currentToken().type == TokenType::RightParen)
+        {
+            consumeToken(); // consume `)`
+            return new CallExpr(callee, callArgs);
+        }
+
+        while (true)
+        {
+            if (currentToken().type == TokenType::EndOfFile)
+            {
+                return std::unexpected(Error(ErrorType::SyntaxError,
+                    "fn call has unclosed parenthese",
+                    "insert `)`",
+                    makeSourcelocation(lparen_token)));
+            }
+
+            const auto &arg_result = parseExpression();
+            if (!arg_result)
+                return std::unexpected(arg_result.error());
+
+            callArgs.args.push_back(*arg_result);
+
+            if (currentToken().type == TokenType::RightParen)
+            {
+                consumeToken(); // consume `)`
+                break;
+            }
+
+            if (currentToken().type != TokenType::Comma)
+            {
+                return std::unexpected(Error(ErrorType::SyntaxError,
+                    "expected `,` or `)` in argument list",
+                    "insert `,`",
+                    makeSourcelocation(currentToken())));
+            }
+
+            consumeToken(); // consume `,`
+        }
+
+        return new CallExpr(callee, callArgs);
+    }
+
+    std::unordered_set<TokenType> Parser::getTerminators()
+    {
+        /*
+
+        Syntax terminators:
+            ;  )  ]  }  ,  EOF
+
+        */
+        static const std::unordered_set<TokenType> baseTerminators = {TokenType::Semicolon,
+            TokenType::RightParen,
+            TokenType::RightBracket,
+            TokenType::RightBrace,
+            TokenType::Comma,
+            TokenType::EndOfFile
+
+        };
+        return baseTerminators;
     }
     bool Parser::shouldTerminate()
     {
@@ -111,6 +190,22 @@ namespace Fig
             }
             lhs = *lhs_result;
         }
+        else if (token.type == TokenType::LeftParen)
+        {
+            const Token &lparen_token = consumeToken(); // consume `(`
+            const auto  &expr_result  = parseExpression(0);
+            if (!expr_result)
+            {
+                return expr_result;
+            }
+            const Token &rparen_token = consumeToken(); // consume `)`
+            if (rparen_token.type != TokenType::RightParen)
+            {
+                return std::unexpected(Error(
+                    ErrorType::SyntaxError, "unclosed parenthese", "insert `)`", makeSourcelocation(lparen_token)));
+            }
+            lhs = *expr_result;
+        }
 
         if (!lhs)
         {
@@ -122,12 +217,12 @@ namespace Fig
 
         while (true)
         {
+            token = currentToken();
             if (shouldTerminate())
             {
-                return lhs;
+                break;
             }
 
-            token = currentToken();
             if (IsTokenOp(token.type /* isBinary = true */)) // 是否为二元运算符
             {
                 BinaryOperator op  = TokenToBinaryOp(token);
@@ -148,10 +243,30 @@ namespace Fig
             }
             // 后缀运算符优先级非常大，几乎永远跟在操作数后面，因此我们可以直接结合
             // 而不用走正常路径
-            else if (0) {}
+            else if (token.type == TokenType::LeftBracket) // `[`
+            {
+                const auto &expr_result = parseIndexExpr(lhs);
+                if (!expr_result)
+                {
+                    return expr_result;
+                }
+                lhs = *expr_result;
+            }
+            else if (token.type == TokenType::LeftParen) // `(`
+            {
+                const auto &expr_result = parseCallExpr(lhs);
+                if (!expr_result)
+                {
+                    return expr_result;
+                }
+                lhs = *expr_result;
+            }
             else
             {
-                return lhs;
+                return std::unexpected(Error(ErrorType::ExpectedExpression,
+                    "expression unexpectedly ended",
+                    "insert expressions",
+                    makeSourcelocation(token)));
             }
         }
         return lhs;

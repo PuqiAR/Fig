@@ -7,10 +7,11 @@
 
 #pragma once
 
-#include <Deps/Deps.hpp>
-#include <Token/Token.hpp>
 #include <Core/SourceLocations.hpp>
+#include <Deps/Deps.hpp>
 #include <Error/Error.hpp>
+#include <Token/Token.hpp>
+
 
 namespace Fig
 {
@@ -25,17 +26,20 @@ namespace Fig
     public:
         SourceReader()
         {
-            index = 0;
+            index    = 0;
             pos.line = pos.column = 1;
         }
         SourceReader(const String &_source) // copy
         {
-            source = _source;
-            index = 0;
+            source   = _source;
+            index    = 0;
             pos.line = pos.column = 1;
         }
 
-        SourcePosition &currentPosition() { return pos; }
+        SourcePosition &currentPosition()
+        {
+            return pos;
+        }
 
         inline char32_t current() const
         {
@@ -52,7 +56,10 @@ namespace Fig
             return source[index];
         }
 
-        inline bool hasNext() const { return index < source.length() - 1; }
+        inline bool hasNext() const
+        {
+            return index < source.length() - 1;
+        }
 
         inline char32_t peek() const
         {
@@ -62,7 +69,10 @@ namespace Fig
 
         inline char32_t peekIf() const
         {
-            if ((index + 1) < source.length()) { return source[index + 1]; }
+            if ((index + 1) < source.length())
+            {
+                return source[index + 1];
+            }
             return 0xFFFD;
         }
 
@@ -92,12 +102,26 @@ namespace Fig
 
         inline void skip(size_t n)
         {
-            for (size_t i = 0; i < n; ++i) { next(); }
+            for (size_t i = 0; i < n; ++i)
+            {
+                next();
+            }
         }
 
-        inline size_t currentIndex() const { return index; }
+        inline size_t currentIndex() const
+        {
+            return index;
+        }
 
-        inline bool isAtEnd() const { return index >= source.length(); }
+        inline bool isAtEnd() const
+        {
+            return index >= source.length();
+        }
+
+        inline size_t getEOFIndex() const
+        {
+            return source.length();
+        }
     };
 
     class Lexer
@@ -125,7 +149,7 @@ namespace Fig
         };
 
     private:
-        String fileName;
+        String       fileName;
         SourceReader rd;
 
     protected:
@@ -149,7 +173,7 @@ namespace Fig
         Lexer() {}
         Lexer(const String &source, String _fileName)
         {
-            rd = SourceReader(source);
+            rd       = SourceReader(source);
             fileName = std::move(_fileName);
         }
 

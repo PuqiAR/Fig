@@ -35,7 +35,7 @@ int main()
         const auto &type = magic_enum::enum_name(token.type);
         if (token.type == TokenType::EndOfFile)
         {
-            std::cout << "EOF: " << type << '\n';
+            std::cout << "EOF: " << type  << " at " << token.index << '\n';
             break;
         }
         std::cout << lexeme << " --> " << type << '\n';
