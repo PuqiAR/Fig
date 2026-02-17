@@ -1,3 +1,10 @@
+/*!
+    @file src/Core/SourceLocations
+    @brief SourcePosition + SourceLocation定义，全局代码定位
+    @author PuqiAR (im@puqiar.top)
+    @date 2026-02-14
+*/
+
 #pragma once
 
 #include <Deps/Deps.hpp>

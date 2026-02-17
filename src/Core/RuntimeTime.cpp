@@ -1,3 +1,10 @@
+/*!
+    @file src/Core/RuntimeTime.cpp
+    @brief 系统时间库实现(steady_clock)
+    @author PuqiAR (im@puqiar.top)
+    @date 2026-02-14
+*/
+
 #include <Core/RuntimeTime.hpp>
 
 #include <cassert>

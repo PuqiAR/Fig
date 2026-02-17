@@ -74,7 +74,7 @@ namespace Fig
             }
             return buffer.back();
         }
-        
+
         Token peekToken(size_t lookahead = 1)
         {
             assert(!isEOF && "peekToken: eof but called peekToken");
@@ -141,6 +141,7 @@ namespace Fig
                 ), fileName, "[internal parser]", magic_enum::enum_name(state).data());
         }
 
+        /* Expressions */
         Result<LiteralExpr *, Error> parseLiteralExpr(); // 当前token为literal时调用
         Result<IdentiExpr *, Error>  parseIdentiExpr();  // 当前token为Identifier调用
 
@@ -150,8 +151,11 @@ namespace Fig
         std::unordered_set<TokenType> getTerminators(); // 返回当前state的终止条件(终止符)
         bool shouldTerminate(); // 通过state判断该不该终止表达式解析
 
-    public:
         Result<Expr *, Error> parseExpression(BindingPower = 0);
+
+        /* Statements */
+        
+    public:
 
         DynArray<AstNode *> parseAll();
     };

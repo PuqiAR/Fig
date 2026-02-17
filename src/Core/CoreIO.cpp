@@ -1,3 +1,10 @@
+/*!
+    @file src/Core/CoreIO.cpp
+    @brief 标准输入输出链接
+    @author PuqiAR (im@puqiar.top)
+    @date 2026-02-14
+*/
+
 #include <Core/CoreIO.hpp>
 #include <Core/CoreInfos.hpp>
 

@@ -1,3 +1,10 @@
+/*!
+    @file src/Core/CoreInfos.hpp
+    @brief 核心系统信息
+    @author PuqiAR (im@puqiar.top)
+    @date 2026-02-14
+*/
+
 #pragma once
 
 #include <Deps/String/String.hpp>
