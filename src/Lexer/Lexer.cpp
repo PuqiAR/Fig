@@ -35,7 +35,7 @@ namespace Fig
 
     Result<Token, Error> Lexer::scanMultilineComments()
     {
-        Token tok(rd.currentIndex(), 2, TokenType::Comments);
+        Token          tok(rd.currentIndex(), 2, TokenType::Comments);
         SourcePosition startPos = rd.currentPosition();
         rd.skip(2); // 跳过 / *
         while (true)
@@ -43,9 +43,9 @@ namespace Fig
             if (rd.isAtEnd())
             {
                 return std::unexpected(Error(ErrorType::UnterminatedComments,
-                                             "unterminated multiline comments",
-                                             "insert '*/'",
-                                             makeSourceLocation(startPos)));
+                    "unterminated multiline comments",
+                    "insert '*/'",
+                    makeSourceLocation(startPos)));
             }
             if (rd.current() == U'*' && rd.peekIf() == U'/')
             {
@@ -60,7 +60,7 @@ namespace Fig
 
     Result<Token, Error> Lexer::scanIdentifierOrKeyword()
     {
-        Token tok(rd.currentIndex(), 1, TokenType::Identifier);
+        Token  tok(rd.currentIndex(), 1, TokenType::Identifier);
         String value;                  // 用于判断是标识符还是关键字
         value.push_back(rd.produce()); // 加入第一个
 
@@ -107,7 +107,7 @@ namespace Fig
             //                                  std::format("bad number postfix 0{}", String(_peek)),
             //                                  "correct it",
             //                                  makeSourceLocation(rd.currentPosition())));
-                
+
             // }
         }
 
@@ -135,15 +135,60 @@ namespace Fig
             rd.next();
         } while (!rd.isAtEnd());
 
-        // 科学计数法
-        while (!rd.isAtEnd() && state == State::ScanDec
-               && (rd.current() == U'e' || rd.current() == U'E' || rd.current() == U'_' || rd.current() == U'+'
-                   || rd.current() == U'-' || CharUtils::isDigit(rd.current())))
+        // 下划线表示法(1_000_000)
+        while (!rd.isAtEnd() && state == State::ScanDec && (rd.current() == U'_' || CharUtils::isDigit(rd.current())))
         {
             tok.length++;
             rd.next();
         }
 
+        // 小数点
+        if (rd.currentIf() == U'.')
+        {
+            tok.length++;
+            rd.next();
+
+            if (!CharUtils::isDigit(rd.currentIf()))
+            {
+                return std::unexpected(Error(ErrorType::InvalidNumberLiteral,
+                    "need matissa",
+                    "insert matissa",
+                    makeSourceLocation(rd.currentPosition())));
+            }
+            while (!rd.isAtEnd() && CharUtils::isDigit(rd.current()))
+            {
+                tok.length++;
+                rd.next();
+            }
+        }
+
+        // 科学计数法
+        if (rd.currentIf() == U'e')
+        {
+            tok.length++;
+            char32_t peek = rd.peekIf();
+            if (peek == U'+' || peek == U'-') // ae+b, ae-b
+            {
+                tok.length++;
+                rd.skip(2); // consume `e`, +/-
+            }
+            else if (CharUtils::isDigit(peek)) // aeb 情况
+            {
+                rd.next(); // `e`
+            }
+            if (!CharUtils::isDigit(rd.currentIf()))
+            {
+                return std::unexpected(Error(ErrorType::InvalidNumberLiteral,
+                    "need exponent for scientific notation",
+                    "insert exponent",
+                    makeSourceLocation(rd.currentPosition())));
+            }
+            while (!rd.isAtEnd() && CharUtils::isDigit(rd.current()))
+            {
+                tok.length++;
+                rd.next();
+            }
+        }
         return tok;
     }
     Result<Token, Error> Lexer::scanStringLiteral()
@@ -152,31 +197,29 @@ namespace Fig
 
         SourcePosition startPos = rd.currentPosition();
 
-
         Token tok(rd.currentIndex(), 1, TokenType::LiteralString); // "
-        rd.next(); // skip " / '
+        rd.next();                                                 // skip " / '
 
         while (true)
         {
             if (state == State::ScanStringDQ && rd.current() == U'"')
             {
-                tok.length ++;
+                tok.length++;
                 rd.next(); // skip '"'
                 break;
             }
             else if (state == State::ScanStringSQ && rd.current() == U'\'')
             {
-                tok.length ++;
+                tok.length++;
                 rd.next(); // skip `'`
                 break;
             }
             else if (rd.isAtEnd())
             {
-                return std::unexpected(
-                    Error(ErrorType::UnterminatedString,
-                          "unterminated string literal",
-                          std::format("insert '{}'", String((state == State::ScanStringDQ ? "\"" : "'"))),
-                          makeSourceLocation(startPos)));
+                return std::unexpected(Error(ErrorType::UnterminatedString,
+                    "unterminated string literal",
+                    std::format("insert '{}'", String((state == State::ScanStringDQ ? "\"" : "'"))),
+                    makeSourceLocation(startPos)));
             }
             else
             {
@@ -220,9 +263,9 @@ namespace Fig
         if (!Token::punctMap.contains(sym))
         {
             return std::unexpected(Error(ErrorType::InvalidSymbol,
-                                         std::format("invalid symbol `{}`", sym),
-                                         "correct it",
-                                         makeSourceLocation(rd.currentPosition())));
+                std::format("invalid symbol `{}`", sym),
+                "correct it",
+                makeSourceLocation(rd.currentPosition())));
         }
         tok.type = Token::punctMap.at(sym);
         return tok;
@@ -276,8 +319,7 @@ namespace Fig
         }
         else
         {
-            return std::unexpected(Error(
-                ErrorType::InvalidCharacter,
+            return std::unexpected(Error(ErrorType::InvalidCharacter,
                 std::format("invalid character '{}' (U+{})", String(rd.current()), static_cast<int>(rd.current())),
                 "correct it",
                 makeSourceLocation(rd.currentPosition())));

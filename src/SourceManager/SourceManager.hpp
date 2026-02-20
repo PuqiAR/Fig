@@ -7,8 +7,9 @@
 
 #pragma once
 
-#include <Deps/Deps.hpp>
 #include <Core/SourceLocations.hpp>
+#include <Deps/Deps.hpp>
+
 
 #include <fstream>
 
@@ -17,8 +18,8 @@ namespace Fig
     class SourceManager
     {
     private:
-        String filePath;
-        String source;
+        String              filePath;
+        String              source;
         std::vector<String> lines;
         std::vector<size_t> lineStartIndex; // 每行在整个源字符串中的起始 index
 
@@ -45,7 +46,7 @@ namespace Fig
         }
 
     public:
-        bool read = false;
+        bool    read = false;
         String &Read()
         {
             std::fstream fs(filePath.toStdString());
@@ -73,7 +74,10 @@ namespace Fig
         }
 
         SourceManager() {}
-        SourceManager(String _path) { filePath = std::move(_path); }
+        SourceManager(String _path)
+        {
+            filePath = std::move(_path);
+        }
 
         bool HasLine(int64_t _line) const
         {
@@ -127,4 +131,4 @@ namespace Fig
             return {line + 1, column};
         }
     };
-};
+}; // namespace Fig

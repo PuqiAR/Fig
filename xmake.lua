@@ -44,9 +44,33 @@ target("ParserTest")
 
     add_files("src/Ast/Operator.cpp")
     add_files("src/Parser/ExprParser.cpp")
+    add_files("src/Parser/StmtParser.cpp")
     add_files("src/Parser/Parser.cpp")
 
     add_files("src/Parser/ParserTest.cpp")
+
+target("ObjectTest")
+    add_files("src/Object/Object.cpp")
+    add_files("src/Object/ObjectTest.cpp")
+
+target("CompilerTest")
+    add_files("src/Core/*.cpp")
+    add_files("src/Token/Token.cpp")
+    add_files("src/Error/Error.cpp")
+    add_files("src/Lexer/Lexer.cpp")
+
+    add_files("src/Ast/Operator.cpp")
+    add_files("src/Parser/ExprParser.cpp")
+    add_files("src/Parser/StmtParser.cpp")
+    add_files("src/Parser/Parser.cpp")
+
+    add_files("src/Object/Object.cpp")
+
+    add_files("src/Compiler/ExprCompiler.cpp")
+    add_files("src/Compiler/StmtCompiler.cpp")
+    add_files("src/Compiler/Compiler.cpp")
+    
+    add_files("src/Compiler/CompileTest.cpp")
 
 target("Fig")
     add_files("src/Core/*.cpp")
@@ -56,6 +80,14 @@ target("Fig")
 
     add_files("src/Ast/Operator.cpp")
     add_files("src/Parser/ExprParser.cpp")
+    add_files("src/Parser/StmtParser.cpp")
     add_files("src/Parser/Parser.cpp")
-    
+
+    add_files("src/Object/Object.cpp")
+
+    add_files("src/Compiler/ExprCompiler.cpp")
+    add_files("src/Compiler/StmtCompiler.cpp")
+    add_files("src/Compiler/Compiler.cpp")
+
+    add_files("src/VM/VM.cpp")
     add_files("src/main.cpp")

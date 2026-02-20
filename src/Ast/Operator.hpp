@@ -20,6 +20,8 @@ namespace Fig
         Negate,    // 取反 -
         Not,       // 逻辑非 ! / not
         AddressOf, // 取引用 &
+
+        Count // 哨兵，(int) Count 获得运算符数量（注意，enum必须从 0 开始且不中断）
     };
     enum class BinaryOperator : std::uint8_t
     {
@@ -43,13 +45,13 @@ namespace Fig
 
         Power, // 幂运算 **
 
-        Assign,        // 赋值(修改) =
-        AddAssign,     // +=
-        SubAssign,    // -=
+        Assign,         // 赋值(修改) =
+        AddAssign,      // +=
+        SubAssign,      // -=
         MultiplyAssign, // *=
-        DivideAssign,    // /=
-        ModuloAssign,  // %=
-        BitXorAssign,    // ^=
+        DivideAssign,   // /=
+        ModuloAssign,   // %=
+        BitXorAssign,   // ^=
 
         // 位运算
         BitAnd,     // 按位与 &
@@ -60,14 +62,22 @@ namespace Fig
 
         // 成员访问
         MemberAccess, // .
+
+        Count // 哨兵，(int) Count 获得运算符数量（注意，enum必须从 0 开始且不中断）
     };
+
+    constexpr unsigned int GetOperatorsSize()
+    {
+        // 获取全部运算符的数量
+        return static_cast<std::uint8_t>(UnaryOperator::Count) + static_cast<std::uint8_t>(BinaryOperator::Count);
+    }
 
     using BindingPower = unsigned int;
 
-    HashMap<TokenType, UnaryOperator> &GetUnaryOpMap();
+    HashMap<TokenType, UnaryOperator>  &GetUnaryOpMap();
     HashMap<TokenType, BinaryOperator> &GetBinaryOpMap();
 
-    HashMap<UnaryOperator, BindingPower> &GetUnaryOpBindingPowerMap();
+    HashMap<UnaryOperator, BindingPower>  &GetUnaryOpBindingPowerMap();
     HashMap<BinaryOperator, BindingPower> &GetBinaryOpBindingPowerMap();
 
     BindingPower GetUnaryOpRBp(UnaryOperator);
@@ -77,6 +87,6 @@ namespace Fig
 
     bool IsTokenOp(TokenType type, bool binary = true);
 
-    UnaryOperator TokenToUnaryOp(const Token &);
+    UnaryOperator  TokenToUnaryOp(const Token &);
     BinaryOperator TokenToBinaryOp(const Token &);
 }; // namespace Fig

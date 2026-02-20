@@ -16,28 +16,32 @@ namespace Fig
     enum class AstType : std::uint8_t
     {
         AstNode, // 基类
+        Program, // 程序
         Expr,    // 表达式
         Stmt,    // 语句
 
         /* Expressions */
         IdentiExpr,  // 标识符表达式
         LiteralExpr, // 字面量表达式
-        PrefixExpr,   // 一元 前缀表达式
-        InfixExpr,  // 二元 中缀表达式
-        
-        IndexExpr,  // 后缀表达式，索引
-        CallExpr,   // 后缀表达式，函数调用
+        PrefixExpr,  // 一元 前缀表达式
+        InfixExpr,   // 二元 中缀表达式
+
+        IndexExpr, // 后缀表达式，索引
+        CallExpr,  // 后缀表达式，函数调用
 
         /* Statements */
-        VarDecl,
+        ExprStmt, // 表达式语句，如 println(1)
+        VarDecl,  // 变量声明
     };
     struct AstNode
     {
-        AstType type = AstType::AstNode;
+        AstType        type = AstType::AstNode;
         SourceLocation location;
 
         virtual String toString() const = 0;
     };
+
+    struct Program;
 
     struct Expr : public AstNode
     {
@@ -53,6 +57,31 @@ namespace Fig
         Stmt()
         {
             type = AstType::Stmt;
+        }
+    };
+
+    struct Program final : public AstNode
+    {
+        DynArray<Stmt *> nodes;
+
+        Program()
+        {
+            type = AstType::Program;
+        }
+
+        Program(DynArray<Stmt *> _nodes)
+        {
+            type  = AstType::Program;
+            nodes = std::move(_nodes);
+            if (!_nodes.empty())
+            {
+                location = std::move(_nodes.back()->location);
+            }
+        }
+
+        virtual String toString() const override
+        {
+            return "Program";
         }
     };
 }; // namespace Fig
@@ -73,4 +102,4 @@ namespace std
             return std::format_to(ctx.out(), "{}", _node->toString().toStdString());
         }
     };
-};
+}; // namespace std

@@ -18,12 +18,15 @@ int main()
 
     Lexer lexer(source, fileName);
     Parser parser(lexer, srcManager, fileName);
-    const auto &result = parser.parseExpression();
+    const auto &result = parser.Parse();
     if (!result)
     {
         ReportError(result.error(), srcManager);
         return 1;
     }
-    Expr *expr = *result;
-    std::cout << expr->toString() << '\n';
+    Program *program = *result;
+    for (Stmt *stmt : program->nodes)
+    {
+        std::cout << stmt->toString() << '\n';
+    }
 }

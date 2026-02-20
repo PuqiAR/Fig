@@ -23,12 +23,13 @@ namespace Fig
             type = AstType::VarDecl;
         }
 
-        VarDecl(String _name, Expr *_typeSpecifier, Expr *_initExpr, SourceLocation _location) :
+        VarDecl(bool _isPublic, String _name, Expr *_typeSpecifier, Expr *_initExpr, SourceLocation _location) :
             name(std::move(_name)),
             typeSpecifier(_typeSpecifier),
             initExpr(_initExpr) // location 指向关键字 var/const位置
         {
             type     = AstType::VarDecl;
+            isPublic = _isPublic;
             location = std::move(_location);
         }
 

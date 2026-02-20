@@ -52,7 +52,10 @@ namespace Fig
             case ExpectedExpression: return "ExpectedExpression";
             case SyntaxError: return "SyntaxError";
 
-            // default: return "Some one forgot to add case to `ErrorTypeToString`";
+            case RedeclarationError: return "RedeclarationError";
+            case UseUndeclaredIdentifier: return "UseUndeclaredIdentifier";
+            case NotAnLvalue: return "NotAnLvalue";
+                // default: return "Some one forgot to add case to `ErrorTypeToString`";
         }
     }
 

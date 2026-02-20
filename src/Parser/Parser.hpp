@@ -111,6 +111,38 @@ namespace Fig
             return current;
         }
 
+        inline bool match(TokenType type)
+        {
+            if (currentToken().type == type)
+            {
+                consumeToken();
+                return true;
+            }
+            return false;
+        }
+
+        inline Error makeUnexpectTokenError(const String &stmtType, const String &expect, const Token &tokenGot, std::source_location loc = std::source_location::current())
+        {
+            return Error(
+                ErrorType::SyntaxError,
+                std::format("expect '{}' in {}, got `{}`", expect, stmtType, magic_enum::enum_name(tokenGot.type)),
+                "none",
+                makeSourceLocation(tokenGot),
+                loc
+            );
+        }
+
+        inline Error makeExpectSemicolonError(std::source_location loc = std::source_location::current())
+        {
+            return Error(
+                ErrorType::SyntaxError,
+                "expect ';' after statement",
+                "insert ';'",
+                makeSourceLocation(currentToken()),
+                loc
+            );
+        }
+
     public:
         enum class State : std::uint8_t
         {
@@ -125,6 +157,8 @@ namespace Fig
             ParsingIndexExpr,
             ParsingCallExpr,
 
+            ParsingVarDecl,
+
         } state;
 
         Parser(Lexer &_lexer, SourceManager &_srcManager, String _fileName) :
@@ -134,37 +168,36 @@ namespace Fig
         }
 
     private:
-        SourceLocation makeSourcelocation(const Token &tok)
+        SourceLocation makeSourceLocation(const Token &tok)
         {
             auto [line, column] = srcManager.GetLineColumn(tok.index);
-            return SourceLocation(
-                SourcePosition(
-                    line,
-                    column,
-                    tok.length
-                ), fileName, "[internal parser]", magic_enum::enum_name(state).data());
+            return SourceLocation(SourcePosition(line, column, tok.length),
+                fileName,
+                "[internal parser]",
+                magic_enum::enum_name(state).data());
         }
 
         /* Expressions */
         Result<LiteralExpr *, Error> parseLiteralExpr(); // 当前token为literal时调用
         Result<IdentiExpr *, Error>  parseIdentiExpr();  // 当前token为Identifier调用
 
-        Result<InfixExpr *, Error>  parseInfixExpr(Expr *);  // 由 parseExpression递归调用, 当前token为op
-        Result<PrefixExpr *, Error> parsePrefixExpr(); // 由 parseExpression递归调用, 当前token为op
+        Result<InfixExpr *, Error>  parseInfixExpr(Expr *); // 由 parseExpression递归调用, 当前token为op
+        Result<PrefixExpr *, Error> parsePrefixExpr();      // 由 parseExpression递归调用, 当前token为op
 
         Result<IndexExpr *, Error> parseIndexExpr(Expr *); // 由 parseExpression调用, 当前token为 `[`
-        Result<CallExpr *, Error> parseCallExpr(Expr *); // 由 parseExpression调用, 当前token为 `(`
+        Result<CallExpr *, Error>  parseCallExpr(Expr *);  // 由 parseExpression调用, 当前token为 `(`
 
-        std::unordered_set<TokenType> getTerminators(); // 返回固定的终止符
-        bool shouldTerminate(); // 判断是否终结
+        std::unordered_set<TokenType> getTerminators();  // 返回固定的终止符
+        bool                          shouldTerminate(); // 判断是否终结
 
-        // Result<Expr *, Error> parseExpression(BindingPower = 0);
+        Result<Expr *, Error> parseExpression(BindingPower = 0, TokenType stop = TokenType::Semicolon, TokenType stop2 = TokenType::Semicolon);
 
         /* Statements */
-        
-    public:
+        Result<VarDecl *, Error> parseVarDecl(bool); // 由 parseStatement调用, 当前token为 var
 
-        Result<Expr *, Error> parseExpression(BindingPower = 0);
-        DynArray<AstNode *> parseAll();
+        Result<Stmt *, Error> parseStatement();
+
+    public:
+        Result<Program *, Error> Parse();
     };
 }; // namespace Fig

@@ -13,7 +13,7 @@ namespace Fig
     {
         state                      = State::ParsingLiteralExpr;
         const Token &literal_token = consumeToken();
-        LiteralExpr *node          = new LiteralExpr(literal_token, makeSourcelocation(literal_token));
+        LiteralExpr *node          = new LiteralExpr(literal_token, makeSourceLocation(literal_token));
         return node;
     }
     Result<IdentiExpr *, Error> Parser::parseIdentiExpr() // 当前token为Identifier调用
@@ -21,7 +21,7 @@ namespace Fig
         state                   = State::ParsingIdentiExpr;
         const Token &identifier = consumeToken();
         IdentiExpr  *node =
-            new IdentiExpr(srcManager.GetSub(identifier.index, identifier.length), makeSourcelocation(identifier));
+            new IdentiExpr(srcManager.GetSub(identifier.index, identifier.length), makeSourceLocation(identifier));
         return node;
     }
 
@@ -75,7 +75,7 @@ namespace Fig
         if (currentToken().type != TokenType::RightBracket) // `]`
         {
             return std::unexpected(
-                Error(ErrorType::SyntaxError, "unclosed brackets", "insert `]`", makeSourcelocation(lbracket_token)));
+                Error(ErrorType::SyntaxError, "unclosed brackets", "insert `]`", makeSourceLocation(lbracket_token)));
         }
         consumeToken(); // consume `]`
 
@@ -104,7 +104,7 @@ namespace Fig
                 return std::unexpected(Error(ErrorType::SyntaxError,
                     "fn call has unclosed parenthese",
                     "insert `)`",
-                    makeSourcelocation(lparen_token)));
+                    makeSourceLocation(lparen_token)));
             }
 
             const auto &arg_result = parseExpression();
@@ -124,7 +124,7 @@ namespace Fig
                 return std::unexpected(Error(ErrorType::SyntaxError,
                     "expected `,` or `)` in argument list",
                     "insert `,`",
-                    makeSourcelocation(currentToken())));
+                    makeSourceLocation(currentToken())));
             }
 
             consumeToken(); // consume `,`
@@ -158,7 +158,7 @@ namespace Fig
         return terminators.contains(token.type);
     }
 
-    Result<Expr *, Error> Parser::parseExpression(BindingPower rbp)
+    Result<Expr *, Error> Parser::parseExpression(BindingPower rbp, TokenType stop, TokenType stop2)
     {
         Expr *lhs   = nullptr;
         Token token = currentToken();
@@ -202,7 +202,7 @@ namespace Fig
             if (rparen_token.type != TokenType::RightParen)
             {
                 return std::unexpected(Error(
-                    ErrorType::SyntaxError, "unclosed parenthese", "insert `)`", makeSourcelocation(lparen_token)));
+                    ErrorType::SyntaxError, "unclosed parenthese", "insert `)`", makeSourceLocation(lparen_token)));
             }
             lhs = *expr_result;
         }
@@ -212,13 +212,17 @@ namespace Fig
             return std::unexpected(Error(ErrorType::ExpectedExpression,
                 "expected expression",
                 "insert expressions",
-                makeSourcelocation(prevToken())));
+                makeSourceLocation(prevToken())));
         }
 
         while (true)
         {
             token = currentToken();
             if (shouldTerminate())
+            {
+                break;
+            }
+            if (token.type == stop || token.type == stop2)
             {
                 break;
             }
@@ -266,7 +270,7 @@ namespace Fig
                 return std::unexpected(Error(ErrorType::ExpectedExpression,
                     "expression unexpectedly ended",
                     "insert expressions",
-                    makeSourcelocation(token)));
+                    makeSourceLocation(token)));
             }
         }
         return lhs;

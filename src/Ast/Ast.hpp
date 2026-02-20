@@ -14,4 +14,5 @@
 #include <Ast/Expr/LiteralExpr.hpp>
 #include <Ast/Expr/PrefixExpr.hpp>
 
+#include <Ast/Stmt/ExprStmt.hpp>
 #include <Ast/Stmt/VarDecl.hpp>

@@ -41,6 +41,11 @@ namespace Fig
         // parser errors
         ExpectedExpression,
         SyntaxError,
+
+        // compiler errors
+        RedeclarationError,
+        UseUndeclaredIdentifier,
+        NotAnLvalue
     };
 
     const char *ErrorTypeToString(ErrorType type);

@@ -10,9 +10,18 @@
 
 namespace Fig
 {
-    DynArray<AstNode *> Parser::parseAll()
+    Result<Program *, Error> Parser::Parse()
     {
-        DynArray<AstNode *> nodes;
-        return nodes;
+        Program *program = new Program;
+        while (!isEOF)
+        {
+            const auto &result = parseStatement();
+            if (!result)
+            {
+                return std::unexpected(result.error());
+            }
+            program->nodes.push_back(*result);
+        }
+        return program;
     }
 };

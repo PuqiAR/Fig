@@ -1,14 +1,12 @@
-#include <Compiler/Compiler.hpp>
-#include <Core/Core.hpp>
-#include <Deps/Deps.hpp>
 #include <Lexer/Lexer.hpp>
 #include <Parser/Parser.hpp>
+#include <Deps/Deps.hpp>
+#include <Core/Core.hpp>
 #include <SourceManager/SourceManager.hpp>
-#include <VM/VM.hpp>
+#include <Compiler/Compiler.hpp>
 
 #include <iostream>
 #include <print>
-#include <chrono>
 
 int main()
 {
@@ -26,7 +24,7 @@ int main()
         return 1;
     }
 
-    Lexer  lexer(manager.GetSource(), fileName);
+    Lexer lexer(manager.GetSource(), fileName);
     Parser parser(lexer, manager, fileName);
 
     const auto &program_result = parser.Parse();
@@ -36,8 +34,8 @@ int main()
         return 1;
     }
     Program *program = *program_result;
-
-    Compiler    compiler(fileName, manager);
+    
+    Compiler compiler(fileName, manager);
     const auto &proto_result = compiler.Compile(program);
     if (!proto_result)
     {
@@ -54,18 +52,7 @@ int main()
     }
 
     DumpCode(proto->code);
-
-    std::cout << "\nMax Stack Size: " << (int) proto->maxStack << std::endl;
     
-    VM vm;
-
-    const auto &result_ = vm.Execute(proto);
-    if (!result_)
-    {
-        ReportError(result_.error(), manager);
-        return 1;
-    }
-    Value result = *result_;
-    std::cout << "result: " << result.ToString() << "\n";
-    vm.PrintRegisters();
+    std::cout << "\nMax Stack Size: " << (int) proto->maxStack << std::endl;
+    return 0;
 }
