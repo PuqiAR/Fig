@@ -158,6 +158,7 @@ namespace Fig
             ParsingCallExpr,
 
             ParsingVarDecl,
+            ParsingIf,
 
         } state;
 
@@ -193,8 +194,9 @@ namespace Fig
         Result<Expr *, Error> parseExpression(BindingPower = 0, TokenType stop = TokenType::Semicolon, TokenType stop2 = TokenType::Semicolon);
 
         /* Statements */
+        Result<BlockStmt *, Error> parseBlockStmt(); // 当前token为 {
         Result<VarDecl *, Error> parseVarDecl(bool); // 由 parseStatement调用, 当前token为 var
-
+        Result<IfStmt *, Error> parseIfStmt(); // 由 parseStatement调用, 当前token is if
         Result<Stmt *, Error> parseStatement();
 
     public:
