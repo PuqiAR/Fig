@@ -24,6 +24,9 @@ namespace Fig
         LoadK,  // iABx 模式: R[A] = Constants[Bx]
         Return, // iA 模式: 返回 R[A] 的值
 
+        Jmp,        // iAsBx: ip += sBx 无条件跳转
+        JmpIfFalse, // iAsBx: 如果 R[A] 为假, ip += sBx
+
         Mov,    // iABx: R[A] = R[Bx]
         Add,    // iABC: R[A] = R[B] + R[C]
         Sub,    // iABC: R[A] = R[B] - R[C]
@@ -52,10 +55,18 @@ namespace Fig
         }
 
         // [OpCode: 8] [A: 8] [B: 8] [C: 8]
-        [[nodiscard]] inline constexpr Instruction iABC(OpCode op, std::uint8_t a, std::uint8_t b, std::uint8_t c)
+        [[nodiscard]] inline constexpr Instruction iABC(
+            OpCode op, std::uint8_t a, std::uint8_t b, std::uint8_t c)
         {
             return static_cast<std::uint32_t>(op) | (static_cast<std::uint32_t>(a) << 8)
                    | (static_cast<std::uint32_t>(b) << 16) | (static_cast<std::uint32_t>(c) << 24);
+        }
+
+        [[nodiscard]]
+        inline constexpr Instruction iAsBx(OpCode op, std::uint8_t a, std::int16_t sbx)
+        {
+            return static_cast<std::uint32_t>(op) | (static_cast<std::uint32_t>(a) << 8)
+                   | (static_cast<std::uint32_t>(static_cast<std::uint16_t>(sbx)) << 16);
         }
     } // namespace Op
 } // namespace Fig

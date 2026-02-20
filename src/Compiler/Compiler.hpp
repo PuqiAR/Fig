@@ -61,7 +61,8 @@ namespace Fig
         SourceManager &manager;
         FuncState     *current = nullptr; // 永远指向当前正在编译的上下文
     public:
-        Compiler(String _fileName, SourceManager &_manager) : fileName(std::move(_fileName)), manager(_manager)
+        Compiler(String _fileName, SourceManager &_manager) :
+            fileName(std::move(_fileName)), manager(_manager)
         {
             // 初始化顶级作用域
             current = new FuncState("global", nullptr);
@@ -196,7 +197,9 @@ namespace Fig
                 {
                     if (it->depth < current->scopeDepth && !it->isPublic)
                     {
-                        assert(false && "ResolveLocal: Attempt to access a private variable from an outer scope!");
+                        assert(
+                            false
+                            && "ResolveLocal: Attempt to access a private variable from an outer scope!");
                     }
 
                     return it->reg;
@@ -204,7 +207,9 @@ namespace Fig
             }
 
             // 如果在本 Frame 没找到，那就是外层函数的变量 (闭包 Upvalue) 或者全局变量 (Global)。
-            assert(false && "ResolveLocal: Variable not found in current frame (Upvalue/Global not implemented yet)!");
+            assert(
+                false
+                && "ResolveLocal: Variable not found in current frame (Upvalue/Global not implemented yet)!");
             return UINT8_MAX;
         }
 
@@ -221,6 +226,33 @@ namespace Fig
             return reg;
         }
 
+        // 发射一条跳转指令，并返回它在代码数组里的绝对索引 (Index)
+        int EmitJump(OpCode op, std::uint8_t aReg = 0)
+        {
+            // 预填 0
+            Emit(Op::iAsBx(op, aReg, 0));
+            return current->proto->code.size() - 1;
+        }
+
+        // 填真实偏移量到那条指令里
+        void PatchJump(int instructionIndex)
+        {
+            // 目标地址就是当前代码数组的末尾
+            int target = current->proto->code.size();
+
+            // 相对偏移量 = 目标地址 - 指令自身所在的地址 - 1
+            // (因为 VM 里的 ip 在取指后会自动 +1，所以偏移要减去 1)
+            int offset = target - instructionIndex - 1;
+
+            if (offset < INT16_MIN || offset > INT16_MAX)
+            {
+                assert(false && "PatchJump: Jump offset exceeds 16-bit signed limit!");
+            }
+            Instruction &inst = current->proto->code[instructionIndex];
+            inst              = (inst & 0x0000FFFF)
+                   | (static_cast<Instruction>(static_cast<std::uint16_t>(offset)) << 16);
+        }
+
         SourceLocation makeSourceLocation(AstNode *node)
         {
             SourceLocation location = node->location; // copy
@@ -232,14 +264,19 @@ namespace Fig
         Result<std::uint8_t, Error> CompileIdentiExpr(IdentiExpr *);
         Result<std::uint8_t, Error> CompileLiteral(LiteralExpr *);
 
-        Result<std::uint8_t, Error> CompileAssignment(InfixExpr *); // 编译赋值，由 CompileInfixExpr调用
+        Result<std::uint8_t, Error> CompileAssignment(
+            InfixExpr *); // 编译赋值，由 CompileInfixExpr调用
         Result<std::uint8_t, Error> CompileInfixExpr(InfixExpr *);
 
-        Result<std::uint8_t, Error> CompileLeftValue(Expr *); // 左值对象，可以是变量、结构体字段或模块对象
+        Result<std::uint8_t, Error> CompileLeftValue(
+            Expr *); // 左值对象，可以是变量、结构体字段或模块对象
 
         Result<std::uint8_t, Error> CompileExpr(Expr *);
 
+        /* Statements */
         Result<void, Error> CompileVarDecl(VarDecl *);
+        Result<void, Error> CompileBlockStmt(BlockStmt *);
+        Result<void, Error> CompileIfStmt(IfStmt *);
         Result<void, Error> CompileStmt(Stmt *);
     };
 
@@ -270,6 +307,15 @@ namespace Fig
                 std::cout << std::format("R{:<3} K[{}]", a, bx);
                 break;
             }
+
+            case OpCode::Jmp:
+            case OpCode::JmpIfFalse: {
+                // iAsBx
+                std::int16_t sbx = static_cast<std::uint16_t>(inst >> 16);
+                std::cout << std::format("R{:<3} [{}]", a, sbx);
+                break;
+            }
+
             case OpCode::Add:
             case OpCode::Sub:
             case OpCode::Mul:

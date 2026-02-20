@@ -94,6 +94,7 @@ namespace Fig
             }
             if (!match(TokenType::RightParen))
             {
+                delete *result;
                 return std::unexpected(Error(ErrorType::SyntaxError,
                     "unclosed parenthese in if condition",
                     "insert `)`",
@@ -155,6 +156,7 @@ namespace Fig
                     state = State::ParsingIf;
                     if (!match(TokenType::RightParen))
                     {
+                        delete *result;
                         return std::unexpected(Error(ErrorType::SyntaxError,
                             "unclosed parenthese in if condition",
                             "insert `)`",

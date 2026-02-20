@@ -54,6 +54,10 @@ namespace Fig
         {
             return (inst >> 24) & 0xFF;
         }
+        inline std::int16_t decodeSBx(Instruction inst)
+        {
+            return static_cast<std::int16_t>(inst >> 16);
+        }
 
     public:
         // 执行入口：接收 Proto

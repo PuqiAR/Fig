@@ -20,7 +20,8 @@ namespace Fig
         }
         return ResolveLocal(ie->name);
     }
-    Result<std::uint8_t, Error> Compiler::CompileLiteral(LiteralExpr *lit) // 编译字面量, 负责转换 token -> Value
+    Result<std::uint8_t, Error> Compiler::CompileLiteral(
+        LiteralExpr *lit) // 编译字面量, 负责转换 token -> Value
     {
         const Token &token  = lit->token;
         String       lexeme = manager.GetSub(token.index, token.length);
@@ -56,9 +57,10 @@ namespace Fig
             std::int32_t i = std::stoi(lexeme.toStdString());
             v              = Value::FromInt(i);
         }
-
-        assert("false" && "CompileLiteral: unsupport literal");
-        v = Value::GetNullInstance();
+        else
+        {
+            assert("false" && "CompileLiteral: unsupport literal");
+        }
 
         std::uint8_t  targetReg = AllocReg();
         std::uint16_t kIndex    = AddConstant(v);
@@ -66,7 +68,8 @@ namespace Fig
         Emit(Op::iABx(OpCode::LoadK, targetReg, kIndex));
         return targetReg;
     }
-    Result<std::uint8_t, Error> Compiler::CompileAssignment(InfixExpr *infix) // 编译赋值，由 CompileInfixExpr调用
+    Result<std::uint8_t, Error> Compiler::CompileAssignment(
+        InfixExpr *infix) // 编译赋值，由 CompileInfixExpr调用
     {
         // op必须为 =
         const auto &_lhsReg = CompileLeftValue(infix->left); // 必须为左值对象
@@ -172,7 +175,8 @@ namespace Fig
         }
         return resultReg;
     }
-    Result<std::uint8_t, Error> Compiler::CompileLeftValue(Expr *expr) // 左值对象，可以是变量、结构体字段或模块对象
+    Result<std::uint8_t, Error> Compiler::CompileLeftValue(
+        Expr *expr) // 左值对象，可以是变量、结构体字段或模块对象
     {
         switch (expr->type)
         {
@@ -185,7 +189,8 @@ namespace Fig
                     makeSourceLocation(expr)));
         }
     }
-    Result<std::uint8_t, Error> Compiler::CompileExpr(Expr *expr) // 编译表达式，必定返回一个存放结果的寄存器 ID
+    Result<std::uint8_t, Error> Compiler::CompileExpr(
+        Expr *expr) // 编译表达式，必定返回一个存放结果的寄存器 ID
     {
         switch (expr->type)
         {
@@ -204,7 +209,7 @@ namespace Fig
                 {
                     return std::unexpected(result.error());
                 }
-                std::uint8_t  targetReg = *result;
+                std::uint8_t targetReg = *result;
                 return targetReg;
             }
             case AstType::InfixExpr: {

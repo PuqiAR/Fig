@@ -42,6 +42,7 @@ namespace Fig
         SourceLocation location;
 
         virtual String toString() const = 0;
+        virtual ~AstNode(){};
     };
 
     struct Program;

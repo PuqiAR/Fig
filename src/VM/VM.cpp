@@ -89,9 +89,31 @@ namespace Fig
                 case OpCode::Exit: {
                     return Value::GetNullInstance();
                 }
+
                 case OpCode::LoadK: {
                     std::uint16_t bx = decodeBx(inst);
                     registers[a]     = k[bx]; // constants
+                    break;
+                }
+
+                case OpCode::Return: {
+                    return registers[a];
+                }
+
+                case OpCode::Jmp: {
+                    std::int16_t sbx = decodeSBx(inst);
+                    ip += sbx;
+                    break;
+                }
+
+                case OpCode::JmpIfFalse: {
+                    Value &v = registers[a];
+                    bool cond = v.AsBool(); // 条件类型 Compiler检查
+                    if (!cond)
+                    {
+                        std::int16_t sbx = decodeSBx(inst);
+                        ip += sbx;
+                    }
                     break;
                 }
 
@@ -113,9 +135,6 @@ namespace Fig
                 BINARY_COMPARE_OP(GreaterEqual, >=);
                 BINARY_COMPARE_OP(LessEqual, <=);
 
-                case OpCode::Return: {
-                    return registers[a];
-                }
 
                 default: {
                     assert(false && "VM: Unknown OpCode encountered!");
