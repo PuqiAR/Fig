@@ -11,13 +11,13 @@ namespace Fig
 {
     Result<std::uint8_t, Error> Compiler::CompileIdentiExpr(IdentiExpr *ie)
     {
-        if (!HasLocal(ie->name))
-        {
-            return std::unexpected(Error(ErrorType::UseUndeclaredIdentifier,
-                std::format("`{}` has not been defined", ie->name),
-                "none",
-                makeSourceLocation(ie)));
-        }
+        // if (!HasLocal(ie->name))
+        // {
+        //     return std::unexpected(Error(ErrorType::UseUndeclaredIdentifier,
+        //         std::format("`{}` has not been defined", ie->name),
+        //         "none",
+        //         makeSourceLocation(ie)));
+        // }
         return ResolveLocal(ie->name);
     }
     Result<std::uint8_t, Error> Compiler::CompileLiteral(

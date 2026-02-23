@@ -100,6 +100,11 @@ namespace Fig
             return source;
         }
 
+        String &GetSource()
+        {
+            return source;
+        }
+
         std::pair<size_t, size_t> GetLineColumn(size_t index) const
         {
             if (lineStartIndex.empty())
@@ -129,6 +134,13 @@ namespace Fig
 
             size_t column = index - lineStartIndex[line] + 1;
             return {line + 1, column};
+        }
+
+        void LoadFromMemory(String src)
+        {
+            source = std::move(src);
+            read = true;
+            preprocessLineIndices();
         }
     };
 }; // namespace Fig

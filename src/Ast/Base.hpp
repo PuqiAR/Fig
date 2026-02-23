@@ -9,6 +9,8 @@
 #include <Core/SourceLocations.hpp>
 #include <Deps/Deps.hpp>
 
+#include <Sema/Type.hpp>
+
 #include <cstdint>
 
 namespace Fig
@@ -49,6 +51,10 @@ namespace Fig
 
     struct Expr : public AstNode
     {
+        TypeTag resolvedType = TypeTag::Any;
+        // TODO: 可选的常量折叠
+        // 拓展 isConstExpr和 constValue槽位
+
         Expr()
         {
             type = AstType::Expr;

@@ -23,6 +23,7 @@ namespace Fig
 
         IndexExpr(Expr *_base, Expr *_index) : base(_base), index(_index)
         {
+            type = AstType::IndexExpr;
             location = base->location;
         }
 

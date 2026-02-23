@@ -12,13 +12,13 @@ namespace Fig
     Result<void, Error> Compiler::CompileVarDecl(VarDecl *varDecl)
     {
         const String &name = varDecl->name;
-        if (HasLocalInCurrentScope(name))
-        {
-            return std::unexpected(Error(ErrorType::RedeclarationError,
-                std::format("variable `{}` has already defined in this scope", name),
-                "change its name",
-                makeSourceLocation(varDecl)));
-        }
+        // if (HasLocalInCurrentScope(name))
+        // {
+        //     return std::unexpected(Error(ErrorType::RedeclarationError,
+        //         std::format("variable `{}` has already defined in this scope", name),
+        //         "change its name",
+        //         makeSourceLocation(varDecl)));
+        // }
         std::uint8_t varReg;
         if (varDecl->initExpr)
         {

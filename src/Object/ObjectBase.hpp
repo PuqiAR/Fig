@@ -165,12 +165,12 @@ namespace Fig
         // 让 VM 的 OP_EQ 指令极简：`if (RA == RB)`
         [[nodiscard]] constexpr bool operator==(const Value &other) const
         {
-            // IEEE 754 规定浮点数有 +0.0 == -0.0 的特殊规则
+            // IEEE 754 规定浮点数有 +0.0 == -0.0 的特殊规则，所以不直接比对raw bits而是转换成 double进行C++比对
             if (IsDouble() && other.IsDouble())
             {
                 return AsDouble() == other.AsDouble();
             }
-            // 直接比较 64 位整数内存
+            // 直接比较 64 位整数内存，所以堆对象比较为地址(运算符重载由Compiler处理)
             return v_ == other.v_;
         }
 

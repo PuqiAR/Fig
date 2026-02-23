@@ -55,6 +55,7 @@ namespace Fig
             case RedeclarationError: return "RedeclarationError";
             case UseUndeclaredIdentifier: return "UseUndeclaredIdentifier";
             case NotAnLvalue: return "NotAnLvalue";
+            case TypeError: return "TypeError";
                 // default: return "Some one forgot to add case to `ErrorTypeToString`";
         }
     }

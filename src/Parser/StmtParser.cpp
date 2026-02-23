@@ -52,7 +52,7 @@ namespace Fig
         Expr *typeSpeicifer = nullptr;
         if (match(TokenType::Colon)) // `:`
         {
-            const auto &result = parseExpression(0, TokenType::Assign);
+            const auto &result = parseExpression(0, TokenType::Assign, TokenType::Walrus);
             if (!result)
             {
                 return std::unexpected(result.error());
@@ -61,6 +61,7 @@ namespace Fig
         }
 
         Expr *initExpr = nullptr;
+        bool isInfer = false;
         if (match(TokenType::Assign))
         {
             const auto &result = parseExpression();
@@ -70,11 +71,30 @@ namespace Fig
             }
             initExpr = *result;
         }
+        else if (match(TokenType::Walrus)) // :=
+        {
+            if (typeSpeicifer) // 指定了类型同时使用 := 
+            {
+                return std::unexpected(Error(
+                    ErrorType::SyntaxError,
+                    "used type infer but specifying the type",
+                    "change `:=` to '='",
+                    makeSourceLocation(prevToken()) // :=
+                ));
+            }
+            const auto &result = parseExpression();
+            if (!result)
+            {
+                return std::unexpected(result.error());
+            }
+            initExpr = *result;
+            isInfer = true; // 使用类型自动推断 :=
+        }
         if (!match(TokenType::Semicolon))
         {
-            makeExpectSemicolonError();
+            return std::unexpected(makeExpectSemicolonError());
         }
-        VarDecl *varDecl = new VarDecl(isPublic, name, typeSpeicifer, initExpr, location);
+        VarDecl *varDecl = new VarDecl(isPublic, name, typeSpeicifer, isInfer, initExpr, location);
         return varDecl;
     }
 
@@ -237,7 +257,11 @@ namespace Fig
             return parseIfStmt();
         }
 
-        const auto &expr_result = parseExpression(0);
+        if (isEOF)
+        {
+            return nullptr;
+        }
+        const auto &expr_result = parseExpression();
         if (!expr_result)
         {
             return std::unexpected(expr_result.error());

@@ -64,7 +64,7 @@ namespace Fig
         String value;                  // 用于判断是标识符还是关键字
         value.push_back(rd.produce()); // 加入第一个
 
-        while (CharUtils::isIdentifierContinue(rd.current())) // continue: _ / 0-9 / aA - zZ
+        while (!rd.isAtEnd() && CharUtils::isIdentifierContinue(rd.current())) // continue: _ / 0-9 / aA - zZ
         {
             tok.length++;
             value.push_back(rd.produce());

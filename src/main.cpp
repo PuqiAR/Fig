@@ -4,6 +4,7 @@
 #include <Lexer/Lexer.hpp>
 #include <Parser/Parser.hpp>
 #include <SourceManager/SourceManager.hpp>
+#include <Sema/Analyzer.hpp>
 #include <VM/VM.hpp>
 
 #include <iostream>
@@ -36,6 +37,16 @@ int main()
         return 1;
     }
     Program *program = *program_result;
+
+    Analyzer analyzer(manager);
+    const auto &analyzeResult = analyzer.Analyze(program);
+    if (!analyzeResult)
+    {
+        ReportError(analyzeResult.error(), manager);
+        return 1;
+    }
+    std::cout << "analyzer: Program OK, PASSED\n";
+
 
     Compiler    compiler(fileName, manager);
     const auto &proto_result = compiler.Compile(program);

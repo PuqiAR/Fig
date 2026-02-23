@@ -16,6 +16,10 @@ namespace Fig
     {
         String name;
         
+        // Analyzer槽位，存储具体深度
+        int resolvedDepth = -1; // 代表未解析
+        bool isGlobal = false; // 是否全局/对外公开 (isPublic)
+
         IdentiExpr()
         {
             type = AstType::IdentiExpr;

@@ -20,7 +20,12 @@ namespace Fig
             {
                 return std::unexpected(result.error());
             }
-            program->nodes.push_back(*result);
+            Stmt *stmt = *result;
+            if (!stmt)
+            {
+                continue;
+            }
+            program->nodes.push_back(stmt);
         }
         return program;
     }
