@@ -13,15 +13,15 @@ namespace Fig
     {
         state                      = State::ParsingLiteralExpr;
         const Token &literal_token = consumeToken();
-        LiteralExpr *node          = new LiteralExpr(literal_token, makeSourceLocation(literal_token));
+        LiteralExpr *node = new LiteralExpr(literal_token, makeSourceLocation(literal_token));
         return node;
     }
     Result<IdentiExpr *, Error> Parser::parseIdentiExpr() // 当前token为Identifier调用
     {
         state                   = State::ParsingIdentiExpr;
         const Token &identifier = consumeToken();
-        IdentiExpr  *node =
-            new IdentiExpr(srcManager.GetSub(identifier.index, identifier.length), makeSourceLocation(identifier));
+        IdentiExpr  *node       = new IdentiExpr(
+            srcManager.GetSub(identifier.index, identifier.length), makeSourceLocation(identifier));
         return node;
     }
 
@@ -61,7 +61,8 @@ namespace Fig
         return node;
     }
 
-    Result<IndexExpr *, Error> Parser::parseIndexExpr(Expr *base) // 由 parseExpression调用, 当前token为 `[`
+    Result<IndexExpr *, Error> Parser::parseIndexExpr(
+        Expr *base) // 由 parseExpression调用, 当前token为 `[`
     {
         state                       = State::ParsingIndexExpr;
         const Token &lbracket_token = consumeToken(); // consume `[`
@@ -74,8 +75,10 @@ namespace Fig
 
         if (currentToken().type != TokenType::RightBracket) // `]`
         {
-            return std::unexpected(
-                Error(ErrorType::SyntaxError, "unclosed brackets", "insert `]`", makeSourceLocation(lbracket_token)));
+            return std::unexpected(Error(ErrorType::SyntaxError,
+                "unclosed brackets",
+                "insert `]`",
+                makeSourceLocation(lbracket_token)));
         }
         consumeToken(); // consume `]`
 
@@ -83,7 +86,8 @@ namespace Fig
         return indexExpr;
     }
 
-    Result<CallExpr *, Error> Parser::parseCallExpr(Expr *callee) // 由 parseExpression调用, 当前token为 `(`
+    Result<CallExpr *, Error> Parser::parseCallExpr(
+        Expr *callee) // 由 parseExpression调用, 当前token为 `(`
     {
         state                     = State::ParsingCallExpr;
         const Token &lparen_token = consumeToken(); // consume `(`
@@ -133,24 +137,34 @@ namespace Fig
         return new CallExpr(callee, callArgs);
     }
 
-    std::unordered_set<TokenType> Parser::getTerminators()
+    const std::unordered_set<TokenType> &Parser::getBaseTerminators()
     {
-        /*
-
-        Syntax terminators:
-            ;  )  ]  }  ,  EOF
-
-        */
         static const std::unordered_set<TokenType> baseTerminators = {TokenType::Semicolon,
             TokenType::RightParen,
             TokenType::RightBracket,
             TokenType::RightBrace,
             TokenType::Comma,
-            TokenType::EndOfFile
-
-        };
+            TokenType::EndOfFile};
         return baseTerminators;
     }
+
+    std::unordered_set<TokenType> &Parser::getTerminators()
+    {
+        /*
+
+        Syntax terminators:
+            ;  )  ]  }  ,  EOF
+        */
+
+        static std::unordered_set<TokenType> terminators(getBaseTerminators());
+        return terminators;
+    }
+
+    void Parser::resetTermintors()
+    {
+        getTerminators() = getBaseTerminators();
+    }
+
     bool Parser::shouldTerminate()
     {
         const Token &token       = currentToken();
@@ -160,6 +174,15 @@ namespace Fig
 
     Result<Expr *, Error> Parser::parseExpression(BindingPower rbp, TokenType stop, TokenType stop2)
     {
+        if (!getTerminators().contains(stop))
+        {
+            getTerminators().insert(stop);
+        }
+        if (!getTerminators().contains(stop2))
+        {
+            getTerminators().insert(stop2);
+        }
+
         Expr *lhs   = nullptr;
         Token token = currentToken();
 
@@ -168,6 +191,7 @@ namespace Fig
             const auto &lhs_result = parseIdentiExpr();
             if (!lhs_result)
             {
+                resetTermintors();
                 return std::unexpected(lhs_result.error());
             }
             lhs = *lhs_result;
@@ -177,6 +201,7 @@ namespace Fig
             const auto &lhs_result = parseLiteralExpr();
             if (!lhs_result)
             {
+                resetTermintors();
                 return std::unexpected(lhs_result.error());
             }
             lhs = *lhs_result;
@@ -186,6 +211,7 @@ namespace Fig
             const auto &lhs_result = parsePrefixExpr();
             if (!lhs_result)
             {
+                resetTermintors();
                 return std::unexpected(lhs_result.error());
             }
             lhs = *lhs_result;
@@ -196,19 +222,23 @@ namespace Fig
             const auto  &expr_result  = parseExpression(0);
             if (!expr_result)
             {
+                resetTermintors();
                 return expr_result;
             }
             const Token &rparen_token = consumeToken(); // consume `)`
             if (rparen_token.type != TokenType::RightParen)
             {
-                return std::unexpected(Error(
-                    ErrorType::SyntaxError, "unclosed parenthese", "insert `)`", makeSourceLocation(lparen_token)));
+                return std::unexpected(Error(ErrorType::SyntaxError,
+                    "unclosed parenthese",
+                    "insert `)`",
+                    makeSourceLocation(lparen_token)));
             }
             lhs = *expr_result;
         }
 
         if (!lhs)
         {
+            resetTermintors();
             return std::unexpected(Error(ErrorType::ExpectedExpression,
                 "expected expression",
                 "insert expressions",
@@ -241,6 +271,7 @@ namespace Fig
                 const auto &result = parseInfixExpr(lhs);
                 if (!result)
                 {
+                    resetTermintors();
                     return result;
                 }
                 lhs = *result;
@@ -252,6 +283,7 @@ namespace Fig
                 const auto &expr_result = parseIndexExpr(lhs);
                 if (!expr_result)
                 {
+                    resetTermintors();
                     return expr_result;
                 }
                 lhs = *expr_result;
@@ -261,6 +293,7 @@ namespace Fig
                 const auto &expr_result = parseCallExpr(lhs);
                 if (!expr_result)
                 {
+                    resetTermintors();
                     return expr_result;
                 }
                 lhs = *expr_result;

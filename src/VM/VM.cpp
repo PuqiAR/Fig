@@ -86,7 +86,7 @@ namespace Fig
             std::uint8_t a  = decodeA(inst);
             switch (op)
             {
-                case OpCode::Exit: {
+                case OpCode::Exit: { [[unlikely]]
                     return Value::GetNullInstance();
                 }
 

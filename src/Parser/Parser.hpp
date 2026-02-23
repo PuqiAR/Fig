@@ -188,7 +188,9 @@ namespace Fig
         Result<IndexExpr *, Error> parseIndexExpr(Expr *); // 由 parseExpression调用, 当前token为 `[`
         Result<CallExpr *, Error>  parseCallExpr(Expr *);  // 由 parseExpression调用, 当前token为 `(`
 
-        std::unordered_set<TokenType> getTerminators();  // 返回固定的终止符
+        const std::unordered_set<TokenType> &getBaseTerminators();
+        std::unordered_set<TokenType> &getTerminators();  // 返回固定的终止符
+        void resetTermintors();
         bool                          shouldTerminate(); // 判断是否终结
 
         Result<Expr *, Error> parseExpression(BindingPower = 0, TokenType stop = TokenType::Semicolon, TokenType stop2 = TokenType::Semicolon);
