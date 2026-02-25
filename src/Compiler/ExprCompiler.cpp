@@ -54,8 +54,11 @@ namespace Fig
                 double d = std::stod(lexeme.toStdString());
                 v        = Value::FromDouble(d);
             }
-            std::int32_t i = std::stoi(lexeme.toStdString());
-            v              = Value::FromInt(i);
+            else
+            {
+                std::int32_t i = std::stoi(lexeme.toStdString());
+                v              = Value::FromInt(i);
+            }
         }
         else
         {
