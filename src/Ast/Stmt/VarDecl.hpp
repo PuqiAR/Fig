@@ -19,6 +19,8 @@ namespace Fig
         bool isInfer; // 是否用了 := 类型推断
         Expr  *initExpr;
 
+        int localId = -1;
+
         VarDecl()
         {
             type = AstType::VarDecl;

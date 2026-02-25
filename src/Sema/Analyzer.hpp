@@ -56,6 +56,7 @@ namespace Fig
 
         Result<void, Error> analyzeVarDecl(VarDecl *);
         Result<void, Error> analyzeIfStmt(IfStmt *);
+        Result<void, Error> analyzeWhileStmt(WhileStmt *);
         
         Result<void, Error> analyzeIdentiExpr(IdentiExpr *);
         Result<void, Error> analyzeInfixExpr(InfixExpr *);

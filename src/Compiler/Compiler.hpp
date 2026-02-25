@@ -29,11 +29,13 @@ namespace Fig
 
     struct LocalVar
     {
-        bool         isPublic; // 是否向上级/同级其他域公开
-        String       name;
-        std::uint8_t reg;   // 寄存器(相对 frame base 的寄存器 id)
-        int          depth; // 作用域深度
+        int          localId; // AST 传来的纯数字 ID
+        std::uint8_t reg;     // 分配到的物理寄存器 ID
+        int          depth;   // 物理作用域深度(用于 EndScope 释放寄存器)
     };
+
+    static constexpr int MAX_LOCALS = 250;
+    static constexpr int MAX_CONSTANTS = UINT16_MAX;
 
     // 任何跨函数、跨模块的编译，都压入弹出这个 State
     struct FuncState
@@ -46,9 +48,12 @@ namespace Fig
         int                scopeDepth = 0;
         DynArray<LocalVar> locals;
 
+        std::uint8_t fastRegMap[UINT8_MAX + 1]; // 256, 索引 = localId, 值 = 寄存器 id
+
         FuncState(String _name, FuncState *enc = nullptr) : name(std::move(_name)), enclosing(enc)
         {
             proto = new Proto();
+            std::fill_n(fastRegMap, 256, UINT8_MAX); // 255代表未分配
         }
         // 注意：这里不 delete proto，因为 proto 是要作为编译产物吐出去的
     };
@@ -100,7 +105,7 @@ namespace Fig
 
         std::uint8_t AllocReg()
         {
-            if (current->freeReg >= 250)
+            if (current->freeReg >= 255)
             {
                 assert(false && "Register overflow!");
             }
@@ -137,6 +142,13 @@ namespace Fig
         std::uint16_t AddConstant(Value v)
         {
             // TODO: 查重
+            auto it =
+                std::find(current->proto->constants.begin(), current->proto->constants.end(), v);
+            if (it != current->proto->constants.end()) 
+            {
+                return std::distance(current->proto->constants.begin(), it);
+            }
+
             current->proto->constants.push_back(v);
             return static_cast<std::uint16_t>(current->proto->constants.size() - 1);
         }
@@ -156,73 +168,18 @@ namespace Fig
             }
         }
 
-        bool HasLocalInCurrentScope(const String &name)
-        {
-            // 逆向查重
-            for (auto it = current->locals.rbegin(); it != current->locals.rend(); ++it)
-            {
-                if (it->depth < current->scopeDepth)
-                    break; // 已经超出了当前深度，提前阻断
-                if (it->name == name)
-                    return true;
-            }
-            return false;
-        }
-
-        bool HasLocal(const String &name)
-        {
-            for (auto it = current->locals.rbegin(); it != current->locals.rend(); ++it)
-            {
-                if (it->name == name)
-                {
-                    if (it->depth == current->scopeDepth)
-                    {
-                        return true; // 同级不管 public直接捕获
-                    }
-                    else if (it->isPublic)
-                    {
-                        return true; // 不同级变量 public才能被捕捉
-                    }
-                }
-            }
-            return false;
-        }
-
-        std::uint8_t ResolveLocal(const String &name)
-        {
-            // 变量遮蔽: 永远先使用同级已有的变量, 所以逆向遍历
-            for (auto it = current->locals.rbegin(); it != current->locals.rend(); ++it)
-            {
-                if (it->name == name)
-                {
-                    if (it->depth < current->scopeDepth && !it->isPublic)
-                    {
-                        assert(
-                            false
-                            && "ResolveLocal: Attempt to access a private variable from an outer scope!");
-                    }
-
-                    return it->reg;
-                }
-            }
-
-            // 如果在本 Frame 没找到，那就是外层函数的变量 (闭包 Upvalue) 或者全局变量 (Global)。
-            assert(
-                false
-                && "ResolveLocal: Variable not found in current frame (Upvalue/Global not implemented yet)!");
-            return UINT8_MAX;
-        }
-
-        std::uint8_t DeclareLocal(bool isPublic, const String &name)
+        std::uint8_t DeclareLocal(int localId)
         {
             std::uint8_t reg = AllocReg();
-            current->locals.push_back(LocalVar{isPublic, name, reg, current->scopeDepth});
+            current->locals.push_back(LocalVar{localId, reg, current->scopeDepth});
+            current->fastRegMap[localId] = reg;
             return reg;
         }
 
-        std::uint8_t DeclareLocal(bool isPublic, const String &name, std::uint8_t reg)
+        std::uint8_t DeclareLocal(int localId, std::uint8_t reg) // 表示复用哪个寄存器
         {
-            current->locals.push_back(LocalVar{isPublic, name, reg, current->scopeDepth});
+            current->locals.push_back(LocalVar{localId, reg, current->scopeDepth});
+            current->fastRegMap[localId] = reg;
             return reg;
         }
 
@@ -261,23 +218,25 @@ namespace Fig
             return location;
         }
 
-        Result<std::uint8_t, Error> CompileIdentiExpr(IdentiExpr *);
-        Result<std::uint8_t, Error> CompileLiteral(LiteralExpr *);
+        Result<std::uint8_t, Error> compileIdentiExpr(IdentiExpr *);
+        Result<std::uint8_t, Error> compileLiteral(LiteralExpr *);
 
-        Result<std::uint8_t, Error> CompileAssignment(
+        Result<std::uint8_t, Error> compileAssignment(
             InfixExpr *); // 编译赋值，由 CompileInfixExpr调用
-        Result<std::uint8_t, Error> CompileInfixExpr(InfixExpr *);
+        Result<std::uint8_t, Error> compileInfixExpr(InfixExpr *);
 
-        Result<std::uint8_t, Error> CompileLeftValue(
+        Result<std::uint8_t, Error> compileLeftValue(
             Expr *); // 左值对象，可以是变量、结构体字段或模块对象
 
-        Result<std::uint8_t, Error> CompileExpr(Expr *);
+        Result<std::uint8_t, Error> compileExpr(Expr *);
 
         /* Statements */
-        Result<void, Error> CompileVarDecl(VarDecl *);
-        Result<void, Error> CompileBlockStmt(BlockStmt *);
-        Result<void, Error> CompileIfStmt(IfStmt *);
-        Result<void, Error> CompileStmt(Stmt *);
+        Result<void, Error> compileVarDecl(VarDecl *);
+        Result<void, Error> compileBlockStmt(BlockStmt *);
+        Result<void, Error> compileIfStmt(IfStmt *);
+        Result<void, Error> compileWhileStmt(WhileStmt *);
+
+        Result<void, Error> compileStmt(Stmt *);
     };
 
     inline void DisassembleInstruction(Instruction inst, std::size_t index)

@@ -41,7 +41,7 @@ namespace Fig
             {
                 return buffer[++index];
             }
-            const auto &result = lexer.NextToken();
+            auto result = lexer.NextToken();
             if (!result)
             {
                 ReportError(result.error(), srcManager);
@@ -82,7 +82,7 @@ namespace Fig
             size_t peekIndex = index + lookahead;
             while (peekIndex >= buffer.size() && !isEOF)
             {
-                const auto &result = lexer.NextToken();
+                auto result = lexer.NextToken();
                 if (!result)
                 {
                     ReportError(result.error(), srcManager);
@@ -121,51 +121,146 @@ namespace Fig
             return false;
         }
 
-        inline Error makeUnexpectTokenError(const String &stmtType, const String &expect, const Token &tokenGot, std::source_location loc = std::source_location::current())
+        inline Error makeUnexpectTokenError(const String &stmtType,
+            const String                                 &expect,
+            const Token                                  &tokenGot,
+            std::source_location                          loc = std::source_location::current())
         {
-            return Error(
-                ErrorType::SyntaxError,
-                std::format("expect '{}' in {}, got `{}`", expect, stmtType, magic_enum::enum_name(tokenGot.type)),
+            return Error(ErrorType::SyntaxError,
+                std::format("expect '{}' in {}, got `{}`",
+                    expect,
+                    stmtType,
+                    magic_enum::enum_name(tokenGot.type)),
                 "none",
                 makeSourceLocation(tokenGot),
-                loc
-            );
+                loc);
         }
 
-        inline Error makeExpectSemicolonError(std::source_location loc = std::source_location::current())
+        inline Error makeExpectSemicolonError(
+            std::source_location loc = std::source_location::current())
         {
-            return Error(
-                ErrorType::SyntaxError,
+            return Error(ErrorType::SyntaxError,
                 "expect ';' after statement",
                 "insert ';'",
                 makeSourceLocation(currentToken()),
-                loc
-            );
+                loc);
         }
 
     public:
-        enum class State : std::uint8_t
+        struct State
         {
-            Standby,
+            enum StateType : std::uint8_t
+            {
+                Standby,
 
-            ParsingLiteralExpr,
-            ParsingIdentiExpr,
+                ParsingLiteralExpr,
+                ParsingIdentiExpr,
 
-            ParsingInfixExpr,
-            ParsingPrefixExpr,
+                ParsingInfixExpr,
+                ParsingPrefixExpr,
 
-            ParsingIndexExpr,
-            ParsingCallExpr,
+                ParsingIndexExpr,
+                ParsingCallExpr,
 
-            ParsingVarDecl,
-            ParsingIf,
+                ParsingVarDecl,
+                ParsingIf,
+                ParsingWhile,
 
-        } state;
+            } type                               = StateType::Standby;
+            std::unordered_set<TokenType> stopAt = {};
+        };
 
+    private:
+        const std::unordered_set<TokenType> &getBaseTerminators()
+        {
+            static const std::unordered_set<TokenType> baseTerminators = {TokenType::Semicolon,
+                TokenType::RightParen,
+                TokenType::RightBracket,
+                TokenType::RightBrace,
+                TokenType::Comma,
+                TokenType::EndOfFile};
+            return baseTerminators;
+        }
+
+        std::unordered_set<TokenType>       &getTerminators() // 返回固定的终止符
+        {
+            /*
+                Syntax terminators:
+                ;  )  ]  }  ,  EOF
+            */
+
+            static std::unordered_set<TokenType> terminators(getBaseTerminators());
+            return terminators;
+        }
+
+        void resetTermintors()
+        {
+            getTerminators() = getBaseTerminators();
+        }
+        bool shouldTerminate() // 判断是否终结
+        {
+            const Token &token       = currentToken();
+            const auto  &terminators = getTerminators();
+
+            if (terminators.contains(token.type))
+            {
+                return true;
+            }
+            for (auto it = stateStack.rbegin(); it < stateStack.rend(); ++it)
+            {
+                if (it->stopAt.contains(token.type))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        DynArray<State> stateStack;
+
+        State &currentState()
+        {
+            return stateStack.back();
+        }
+
+        void pushState(State _state)
+        {
+            stateStack.push_back(std::move(_state));
+        }
+
+        void popState()
+        {
+            if (!stateStack.empty())
+            {
+                stateStack.pop_back();
+            }
+        }
+
+        class StateProtector
+        {
+            Parser *parser;
+
+        public:
+            StateProtector(Parser *p, const State &newState) : parser(p)
+            {
+                parser->pushState(newState);
+            }
+
+            ~StateProtector()
+            {
+                parser->popState();
+            }
+
+            // 禁止拷贝
+            StateProtector(const StateProtector &)            = delete;
+            StateProtector &operator=(const StateProtector &) = delete;
+        };
+
+    public:
         Parser(Lexer &_lexer, SourceManager &_srcManager, String _fileName) :
             lexer(_lexer), srcManager(_srcManager), fileName(std::move(_fileName))
         {
-            state = State::Standby;
+            pushState(State());
         }
 
     private:
@@ -175,33 +270,33 @@ namespace Fig
             return SourceLocation(SourcePosition(line, column, tok.length),
                 fileName,
                 "[internal parser]",
-                magic_enum::enum_name(state).data());
+                magic_enum::enum_name(currentState().type).data());
         }
 
         /* Expressions */
         Result<LiteralExpr *, Error> parseLiteralExpr(); // 当前token为literal时调用
         Result<IdentiExpr *, Error>  parseIdentiExpr();  // 当前token为Identifier调用
 
-        Result<InfixExpr *, Error>  parseInfixExpr(Expr *); // 由 parseExpression递归调用, 当前token为op
-        Result<PrefixExpr *, Error> parsePrefixExpr();      // 由 parseExpression递归调用, 当前token为op
+        Result<InfixExpr *, Error> parseInfixExpr(
+            Expr *);                                   // 由 parseExpression递归调用, 当前token为op
+        Result<PrefixExpr *, Error> parsePrefixExpr(); // 由 parseExpression递归调用, 当前token为op
 
-        Result<IndexExpr *, Error> parseIndexExpr(Expr *); // 由 parseExpression调用, 当前token为 `[`
-        Result<CallExpr *, Error>  parseCallExpr(Expr *);  // 由 parseExpression调用, 当前token为 `(`
+        Result<IndexExpr *, Error> parseIndexExpr(
+            Expr *);                                     // 由 parseExpression调用, 当前token为 `[`
+        Result<CallExpr *, Error> parseCallExpr(Expr *); // 由 parseExpression调用, 当前token为 `(`
 
-        const std::unordered_set<TokenType> &getBaseTerminators();
-        std::unordered_set<TokenType> &getTerminators();  // 返回固定的终止符
-        void resetTermintors();
-        bool                          shouldTerminate(); // 判断是否终结
-
-        Result<Expr *, Error> parseExpression(BindingPower = 0, TokenType stop = TokenType::Semicolon, TokenType stop2 = TokenType::Semicolon);
+        Result<Expr *, Error> parseExpression(BindingPower = 0);
 
         /* Statements */
-        Result<BlockStmt *, Error> parseBlockStmt(); // 当前token为 {
-        Result<VarDecl *, Error> parseVarDecl(bool); // 由 parseStatement调用, 当前token为 var
-        Result<IfStmt *, Error> parseIfStmt(); // 由 parseStatement调用, 当前token is if
-        Result<Stmt *, Error> parseStatement();
+        Result<BlockStmt *, Error> parseBlockStmt();   // 当前token为 {
+        Result<VarDecl *, Error>   parseVarDecl(bool); // 由 parseStatement调用, 当前token为 var
+        Result<IfStmt *, Error>    parseIfStmt();      // 由 parseStatement调用, 当前token为 if
+        Result<WhileStmt *, Error> parseWhileStmt();   // 由 parseStatement调用, 当前token为 while
+        Result<Stmt *, Error>      parseStatement();
 
     public:
         Result<Program *, Error> Parse();
     };
+
+#define SET_STOP_AT(...) currentState().stopAt = {__VA_ARGS__};
 }; // namespace Fig

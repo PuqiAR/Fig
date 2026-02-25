@@ -5,7 +5,6 @@
     @date 2026-02-14
 */
 
-
 #include <Parser/Parser.hpp>
 
 namespace Fig
@@ -15,7 +14,7 @@ namespace Fig
         Program *program = new Program;
         while (!isEOF)
         {
-            const auto &result = parseStatement();
+            auto result = parseStatement();
             if (!result)
             {
                 return std::unexpected(result.error());
@@ -29,4 +28,4 @@ namespace Fig
         }
         return program;
     }
-};
+}; // namespace Fig

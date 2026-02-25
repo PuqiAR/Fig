@@ -1,6 +1,7 @@
 #include <Error/Error.hpp>
-#include <Token/Token.hpp>
 #include <Lexer/Lexer.hpp>
+#include <Token/Token.hpp>
+
 
 #include <iostream>
 
@@ -24,18 +25,18 @@ int main()
 
     while (true)
     {
-        const auto &result = lexer.NextToken();
+        auto result = lexer.NextToken();
         if (!result.has_value())
         {
             ReportError(result.error(), manager);
             break;
         }
-        const Token &token = *result;
+        const Token  &token  = *result;
         const String &lexeme = manager.GetSub(token.index, token.length);
-        const auto &type = magic_enum::enum_name(token.type);
+        const auto   &type   = magic_enum::enum_name(token.type);
         if (token.type == TokenType::EndOfFile)
         {
-            std::cout << "EOF: " << type  << " at " << token.index << '\n';
+            std::cout << "EOF: " << type << " at " << token.index << '\n';
             break;
         }
         std::cout << lexeme << " --> " << type << '\n';

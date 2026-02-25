@@ -9,40 +9,40 @@
 
 namespace Fig
 {
-    Result<void, Error> Compiler::CompileVarDecl(VarDecl *varDecl)
+    Result<void, Error> Compiler::compileVarDecl(VarDecl *varDecl)
     {
-        const String &name = varDecl->name;
-        // if (HasLocalInCurrentScope(name))
-        // {
-        //     return std::unexpected(Error(ErrorType::RedeclarationError,
-        //         std::format("variable `{}` has already defined in this scope", name),
-        //         "change its name",
-        //         makeSourceLocation(varDecl)));
-        // }
+        if (current->freeReg > MAX_LOCALS)
+        {
+            return std::unexpected(Error(ErrorType::TooManyLocals,
+                std::format("local limit exceeded: {}", MAX_LOCALS),
+                "try split function or use arrays/structs...",
+                makeSourceLocation(varDecl)));
+        }
+
         std::uint8_t varReg;
         if (varDecl->initExpr)
         {
-            const auto &result = CompileExpr(varDecl->initExpr);
+            auto result = compileExpr(varDecl->initExpr);
             if (!result)
             {
                 return std::unexpected(result.error());
             }
             std::uint8_t resultReg = *result;
-            varReg                 = resultReg; // 复用临时计算结果寄存器
-            DeclareLocal(varDecl->isPublic, name, varReg);
+            varReg = DeclareLocal(varDecl->localId, resultReg); // 复用临时计算结果寄存器
         }
         else
         {
-            varReg = DeclareLocal(varDecl->isPublic, name);
+            varReg = DeclareLocal(varDecl->localId);
         }
+
         return Result<void, Error>();
     }
 
-    Result<void, Error> Compiler::CompileBlockStmt(BlockStmt *blockStmt)
+    Result<void, Error> Compiler::compileBlockStmt(BlockStmt *blockStmt)
     {
         for (Stmt *stmt : blockStmt->nodes)
         {
-            const auto &result = CompileStmt(stmt);
+            auto result = compileStmt(stmt);
             if (!result)
             {
                 return result;
@@ -51,7 +51,7 @@ namespace Fig
         return {};
     }
 
-    Result<void, Error> Compiler::CompileIfStmt(IfStmt *stmt)
+    Result<void, Error> Compiler::compileIfStmt(IfStmt *stmt)
     {
         /*
             if cond1
@@ -97,7 +97,7 @@ namespace Fig
 
         */
         std::vector<int> exitJumps; // 所有分支都要跳到最后，收集所有jump最后回填
-        const auto      &condResult = CompileExpr(stmt->cond);
+        const auto      &condResult = compileExpr(stmt->cond);
         if (!condResult)
         {
             return std::unexpected(condResult.error());
@@ -106,7 +106,7 @@ namespace Fig
         int          jumpToNext = EmitJump(OpCode::JmpIfFalse, condReg);
         FreeReg(condReg);
 
-        const auto &blockResult = CompileStmt(stmt->consequent);
+        const auto &blockResult = compileStmt(stmt->consequent);
         if (!blockResult)
         {
             return blockResult;
@@ -117,7 +117,7 @@ namespace Fig
 
         for (auto *elif : stmt->elifs)
         {
-            const auto &elifCondResult = CompileExpr(elif->cond);
+            const auto &elifCondResult = compileExpr(elif->cond);
             if (!elifCondResult)
                 return std::unexpected(elifCondResult.error());
             std::uint8_t elifCondReg = *elifCondResult;
@@ -125,7 +125,7 @@ namespace Fig
             jumpToNext = EmitJump(OpCode::JmpIfFalse, elifCondReg);
             FreeReg(elifCondReg);
 
-            const auto &blockResult = CompileStmt(elif->consequent);
+            const auto &blockResult = compileStmt(elif->consequent);
             if (!blockResult)
             {
                 return blockResult;
@@ -136,7 +136,7 @@ namespace Fig
 
         if (stmt->alternate)
         {
-            const auto &result = CompileStmt(stmt->alternate);
+            auto result = compileStmt(stmt->alternate);
             if (!result)
             {
                 return result;
@@ -148,31 +148,65 @@ namespace Fig
         }
         return {};
     }
-    Result<void, Error> Compiler::CompileStmt(Stmt *stmt) // 编译语句
+
+    Result<void, Error> Compiler::compileWhileStmt(WhileStmt *stmt)
     {
-        if (stmt->type == AstType::ExprStmt)
+        int beginIns = current->proto->code.size() - 1;
+
+        auto condRegResult = compileExpr(stmt->cond);
+        if (!condRegResult)
         {
-            ExprStmt   *exprStmt = static_cast<ExprStmt *>(stmt);
-            Expr       *expr     = exprStmt->expr;
-            const auto &result   = CompileExpr(expr);
-            if (!result)
-            {
-                return std::unexpected(result.error());
+            return std::unexpected(condRegResult.error());
+        }
+
+        std::uint8_t condReg = *condRegResult;
+
+        int  exitJump   = EmitJump(OpCode::JmpIfFalse, condReg);
+        auto bodyResult = compileBlockStmt(stmt->body);
+
+        if (!bodyResult)
+        {
+            return bodyResult;
+        }
+        Emit(Op::iAsBx(
+            OpCode::Jmp, 0, beginIns - current->proto->code.size())); // 回到开头对condition求值
+        PatchJump(exitJump);
+        return {};
+    }
+
+    Result<void, Error> Compiler::compileStmt(Stmt *stmt) // 编译语句
+    {
+        switch (stmt->type)
+        {
+            case AstType::ExprStmt: {
+                ExprStmt *exprStmt = static_cast<ExprStmt *>(stmt);
+                Expr     *expr     = exprStmt->expr;
+                auto      result   = compileExpr(expr);
+                if (!result)
+                {
+                    return std::unexpected(result.error());
+                }
+                FreeReg(*result);
+                break;
             }
-            FreeReg(*result);
+
+            case AstType::VarDecl: {
+                return compileVarDecl(static_cast<VarDecl *>(stmt));
+            }
+
+            case AstType::BlockStmt: {
+                return compileBlockStmt(static_cast<BlockStmt *>(stmt));
+            }
+
+            case AstType::IfStmt: {
+                return compileIfStmt(static_cast<IfStmt *>(stmt));
+            }
+
+            case AstType::WhileStmt: {
+                return compileWhileStmt(static_cast<WhileStmt *>(stmt));
+            }
         }
-        else if (stmt->type == AstType::VarDecl)
-        {
-            return CompileVarDecl(static_cast<VarDecl *>(stmt));
-        }
-        else if (stmt->type == AstType::BlockStmt)
-        {
-            return CompileBlockStmt(static_cast<BlockStmt *>(stmt));
-        }
-        else if (stmt->type == AstType::IfStmt)
-        {
-            return CompileIfStmt(static_cast<IfStmt *>(stmt));
-        }
+
         return Result<void, Error>();
     }
 }; // namespace Fig

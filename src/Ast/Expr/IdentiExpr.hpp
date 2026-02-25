@@ -16,9 +16,17 @@ namespace Fig
     {
         String name;
         
-        // Analyzer槽位，存储具体深度
-        int resolvedDepth = -1; // 代表未解析
-        bool isGlobal = false; // 是否全局/对外公开 (isPublic)
+        // Analyzer槽位
+
+        // 寻址空间
+        bool isGlobal = false; // 是否全局, 全局变量存哈希/堆
+
+        // 仅 isGlobal = false 有效
+        int resolvedDepth = -1; // 用于获取闭包上值, -1 代表未解析
+
+        // 栈内槽位
+        int localId = -1; // 局部变量id, -1 未解析
+
 
         IdentiExpr()
         {

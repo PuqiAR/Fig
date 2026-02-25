@@ -24,10 +24,10 @@ int main()
         return 1;
     }
 
-    Lexer lexer(manager.GetSource(), fileName);
+    Lexer  lexer(manager.GetSource(), fileName);
     Parser parser(lexer, manager, fileName);
 
-    const auto &result = parser.Parse();
+    auto result = parser.Parse();
     if (!result)
     {
         ReportError(result.error(), manager);

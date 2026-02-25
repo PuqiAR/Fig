@@ -19,14 +19,14 @@ namespace Fig
             {
                 return std::unexpected(Error(ErrorType::SyntaxError,
                     "unclosed braces in block stmt",
-                    "insert `}`",
+                    "insert '}'",
                     location));
             }
             if (match(TokenType::RightBrace))
             {
                 break;
             }
-            const auto &result = parseStatement();
+            auto result = parseStatement();
             if (!result)
             {
                 return std::unexpected(result.error());
@@ -38,7 +38,7 @@ namespace Fig
     Result<VarDecl *, Error> Parser::parseVarDecl(
         bool isPublic) // 由 parseStatement调用, 当前token为 var
     {
-        state = State::ParsingVarDecl;
+        StateProtector p(this, {State::ParsingVarDecl});
 
         SourceLocation location = makeSourceLocation(consumeToken()); // consume `var`
 
@@ -52,7 +52,8 @@ namespace Fig
         Expr *typeSpeicifer = nullptr;
         if (match(TokenType::Colon)) // `:`
         {
-            const auto &result = parseExpression(0, TokenType::Assign, TokenType::Walrus);
+            SET_STOP_AT(TokenType::Walrus, TokenType::Assign);
+            auto result = parseExpression(0);
             if (!result)
             {
                 return std::unexpected(result.error());
@@ -61,10 +62,10 @@ namespace Fig
         }
 
         Expr *initExpr = nullptr;
-        bool isInfer = false;
+        bool  isInfer  = false;
         if (match(TokenType::Assign))
         {
-            const auto &result = parseExpression();
+            auto result = parseExpression();
             if (!result)
             {
                 return std::unexpected(result.error());
@@ -73,22 +74,21 @@ namespace Fig
         }
         else if (match(TokenType::Walrus)) // :=
         {
-            if (typeSpeicifer) // 指定了类型同时使用 := 
+            if (typeSpeicifer) // 指定了类型同时使用 :=
             {
-                return std::unexpected(Error(
-                    ErrorType::SyntaxError,
+                return std::unexpected(Error(ErrorType::SyntaxError,
                     "used type infer but specifying the type",
                     "change `:=` to '='",
                     makeSourceLocation(prevToken()) // :=
-                ));
+                    ));
             }
-            const auto &result = parseExpression();
+            auto result = parseExpression();
             if (!result)
             {
                 return std::unexpected(result.error());
             }
             initExpr = *result;
-            isInfer = true; // 使用类型自动推断 :=
+            isInfer  = true; // 使用类型自动推断 :=
         }
         if (!match(TokenType::Semicolon))
         {
@@ -100,14 +100,16 @@ namespace Fig
 
     Result<IfStmt *, Error> Parser::parseIfStmt() // 由 parseStatement调用, 当前token is if
     {
-        state                   = State::ParsingIf;
+        StateProtector p(this, {State::ParsingIf});
+
         SourceLocation location = makeSourceLocation(consumeToken()); // consume `if`
 
         Expr *cond = nullptr;
         if (match(TokenType::LeftParen)) // match and consume `(`
         {
             const Token &lpToken = prevToken();
-            const auto  &result  = parseExpression(0, TokenType::RightParen, TokenType::LeftBrace);
+            SET_STOP_AT(TokenType::RightParen, TokenType::LeftBrace);
+            const auto &result = parseExpression(0);
             if (!result)
             {
                 return std::unexpected(result.error());
@@ -124,21 +126,21 @@ namespace Fig
         }
         else
         {
-            const auto &result = parseExpression(0, TokenType::LeftBrace);
+            SET_STOP_AT(TokenType::LeftBrace);
+            auto result = parseExpression(0);
             if (!result)
             {
                 return std::unexpected(result.error());
             }
             cond = *result;
         }
-        state = State::ParsingIf;
 
         if (currentToken().type != TokenType::LeftBrace)
         {
             return std::unexpected(
                 makeUnexpectTokenError("IfStmt", "LeftBrace `{`", currentToken()));
         }
-        const auto &result = parseBlockStmt();
+        auto result = parseBlockStmt();
         if (!result)
         {
             return std::unexpected(result.error());
@@ -167,13 +169,13 @@ namespace Fig
                 if (match(TokenType::LeftParen)) // `(`
                 {
                     const Token &lpToken = prevToken();
-                    const auto  &result =
-                        parseExpression(0, TokenType::RightParen, TokenType::LeftBrace);
+
+                    SET_STOP_AT(TokenType::RightParen, TokenType::LeftBrace);
+                    const auto &result = parseExpression(0);
                     if (!result)
                     {
                         return std::unexpected(result.error());
                     }
-                    state = State::ParsingIf;
                     if (!match(TokenType::RightParen))
                     {
                         delete *result;
@@ -186,25 +188,24 @@ namespace Fig
                 }
                 else
                 {
-                    const auto &result = parseExpression(0, TokenType::LeftBrace);
+                    SET_STOP_AT(TokenType::LeftBrace);
+                    auto result = parseExpression(0);
                     if (!result)
                     {
                         return std::unexpected(result.error());
                     }
-                    state = State::ParsingIf;
-                    cond  = *result;
+                    cond = *result;
                 }
                 if (currentToken().type != TokenType::LeftBrace)
                 {
                     return std::unexpected(
                         makeUnexpectTokenError("ElseIfStmt", "LeftBrace `{`", currentToken()));
                 }
-                const auto &result = parseBlockStmt();
+                auto result = parseBlockStmt();
                 if (!result)
                 {
                     return std::unexpected(result.error());
                 }
-                state                  = State::ParsingIf;
                 BlockStmt  *consequent = *result;
                 ElseIfStmt *elif       = new ElseIfStmt(cond, consequent, elseLocation);
                 elifs.push_back(elif);
@@ -224,12 +225,11 @@ namespace Fig
                     return std::unexpected(
                         makeUnexpectTokenError("ElseStmt", "LeftBrace `{`", currentToken()));
                 }
-                const auto &result = parseBlockStmt();
+                auto result = parseBlockStmt();
                 if (!result)
                 {
                     return std::unexpected(result.error());
                 }
-                state     = State::ParsingIf;
                 alternate = *result;
             }
         }
@@ -237,9 +237,68 @@ namespace Fig
         return ifStmt;
     }
 
+    Result<WhileStmt *, Error> Parser::parseWhileStmt() // 由 parseStatement调用, 当前token为 while
+    {
+        StateProtector p(this, {State::ParsingWhile});
+
+        SourceLocation location = makeSourceLocation(consumeToken()); // consume `while`
+
+        Expr *cond = nullptr;
+        if (match(TokenType::LeftParen))
+        {
+            const Token &lpToken = prevToken();
+            SET_STOP_AT(TokenType::RightParen, TokenType::LeftBrace);
+
+            auto result = parseExpression();
+            if (!result)
+            {
+                return std::unexpected(result.error());
+            }
+
+            if (!match(TokenType::RightParen))
+            {
+                delete *result;
+                return std::unexpected(Error(ErrorType::SyntaxError,
+                    "unclosed parenthese in while condition",
+                    "insert ')'",
+                    makeSourceLocation(lpToken)));
+            }
+            cond = *result;
+        }
+        else
+        {
+            SET_STOP_AT(TokenType::LeftBrace);
+            auto result = parseExpression();
+            if (!result)
+            {
+                return std::unexpected(result.error());
+            }
+            cond = *result;
+        }
+
+        if (currentToken().type != TokenType::LeftBrace)
+        {
+            delete cond;
+            return std::unexpected(
+                makeUnexpectTokenError("while stmt", "left brace '{'", currentToken()));
+        }
+
+        auto result = parseBlockStmt();
+        if (!result)
+        {
+            delete cond;
+            return std::unexpected(result.error());
+        }
+        BlockStmt *body = *result;
+
+        WhileStmt *whileStmt = new WhileStmt(cond, body, location);
+        return whileStmt;
+    }
+
     Result<Stmt *, Error> Parser::parseStatement()
     {
-        state = State::Standby;
+        StateProtector p(this, {State::Standby});
+
         if (currentToken().type == TokenType::Public)
         {
             consumeToken(); // consume `public`
@@ -247,20 +306,38 @@ namespace Fig
             {
                 return parseVarDecl(true);
             }
+            else
+            {
+                return std::unexpected(
+                    makeUnexpectTokenError("public", "var/const/func/struct", currentToken()));
+            }
         }
+
+        if (currentToken().type == TokenType::LeftBrace)
+        {
+            return parseBlockStmt();
+        }
+
         if (currentToken().type == TokenType::Variable)
         {
             return parseVarDecl(false);
         }
+
         if (currentToken().type == TokenType::If)
         {
             return parseIfStmt();
+        }
+
+        if (currentToken().type == TokenType::While)
+        {
+            return parseWhileStmt();
         }
 
         if (isEOF)
         {
             return nullptr;
         }
+        
         const auto &expr_result = parseExpression();
         if (!expr_result)
         {

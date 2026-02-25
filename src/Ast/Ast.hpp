@@ -17,3 +17,4 @@
 #include <Ast/Stmt/ExprStmt.hpp>
 #include <Ast/Stmt/IfStmt.hpp>
 #include <Ast/Stmt/VarDecl.hpp>
+#include <Ast/Stmt/WhileStmt.hpp>

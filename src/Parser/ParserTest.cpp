@@ -16,9 +16,9 @@ int main()
         return 1;
     }
 
-    Lexer lexer(source, fileName);
+    Lexer  lexer(source, fileName);
     Parser parser(lexer, srcManager, fileName);
-    const auto &result = parser.Parse();
+    auto   result = parser.Parse();
     if (!result)
     {
         ReportError(result.error(), srcManager);

@@ -101,7 +101,7 @@ target("LSP")
 
     add_files("src/Sema/Analyzer.cpp")
 
-    add_files("src/LSP/FigLSPServer.cpp")
+    add_files("src/LSP/LSPServer.cpp")
 
     set_filename("Fig-LSP")
 

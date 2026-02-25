@@ -56,6 +56,9 @@ namespace Fig
             case UseUndeclaredIdentifier: return "UseUndeclaredIdentifier";
             case NotAnLvalue: return "NotAnLvalue";
             case TypeError: return "TypeError";
+
+            case TooManyLocals: return "TooManyLocals";
+            case TooManyConstants: return "TooManyConstants";
                 // default: return "Some one forgot to add case to `ErrorTypeToString`";
         }
     }

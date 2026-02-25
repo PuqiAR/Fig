@@ -36,7 +36,8 @@ namespace Fig
         ExprStmt,   // 表达式语句，如 println(1)
         VarDecl,    // 变量声明
         IfStmt,     // If语句
-        ElseIfStmt, // ElseIf语句，不准悬空
+        ElseIfStmt, // ElseIf语句，不准悬空，平铺式else if
+        WhileStmt,  // while语句
     };
     struct AstNode
     {

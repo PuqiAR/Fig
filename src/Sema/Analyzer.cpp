@@ -11,7 +11,8 @@ namespace Fig
 {
     Result<void, Error> Analyzer::analyzeVarDecl(VarDecl *stmt)
     {
-        if (env.Resolve(stmt->name) != std::nullopt)
+        auto sym = env.Resolve(stmt->name);
+        if (sym != std::nullopt && sym->depth == env.GetDepth())
         {
             return std::unexpected(Error(ErrorType::RedeclarationError,
                 std::format("variable `{}` has already defined in this scope", stmt->name),
@@ -50,7 +51,7 @@ namespace Fig
                 "none",
                 makeSourceLocation(stmt->initExpr)));
         }
-        env.Define(stmt->name, declaredType, stmt->isPublic, false);
+        stmt->localId = env.Define(stmt->name, declaredType, stmt->isPublic, false);
         return {};
     }
 
@@ -63,12 +64,11 @@ namespace Fig
         }
         if (stmt->cond->resolvedType != TypeTag::Any && stmt->cond->resolvedType != TypeTag::Bool)
         {
-            return std::unexpected(Error(
-                ErrorType::TypeError,
-                std::format("if condition must be boolean, got `{}`", magic_enum::enum_name(stmt->cond->resolvedType)),
+            return std::unexpected(Error(ErrorType::TypeError,
+                std::format("if condition must be boolean, got `{}`",
+                    magic_enum::enum_name(stmt->cond->resolvedType)),
                 "ensure condition is boolean",
-                makeSourceLocation(stmt->cond)
-            ));
+                makeSourceLocation(stmt->cond)));
         }
         auto consequentRes = analyzeStmt(stmt->consequent);
         if (!consequentRes)
@@ -106,6 +106,31 @@ namespace Fig
         return {};
     }
 
+    Result<void, Error> Analyzer::analyzeWhileStmt(WhileStmt *stmt)
+    {
+        auto condRes = analyzeExpr(stmt->cond);
+        if (!condRes)
+        {
+            return condRes;
+        }
+
+        if (stmt->cond->resolvedType != TypeTag::Any && stmt->cond->resolvedType != TypeTag::Bool)
+        {
+            return std::unexpected(Error(ErrorType::TypeError,
+                std::format("while condition must be boolean, got `{}`",
+                    magic_enum::enum_name(stmt->cond->resolvedType)),
+                "ensure condition is boolean",
+                makeSourceLocation(stmt->cond)));
+        }
+
+        auto bodyRes = analyzeStmt(stmt->body);
+        if (!bodyRes)
+        {
+            return bodyRes;
+        }
+        return {};
+    }
+
     Result<void, Error> Analyzer::analyzeIdentiExpr(IdentiExpr *expr)
     {
         auto sym = env.Resolve(expr->name);
@@ -117,8 +142,11 @@ namespace Fig
                 makeSourceLocation(expr)));
         }
         // TODO: 引入 Module 跨文件 import，检查 isPublic
-        expr->resolvedType = sym->type;
+        expr->localId = sym->localId;
+
+        expr->resolvedType  = sym->type;
         expr->resolvedDepth = sym->depth;
+        expr->isGlobal = (sym->depth == 0);
 
         return {};
     }
@@ -138,7 +166,7 @@ namespace Fig
 
         switch (expr->op)
         {
-            // 1. 算术族 (+, -, *, /, **)
+            // 算术族 (+, -, *, /, **)
             case BinaryOperator::Add:
                 if (lType == TypeTag::String && rType == TypeTag::String)
                 {
@@ -172,7 +200,7 @@ namespace Fig
                 }
                 break;
 
-            // 2. 整数特化族 (%, &, |, ^, <<, >>)
+            // 整数特化族 (%, &, |, ^, <<, >>)
             case BinaryOperator::Modulo:
             case BinaryOperator::BitAnd:
             case BinaryOperator::BitOr:
@@ -196,8 +224,7 @@ namespace Fig
                 }
                 break;
 
-
-            // 3. 比较族 (==, !=, <, >, <=, >=)
+            // 比较族 (==, !=, <, >, <=, >=)
 
             case BinaryOperator::Equal:
             case BinaryOperator::NotEqual:
@@ -206,7 +233,8 @@ namespace Fig
             case BinaryOperator::LessEqual:
             case BinaryOperator::GreaterEqual:
             case BinaryOperator::Is:
-                if (lType != TypeTag::Any && rType != TypeTag::Any && lType != rType) // lType == rType放行
+                if (lType != TypeTag::Any && rType != TypeTag::Any
+                    && lType != rType) // lType == rType放行
                 {
                     if (!((lType == TypeTag::Int && rType == TypeTag::Double)
                             || (lType == TypeTag::Double && rType == TypeTag::Int)))
@@ -217,7 +245,7 @@ namespace Fig
                             makeSourceLocation(expr)));
                     }
                 }
-                
+
                 // TODO: 支持Struct后进行检查，右操作数是 Struct才合理
                 // 如 1.2 is Int --> false
                 // 1 is Int --> true
@@ -225,8 +253,7 @@ namespace Fig
                 expr->resolvedType = TypeTag::Bool;
                 break;
 
-
-            // 4. 逻辑族 (&&, ||)
+            // 逻辑族 (&&, ||)
             case BinaryOperator::LogicalAnd:
             case BinaryOperator::LogicalOr:
                 if (lType == TypeTag::Bool && rType == TypeTag::Bool)
@@ -246,8 +273,7 @@ namespace Fig
                 }
                 break;
 
-
-            // 5. 纯赋值与复合赋值族 (=, +=, -=, ...)
+            // 纯赋值与复合赋值族 (=, +=, -=, ...)
             case BinaryOperator::Assign:
             case BinaryOperator::AddAssign:
             case BinaryOperator::SubAssign:
@@ -258,12 +284,11 @@ namespace Fig
                 // 左侧必须是合法的 L-Value
                 if (!isValidLvalue(expr->left))
                 {
-                    return std::unexpected(
-                        Error(ErrorType::NotAnLvalue,
-                            "invalid assignment target",
-                            "left side must be a variable, property, or indexable target",
-                            makeSourceLocation(expr->left) // 错误精准定位到左侧节点
-                            ));
+                    return std::unexpected(Error(ErrorType::NotAnLvalue,
+                        "invalid assignment target",
+                        "left side must be a variable, property, or indexable target",
+                        makeSourceLocation(expr->left) // 错误精准定位到左侧节点
+                        ));
                 }
 
                 // 类型匹配拦截 (纯赋值)
@@ -283,8 +308,7 @@ namespace Fig
                 expr->resolvedType = lType;
                 break;
 
-
-            // 6. 成员访问 (.)
+            // 成员访问 (.)
             case BinaryOperator::MemberAccess:
                 if (lType != TypeTag::Struct && lType != TypeTag::Any)
                 {
@@ -292,6 +316,15 @@ namespace Fig
                         "member access requires a Struct object",
                         "check if the left side evaluates to an object",
                         makeSourceLocation(expr->left)));
+                }
+                if (expr->right->type != AstType::IdentiExpr)
+                {
+                    return std::unexpected(Error(
+                        ErrorType::SyntaxError,
+                        std::format("expect field name after member access '.', got {}", expr->right->toString()),
+                        "none",
+                        makeSourceLocation(expr->right)
+                    ));
                 }
                 expr->resolvedType = TypeTag::Any;
                 break;
@@ -335,14 +368,18 @@ namespace Fig
             case AstType::IfStmt: {
                 return analyzeIfStmt(static_cast<IfStmt *>(stmt));
             }
-            
-            // TODO: 其他语句分析
 
-            // default:
-            //     return std::unexpected(Error(ErrorType::TypeError,
-            //         "unsupported statement type in analyzer",
-            //         "internal compiler error",
-            //         makeSourceLocation(stmt)));
+            case AstType::WhileStmt: {
+                return analyzeWhileStmt(static_cast<WhileStmt *>(stmt));
+            }
+
+                // TODO: 其他语句分析
+
+                // default:
+                //     return std::unexpected(Error(ErrorType::TypeError,
+                //         "unsupported statement type in analyzer",
+                //         "internal compiler error",
+                //         makeSourceLocation(stmt)));
         }
         return {};
     }
@@ -356,17 +393,13 @@ namespace Fig
         {
             case AstType::LiteralExpr: {
                 auto *lit = static_cast<LiteralExpr *>(expr);
-                switch(lit->token.type)
+                switch (lit->token.type)
                 {
                     case TokenType::LiteralTrue:
-                    case TokenType::LiteralFalse:
-                        lit->resolvedType = TypeTag::Bool;
-                        break;
-                    
-                    case TokenType::LiteralNull:
-                        lit->resolvedType = TypeTag::Null;
-                        break;
-                    
+                    case TokenType::LiteralFalse: lit->resolvedType = TypeTag::Bool; break;
+
+                    case TokenType::LiteralNull: lit->resolvedType = TypeTag::Null; break;
+
                     case TokenType::LiteralNumber: {
                         const String &lexeme = manager.GetSub(lit->token.index, lit->token.length);
                         if (lexeme.contains(U'.') || lexeme.contains(U'e'))
@@ -385,9 +418,10 @@ namespace Fig
                         break;
                     }
 
-                    default:
+                    default: {
                         lit->resolvedType = TypeTag::Any;
                         break;
+                    }
                 }
                 return {};
             }

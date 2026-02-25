@@ -47,6 +47,10 @@ namespace Fig
         UseUndeclaredIdentifier,
         NotAnLvalue,
         TypeError,
+
+        // compile errors
+        TooManyLocals,
+        TooManyConstants,
     };
 
     const char *ErrorTypeToString(ErrorType type);

@@ -3,13 +3,15 @@
 #include <Deps/Deps.hpp>
 #include <Lexer/Lexer.hpp>
 #include <Parser/Parser.hpp>
-#include <SourceManager/SourceManager.hpp>
 #include <Sema/Analyzer.hpp>
+#include <SourceManager/SourceManager.hpp>
 #include <VM/VM.hpp>
 
+
+#include <chrono>
 #include <iostream>
 #include <print>
-#include <chrono>
+
 
 int main()
 {
@@ -38,7 +40,7 @@ int main()
     }
     Program *program = *program_result;
 
-    Analyzer analyzer(manager);
+    Analyzer    analyzer(manager);
     const auto &analyzeResult = analyzer.Analyze(program);
     if (!analyzeResult)
     {
@@ -46,7 +48,6 @@ int main()
         return 1;
     }
     std::cout << "analyzer: Program OK, PASSED\n";
-
 
     Compiler    compiler(fileName, manager);
     const auto &proto_result = compiler.Compile(program);
@@ -67,10 +68,10 @@ int main()
     DumpCode(proto->code);
 
     std::cout << "\nMax Stack Size: " << (int) proto->maxStack << std::endl;
-    
+
     VM vm;
 
-    const auto &result_ = vm.Execute(proto);
+    auto result_ = vm.Execute(proto);
     if (!result_)
     {
         ReportError(result_.error(), manager);

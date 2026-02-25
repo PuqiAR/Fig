@@ -16,7 +16,7 @@ namespace Fig
 
         for (Stmt *stmt : program->nodes)
         {
-            const auto &result = CompileStmt(static_cast<Stmt *>(stmt));
+            auto result = compileStmt(static_cast<Stmt *>(stmt));
             if (!result)
             {
                 return std::unexpected(result.error());

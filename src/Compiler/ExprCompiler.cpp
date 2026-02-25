@@ -9,18 +9,18 @@
 
 namespace Fig
 {
-    Result<std::uint8_t, Error> Compiler::CompileIdentiExpr(IdentiExpr *ie)
+    Result<std::uint8_t, Error> Compiler::compileIdentiExpr(IdentiExpr *ie)
     {
-        // if (!HasLocal(ie->name))
-        // {
-        //     return std::unexpected(Error(ErrorType::UseUndeclaredIdentifier,
-        //         std::format("`{}` has not been defined", ie->name),
-        //         "none",
-        //         makeSourceLocation(ie)));
-        // }
-        return ResolveLocal(ie->name);
+        // TODO: 处理全局变量和闭包 Upvalue
+        std::uint8_t targetReg = current->fastRegMap[ie->localId];
+
+        if (targetReg == UINT8_MAX)
+        {
+            assert(false && "Compiler Bug: Encountered unmapped localId in fastRegMap!");
+        }
+        return targetReg;
     }
-    Result<std::uint8_t, Error> Compiler::CompileLiteral(
+    Result<std::uint8_t, Error> Compiler::compileLiteral(
         LiteralExpr *lit) // 编译字面量, 负责转换 token -> Value
     {
         const Token &token  = lit->token;
@@ -47,8 +47,8 @@ namespace Fig
         }
         else if (token.type == TokenType::LiteralNumber)
         {
-            // TODO: 更换为无异常手写数字解析版本
-            if (lexeme.contains(U'.'))
+            // TODO: 更换为无异常手写数字解析版本 (charconv也可)
+            if (lexeme.contains(U'.') || lexeme.contains(U'e'))
             {
                 // 非整数
                 double d = std::stod(lexeme.toStdString());
@@ -63,23 +63,34 @@ namespace Fig
         }
 
         std::uint8_t  targetReg = AllocReg();
+
+        if (current->proto->constants.size() >= MAX_CONSTANTS)
+        {
+            return std::unexpected(Error(
+                ErrorType::TooManyConstants,
+                std::format("constant limit exceeded: {}", MAX_CONSTANTS),
+                "How did you write such code? try global variable or split file",
+                makeSourceLocation(lit)
+            ));
+        }
+
         std::uint16_t kIndex    = AddConstant(v);
 
         Emit(Op::iABx(OpCode::LoadK, targetReg, kIndex));
         return targetReg;
     }
-    Result<std::uint8_t, Error> Compiler::CompileAssignment(
+    Result<std::uint8_t, Error> Compiler::compileAssignment(
         InfixExpr *infix) // 编译赋值，由 CompileInfixExpr调用
     {
         // op必须为 =
-        const auto &_lhsReg = CompileLeftValue(infix->left); // 必须为左值对象
+        const auto &_lhsReg = compileLeftValue(infix->left); // 必须为左值对象
         if (!_lhsReg)
         {
             return _lhsReg;
         }
         std::uint8_t lhsReg = *_lhsReg;
 
-        const auto  &_rhsReg = CompileExpr(infix->right);
+        const auto  &_rhsReg = compileExpr(infix->right);
         std::uint8_t rhsReg  = *_rhsReg;
 
         FreeReg(rhsReg);
@@ -119,21 +130,21 @@ namespace Fig
         }
         return lhsReg; // 返回赋值的结果，支持连续赋值
     }
-    Result<std::uint8_t, Error> Compiler::CompileInfixExpr(
+    Result<std::uint8_t, Error> Compiler::compileInfixExpr(
         InfixExpr *infix) // 编译中缀表达式，返回一个存放结果的寄存器 ID
     {
         if (infix->op >= BinaryOperator::Assign && infix->op <= BinaryOperator::BitXorAssign)
         {
-            return CompileAssignment(infix);
+            return compileAssignment(infix);
         }
 
-        const auto &_lhsReg = CompileExpr(infix->left);
+        const auto &_lhsReg = compileExpr(infix->left);
         if (!_lhsReg)
         {
             return _lhsReg;
         }
         std::uint8_t lhsReg  = *_lhsReg;
-        const auto  &_rhsReg = CompileExpr(infix->right);
+        const auto  &_rhsReg = compileExpr(infix->right);
         if (!_rhsReg)
         {
             return _rhsReg;
@@ -171,25 +182,52 @@ namespace Fig
                 break;
             }
 
+            case BinaryOperator::Greater: {
+                Emit(Op::iABC(OpCode::Greater, resultReg, lhsReg, rhsReg));
+                break;
+            }
+
+            case BinaryOperator::GreaterEqual: {
+                Emit(Op::iABC(OpCode::GreaterEqual, resultReg, lhsReg, rhsReg));
+                break;
+            }
+
+            case BinaryOperator::Less: {
+                Emit(Op::iABC(OpCode::Less, resultReg, lhsReg, rhsReg));
+                break;
+            }
+
+            case BinaryOperator::LessEqual: {
+                Emit(Op::iABC(OpCode::LessEqual, resultReg, lhsReg, rhsReg));
+                break;
+            }
+
+            case BinaryOperator::Equal: {
+                Emit(Op::iABC(OpCode::Equal, resultReg, lhsReg, rhsReg));
+                break;
+            }
+
             default: assert(false && "CompileInfixExpr: op unsupported yet");
         }
         return resultReg;
     }
-    Result<std::uint8_t, Error> Compiler::CompileLeftValue(
+    Result<std::uint8_t, Error> Compiler::compileLeftValue(
         Expr *expr) // 左值对象，可以是变量、结构体字段或模块对象
     {
         switch (expr->type)
         {
-            case AstType::IdentiExpr: return CompileIdentiExpr(static_cast<IdentiExpr *>(expr));
+            case AstType::IdentiExpr:
+                return compileIdentiExpr(static_cast<IdentiExpr *>(expr));
+                // TODO: 数组切片(a[0])或对象属性(a.b)
 
             default:
-                return std::unexpected(Error(ErrorType::NotAnLvalue,
-                    std::format("`{}` is not a lvalue, expect a valid lvalue", expr->toString()),
-                    "none",
-                    makeSourceLocation(expr)));
+                // Analyzer 有漏洞（编译器内部
+                // 直接崩溃
+                assert(false && "Compiler Bug: Invalid L-value bypassed Analyzer!");
+                return 0;
         }
     }
-    Result<std::uint8_t, Error> Compiler::CompileExpr(
+    Result<std::uint8_t, Error> Compiler::compileExpr(
         Expr *expr) // 编译表达式，必定返回一个存放结果的寄存器 ID
     {
         switch (expr->type)
@@ -199,12 +237,12 @@ namespace Fig
             case AstType::AstNode: assert(false && "CompileExpr: bad node type"); break;
 
             case AstType::IdentiExpr: {
-                return CompileLeftValue(expr); // 左值直接转换成右值
+                return compileLeftValue(expr); // 左值直接转换成右值
             }
             case AstType::LiteralExpr: {
                 LiteralExpr *lit = static_cast<LiteralExpr *>(expr);
 
-                const auto &result = CompileLiteral(lit);
+                auto result = compileLiteral(lit);
                 if (!result)
                 {
                     return std::unexpected(result.error());
@@ -213,7 +251,7 @@ namespace Fig
                 return targetReg;
             }
             case AstType::InfixExpr: {
-                return CompileInfixExpr(static_cast<InfixExpr *>(expr));
+                return compileInfixExpr(static_cast<InfixExpr *>(expr));
             }
         }
     }
