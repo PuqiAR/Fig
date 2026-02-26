@@ -15,6 +15,8 @@
 #include <Ast/Expr/PrefixExpr.hpp>
 
 #include <Ast/Stmt/ExprStmt.hpp>
+#include <Ast/Stmt/FnDefStmt.hpp>
 #include <Ast/Stmt/IfStmt.hpp>
 #include <Ast/Stmt/VarDecl.hpp>
 #include <Ast/Stmt/WhileStmt.hpp>
+#include <Ast/TypeExpr.hpp>

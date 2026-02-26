@@ -49,11 +49,11 @@ namespace Fig
         const String &name = srcManager.GetSub(currentToken().index, currentToken().length);
         consumeToken(); // consume name
 
-        Expr *typeSpeicifer = nullptr;
+        TypeExpr *typeSpeicifer = nullptr;
         if (match(TokenType::Colon)) // `:`
         {
-            SET_STOP_AT(TokenType::Walrus, TokenType::Assign);
-            auto result = parseExpression(0);
+            // SET_STOP_AT(TokenType::Walrus, TokenType::Assign);
+            auto result = parseTypeExpr();
             if (!result)
             {
                 return std::unexpected(result.error());
@@ -295,6 +295,136 @@ namespace Fig
         return whileStmt;
     }
 
+    Result<DynArray<Param *>, Error> Parser::parseFnParams() // 由 parseFnDefStmt或lambda调用
+    {
+        StateProtector p(this, {State::ParsingFnDefStmt});
+
+        const Token      &lpToken = consumeToken(); // consume `(`
+        DynArray<Param *> params;
+
+        while (true)
+        {
+            if (isEOF)
+            {
+                return std::unexpected(Error(ErrorType::SyntaxError,
+                    "unclosed parenthese in function parameters",
+                    "insert ')'",
+                    makeSourceLocation(lpToken)));
+            }
+            if (match(TokenType::RightParen))
+            {
+                break;
+            }
+
+            const Token   &nToken   = consumeToken();
+            SourceLocation location = makeSourceLocation(nToken);
+            const String  &name     = srcManager.GetSub(nToken.index, nToken.length);
+
+            // TODO: 支持剩余参数解析...
+
+            TypeExpr *type = nullptr;
+            if (match(TokenType::Colon)) // :
+            {
+                auto result = parseTypeExpr();
+                if (!result)
+                {
+                    return std::unexpected(result.error());
+                }
+                type = *result;
+            }
+
+            Expr *defaultValue = nullptr;
+
+            if (match(TokenType::Assign)) // =
+            {
+                SET_STOP_AT(TokenType::Comma, TokenType::RightParen, TokenType::LeftBrace); // , ) {
+                auto result = parseExpression();
+                if (!result)
+                {
+                    if (type)
+                    {
+                        delete type;
+                    }
+                    return std::unexpected(result.error());
+                }
+                defaultValue = *result;
+            }
+
+            PosParam *posParam = new PosParam(name, type, defaultValue, location);
+            params.push_back(posParam);
+
+            if (match(TokenType::Comma))
+            {
+                if (!currentToken().isIdentifier())
+                {
+                    return std::unexpected(makeUnexpectTokenError("fn params", "param name", currentToken()));
+                }
+            }
+        }
+        return params;
+    }
+
+    Result<FnDefStmt *, Error> Parser::parseFnDefStmt(
+        bool isPublic) // 由 parseStatement调用, 当前token为 func
+    {
+        SourceLocation location = makeSourceLocation(
+            consumeToken()); // 无论是否加了public, location都设置为 func token (我懒 :D)
+
+        if (!currentToken().isIdentifier())
+        {
+            return std::unexpected(
+                makeUnexpectTokenError("fn def stmt", "function name", currentToken()));
+        }
+        const Token  &nameToken = consumeToken(); // consume name
+        const String &name      = srcManager.GetSub(nameToken.index, nameToken.length);
+
+        if (currentToken().type != TokenType::LeftParen)
+        {
+            return std::unexpected(
+                makeUnexpectTokenError("fn def stmt", "lparen '('", currentToken()));
+        }
+
+        DynArray<Param *> params;
+
+        auto paraResult = parseFnParams();
+        if (!paraResult)
+        {
+            return std::unexpected(paraResult.error());
+        }
+        params = *paraResult;
+
+        TypeExpr *returnType = nullptr;
+        if (match(TokenType::RightArrow)) // ->
+        {
+            auto result = parseTypeExpr();
+            if (!result)
+            {
+                return std::unexpected(result.error());
+            }
+            returnType = *result;
+        }
+
+        if (currentToken().type != TokenType::LeftBrace)
+        {
+            return std::unexpected(
+                makeUnexpectTokenError("fn def stmt", "function body '{'", currentToken()));
+        }
+        BlockStmt *body       = nullptr;
+        auto       bodyResult = parseBlockStmt();
+
+        if (!bodyResult)
+        {
+            if (returnType)
+            {
+                delete returnType;
+            }
+            body = *bodyResult;
+        }
+
+        FnDefStmt *fnDef = new FnDefStmt(isPublic, name, params, returnType, body, location);
+        return fnDef;
+    }
+
     Result<Stmt *, Error> Parser::parseStatement()
     {
         StateProtector p(this, {State::Standby});
@@ -306,11 +436,14 @@ namespace Fig
             {
                 return parseVarDecl(true);
             }
-            else
+
+            if (currentToken().type == TokenType::Function)
             {
-                return std::unexpected(
-                    makeUnexpectTokenError("public", "var/const/func/struct", currentToken()));
+                return parseFnDefStmt(true);
             }
+
+            return std::unexpected(
+                makeUnexpectTokenError("public", "var/const/func/struct", currentToken()));
         }
 
         if (currentToken().type == TokenType::LeftBrace)
@@ -333,11 +466,16 @@ namespace Fig
             return parseWhileStmt();
         }
 
+        if (currentToken().type == TokenType::Function)
+        {
+            return parseFnDefStmt(false);
+        }
+
         if (isEOF)
         {
             return nullptr;
         }
-        
+
         const auto &expr_result = parseExpression();
         if (!expr_result)
         {

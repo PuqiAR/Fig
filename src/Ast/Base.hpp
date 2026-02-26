@@ -38,6 +38,12 @@ namespace Fig
         IfStmt,     // If语句
         ElseIfStmt, // ElseIf语句，不准悬空，平铺式else if
         WhileStmt,  // while语句
+        FnDefStmt,  // func函数定义语句
+
+        /* Type Expressions */
+        TypeExpr,      // 基类
+        NamedTypeExpr, // 命名类型，支持namespace, std.file这样的
+        // 泛型等...
     };
     struct AstNode
     {
@@ -45,7 +51,16 @@ namespace Fig
         SourceLocation location;
 
         virtual String toString() const = 0;
-        virtual ~AstNode(){};
+        virtual ~AstNode() {};
+    };
+
+    struct TypeExpr : public AstNode
+    {
+        TypeExpr()
+        {
+            type = AstType::TypeExpr;
+        }
+        virtual ~TypeExpr() = default;
     };
 
     struct Program;

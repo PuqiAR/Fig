@@ -15,7 +15,7 @@ namespace Fig
     struct VarDecl final : public Stmt
     {
         String name;
-        Expr  *typeSpecifier;
+        TypeExpr  *typeSpecifier;
         bool isInfer; // 是否用了 := 类型推断
         Expr  *initExpr;
 
@@ -26,7 +26,7 @@ namespace Fig
             type = AstType::VarDecl;
         }
 
-        VarDecl(bool _isPublic, String _name, Expr *_typeSpecifier, bool _isInfer, Expr *_initExpr, SourceLocation _location) :
+        VarDecl(bool _isPublic, String _name, TypeExpr *_typeSpecifier, bool _isInfer, Expr *_initExpr, SourceLocation _location) :
             name(std::move(_name)),
             typeSpecifier(_typeSpecifier),
             isInfer(_isInfer),

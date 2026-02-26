@@ -165,6 +165,9 @@ namespace Fig
                 ParsingVarDecl,
                 ParsingIf,
                 ParsingWhile,
+                ParsingFnDefStmt,
+
+                ParsingNamedTypeExpr,
 
             } type                               = StateType::Standby;
             std::unordered_set<TokenType> stopAt = {};
@@ -273,6 +276,12 @@ namespace Fig
                 magic_enum::enum_name(currentState().type).data());
         }
 
+        /* TypeExpressions */
+
+        Result<NamedTypeExpr *, Error> parseNamedTypeExpr(); // 当前token为identifier
+
+        Result<TypeExpr *, Error> parseTypeExpr();
+
         /* Expressions */
         Result<LiteralExpr *, Error> parseLiteralExpr(); // 当前token为literal时调用
         Result<IdentiExpr *, Error>  parseIdentiExpr();  // 当前token为Identifier调用
@@ -292,6 +301,10 @@ namespace Fig
         Result<VarDecl *, Error>   parseVarDecl(bool); // 由 parseStatement调用, 当前token为 var
         Result<IfStmt *, Error>    parseIfStmt();      // 由 parseStatement调用, 当前token为 if
         Result<WhileStmt *, Error> parseWhileStmt();   // 由 parseStatement调用, 当前token为 while
+
+        Result<DynArray<Param *>, Error> parseFnParams();  // 由 parseFnDefStmt或lambda调用
+        Result<FnDefStmt *, Error> parseFnDefStmt(bool);   // 由 parseStatement调用, 当前token为 func
+
         Result<Stmt *, Error>      parseStatement();
 
     public:
