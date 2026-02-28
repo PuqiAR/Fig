@@ -9,5 +9,31 @@
 
 namespace Fig
 {
-
+    constexpr String Value::ToString() const
+    {
+        if (IsNull())
+        {
+            return "null";
+        }
+        else if (IsInt())
+        {
+            return std::to_string(AsInt());
+        }
+        else if (IsDouble())
+        {
+            return std::format("{}", AsDouble());
+        }
+        else if (IsBool())
+        {
+            return (AsBool() ? "true" : "false");
+        }
+        else if (IsObject())
+        {
+            return "Object"; // TODO: 分派
+        }
+        else
+        {
+            return "Unknow";
+        }
+    }
 }; // namespace Fig

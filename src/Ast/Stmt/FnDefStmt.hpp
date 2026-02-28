@@ -16,6 +16,9 @@ namespace Fig
         String         name;
         SourceLocation location;
 
+        TypeInfo *resolvedType = nullptr;
+        int       localId      = -1;
+
         virtual String toString() const = 0;
     };
 
@@ -28,18 +31,16 @@ namespace Fig
         PosParam(String _name, TypeExpr *_type, Expr *_defaultValue, SourceLocation _location) :
             type(_type), defaultValue(_defaultValue)
         {
-            name = std::move(_name);
+            name     = std::move(_name);
             location = std::move(_location);
         }
 
         virtual String toString() const override
         {
-            return std::format(
-                "<Pos {}: {}{}>",
+            return std::format("<Pos {}: {}{}>",
                 name,
                 (type ? type->toString() : "Any"),
-                (defaultValue ? " =" + defaultValue->toString() : "")
-            );
+                (defaultValue ? " =" + defaultValue->toString() : ""));
         }
     };
 
@@ -57,6 +58,9 @@ namespace Fig
         DynArray<Param *> params;
         TypeExpr         *returnType;
         BlockStmt        *body;
+
+        TypeInfo *resolvedReturnType = nullptr;
+        int       localId            = -1;
 
         FnDefStmt()
         {
@@ -87,14 +91,12 @@ namespace Fig
                 }
                 pStr += p->toString();
             }
-            return std::format(
-                "<FnDefStmt {}{}({}) -> {} {{{}}}>",
+            return std::format("<FnDefStmt {}{}({}) -> {} {{{}}}>",
                 (isPublic ? "public " : ""),
                 name,
                 pStr,
                 (returnType ? returnType->toString() : "Any"),
-                body->toString()
-            );
+                body->toString());
         }
     };
 }; // namespace Fig

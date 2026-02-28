@@ -33,12 +33,15 @@ namespace Fig
         CallExpr,  // 后缀表达式，函数调用
 
         /* Statements */
-        ExprStmt,   // 表达式语句，如 println(1)
-        VarDecl,    // 变量声明
-        IfStmt,     // If语句
-        ElseIfStmt, // ElseIf语句，不准悬空，平铺式else if
-        WhileStmt,  // while语句
-        FnDefStmt,  // func函数定义语句
+        ExprStmt,     // 表达式语句，如 println(1)
+        VarDecl,      // 变量声明
+        IfStmt,       // If语句
+        ElseIfStmt,   // ElseIf语句，不准悬空，平铺式else if
+        WhileStmt,    // while语句
+        FnDefStmt,    // func函数定义语句
+        ReturnStmt,   // 返回语句
+        BreakStmt,    // break语句
+        ContinueStmt, // continue语句
 
         /* Type Expressions */
         TypeExpr,      // 基类
@@ -67,7 +70,7 @@ namespace Fig
 
     struct Expr : public AstNode
     {
-        TypeTag resolvedType = TypeTag::Any;
+        TypeInfo *resolvedType = nullptr;
         // TODO: 可选的常量折叠
         // 拓展 isConstExpr和 constValue槽位
 

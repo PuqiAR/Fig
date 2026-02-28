@@ -32,6 +32,7 @@ namespace Fig
         }
         else
         {
+            // TODO: 未初始化提供初始值
             varReg = DeclareLocal(varDecl->localId);
         }
 

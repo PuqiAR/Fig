@@ -166,6 +166,9 @@ namespace Fig
                 ParsingIf,
                 ParsingWhile,
                 ParsingFnDefStmt,
+                ParsingReturn,
+                ParsingBreak,
+                ParsingContinue,
 
                 ParsingNamedTypeExpr,
 
@@ -304,6 +307,9 @@ namespace Fig
 
         Result<DynArray<Param *>, Error> parseFnParams();  // 由 parseFnDefStmt或lambda调用
         Result<FnDefStmt *, Error> parseFnDefStmt(bool);   // 由 parseStatement调用, 当前token为 func
+
+        Result<ReturnStmt *, Error> parseReturnStmt(); // 由 parseStatement调用, 当前token为 return
+        // continue break直接由parseStatement一步解析
 
         Result<Stmt *, Error>      parseStatement();
 

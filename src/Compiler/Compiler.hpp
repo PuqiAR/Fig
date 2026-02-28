@@ -34,8 +34,8 @@ namespace Fig
         int          depth;   // 物理作用域深度(用于 EndScope 释放寄存器)
     };
 
-    static constexpr int MAX_LOCALS = 250;
-    static constexpr int MAX_CONSTANTS = UINT16_MAX;
+    inline constexpr int MAX_LOCALS = 250;
+    inline constexpr int MAX_CONSTANTS = UINT16_MAX + 1;
 
     // 任何跨函数、跨模块的编译，都压入弹出这个 State
     struct FuncState
@@ -66,6 +66,24 @@ namespace Fig
         SourceManager &manager;
         FuncState     *current = nullptr; // 永远指向当前正在编译的上下文
     public:
+        struct FuncStateProtector
+        {
+            Compiler  *compiler;
+            FuncState *prevState;
+
+            [[nodiscard]]
+            FuncStateProtector(Compiler *comp, FuncState *newState) :
+                compiler(comp), prevState(comp->current)
+            {
+                compiler->current = newState;
+            }
+
+            ~FuncStateProtector()
+            {
+                compiler->current = prevState;
+            }
+        };
+
         Compiler(String _fileName, SourceManager &_manager) :
             fileName(std::move(_fileName)), manager(_manager)
         {
@@ -85,7 +103,6 @@ namespace Fig
         }
 
         Result<Proto *, Error> Compile(Program *program);
-
     private:
         void PushState(String _name)
         {

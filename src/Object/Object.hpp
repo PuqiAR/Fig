@@ -8,5 +8,6 @@
 #pragma once
 
 #include <Object/ObjectBase.hpp>
-#include <Object/String.hpp>
-#include <Object/Struct.hpp>
+#include <Object/StringObject.hpp>
+#include <Object/StructObject.hpp>
+#include <Object/FunctionObject.hpp>

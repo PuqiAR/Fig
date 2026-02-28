@@ -1,6 +1,6 @@
 /*!
-    @file src/Object/Struct.hpp
-    @brief 结构体类型 Struct定义
+    @file src/Object/StructObject.hpp
+    @brief 结构体类型 StructObject 定义
     @author PuqiAR (im@puqiar.top)
     @date 2026-02-19
 */

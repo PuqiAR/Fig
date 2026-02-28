@@ -1,5 +1,5 @@
 /*!
-    @file src/Object/String.hpp
+    @file src/Object/StringObject.hpp
     @brief 字符串对象标识
     @author PuqiAR (im@puqiar.top)
     @date 2026-02-19

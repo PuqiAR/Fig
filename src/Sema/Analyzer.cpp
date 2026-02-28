@@ -9,6 +9,29 @@
 
 namespace Fig
 {
+    Result<TypeInfo *, Error> Analyzer::resolveType(TypeExpr *typeExpr)
+    {
+        NamedTypeExpr *nte  = dynamic_cast<NamedTypeExpr *>(typeExpr);
+        TypeInfo      *type = nullptr;
+        if (nte)
+        {
+            type = typeCtx.ResolveTypePath(nte->path);
+            if (!type)
+            {
+                return std::unexpected(Error(ErrorType::TypeError,
+                    std::format("no such type `{}` exists", nte->toString()),
+                    "none",
+                    makeSourceLocation(typeExpr)));
+            }
+            // ...
+        }
+        else
+        {
+            // ...
+        }
+        return type;
+    }
+
     Result<void, Error> Analyzer::analyzeVarDecl(VarDecl *stmt)
     {
         auto sym = env.Resolve(stmt->name);
@@ -20,7 +43,7 @@ namespace Fig
                 makeSourceLocation(stmt)));
         }
 
-        TypeTag initType = TypeTag::Any;
+        TypeInfo *initType = typeCtx.GetNull();
         if (stmt->initExpr)
         {
             const auto &res = analyzeExpr(stmt->initExpr);
@@ -31,23 +54,29 @@ namespace Fig
             initType = stmt->initExpr->resolvedType;
         }
 
-        TypeTag declaredType = TypeTag::Any;
+        TypeInfo *declaredType = typeCtx.GetAny();
         if (stmt->typeSpecifier)
         {
-            // TODO: 解析类型定义
+            auto result = resolveType(stmt->typeSpecifier);
+            if (!result)
+            {
+                return std::unexpected(result.error());
+            }
+
+            declaredType = *result;
         }
 
         if (stmt->isInfer)
         {
             declaredType = initType;
         }
-        else if (declaredType != TypeTag::Any && declaredType != initType)
+        else if (stmt->initExpr && declaredType != typeCtx.GetAny() && declaredType != initType)
         {
             return std::unexpected(Error(ErrorType::TypeError,
                 std::format("cannot assign type `{}` to variable {} which speicifer type is '{}'",
-                    magic_enum::enum_name(initType),
+                    initType->name,
                     stmt->name,
-                    magic_enum::enum_name(declaredType)),
+                    declaredType->name),
                 "none",
                 makeSourceLocation(stmt->initExpr)));
         }
@@ -62,11 +91,12 @@ namespace Fig
         {
             return condRes;
         }
-        if (stmt->cond->resolvedType != TypeTag::Any && stmt->cond->resolvedType != TypeTag::Bool)
+        if (stmt->cond->resolvedType != typeCtx.GetAny()
+            && stmt->cond->resolvedType != typeCtx.GetBool())
         {
             return std::unexpected(Error(ErrorType::TypeError,
-                std::format("if condition must be boolean, got `{}`",
-                    magic_enum::enum_name(stmt->cond->resolvedType)),
+                std::format(
+                    "if condition must be boolean, got `{}`", stmt->cond->resolvedType->name),
                 "ensure condition is boolean",
                 makeSourceLocation(stmt->cond)));
         }
@@ -79,12 +109,12 @@ namespace Fig
         for (ElseIfStmt *elif : stmt->elifs)
         {
             auto condRes = analyzeExpr(elif->cond);
-            if (elif->cond->resolvedType != TypeTag::Any
-                && elif->cond->resolvedType != TypeTag::Bool)
+            if (elif->cond->resolvedType != typeCtx.GetAny()
+                && elif->cond->resolvedType != typeCtx.GetBool())
             {
                 return std::unexpected(Error(ErrorType::TypeError,
                     std::format("else if condition must be boolean, got `{}`",
-                        magic_enum::enum_name(elif->cond->resolvedType)),
+                        elif->cond->resolvedType->name),
                     "ensure condition is boolean",
                     makeSourceLocation(elif->cond)));
             }
@@ -114,11 +144,12 @@ namespace Fig
             return condRes;
         }
 
-        if (stmt->cond->resolvedType != TypeTag::Any && stmt->cond->resolvedType != TypeTag::Bool)
+        if (stmt->cond->resolvedType != typeCtx.GetAny()
+            && stmt->cond->resolvedType != typeCtx.GetBool())
         {
             return std::unexpected(Error(ErrorType::TypeError,
-                std::format("while condition must be boolean, got `{}`",
-                    magic_enum::enum_name(stmt->cond->resolvedType)),
+                std::format(
+                    "while condition must be boolean, got `{}`", stmt->cond->resolvedType->name),
                 "ensure condition is boolean",
                 makeSourceLocation(stmt->cond)));
         }
@@ -127,6 +158,138 @@ namespace Fig
         if (!bodyRes)
         {
             return bodyRes;
+        }
+        return {};
+    }
+
+    Result<void, Error> Analyzer::analyzeFnDefStmt(FnDefStmt *stmt)
+    {
+        auto sym = env.Resolve(stmt->name);
+        if (sym != std::nullopt && sym->depth == env.GetDepth())
+        {
+            return std::unexpected(Error(ErrorType::RedeclarationError,
+                std::format("function `{}` has already defined in this scope", stmt->name),
+                "change its name",
+                makeSourceLocation(stmt)));
+        }
+
+        stmt->resolvedReturnType = typeCtx.GetAny(); // 默认Any
+        if (stmt->returnType)
+        {
+            auto result = resolveType(stmt->returnType);
+            if (!result)
+            {
+                return std::unexpected(result.error());
+            }
+            stmt->resolvedReturnType = *result;
+        }
+
+        stmt->localId = env.Define(stmt->name,
+            typeCtx.GetFunction(),
+            stmt->isPublic,
+            true); // 函数定义语句定义的函数为常量
+
+        env.EnterFunction();
+        env.EnterScope();
+
+        PosParam *lastDefaultValueP = nullptr;
+        for (Param *p : stmt->params)
+        {
+            PosParam *posParam = dynamic_cast<PosParam *>(p);
+            if (posParam)
+            {
+                posParam->resolvedType = typeCtx.GetAny();
+                if (posParam->type)
+                {
+                    auto result = resolveType(posParam->type);
+                    if (!result)
+                    {
+                        return std::unexpected(result.error());
+                    }
+                    posParam->resolvedType = *result;
+                }
+
+                if (!posParam->defaultValue && lastDefaultValueP)
+                {
+                    return std::unexpected(Error(ErrorType::SyntaxError,
+                        std::format("no-default parameter `{}` follows default parameter '{}'",
+                            posParam->name,
+                            lastDefaultValueP->name),
+                        "reorder parameters",
+                        posParam->location));
+                }
+
+                if (posParam->defaultValue)
+                {
+                    lastDefaultValueP = posParam;
+
+                    auto result = analyzeExpr(posParam->defaultValue);
+                    if (!result)
+                    {
+                        return result;
+                    }
+                    if (posParam->resolvedType != typeCtx.GetAny()
+                        && posParam->defaultValue->resolvedType != posParam->resolvedType)
+                    {
+                        return std::unexpected(Error(ErrorType::TypeError,
+                            std::format(
+                                "in function '{}', parameter '{}' expects type '{}', but got default value type `{}`",
+                                stmt->name,
+                                posParam->name,
+                                posParam->resolvedType->name,
+                                posParam->defaultValue->resolvedType->name),
+                            "none",
+                            makeSourceLocation(posParam->defaultValue)));
+                    }
+                }
+
+                posParam->localId =
+                    env.Define(posParam->name, posParam->resolvedType, false, false);
+            }
+            else
+            {
+                // ... 其他参数解析
+            }
+        }
+
+        ReturnTypeProtector p(this, stmt->resolvedReturnType);
+
+        auto bodyRes = analyzeStmt(stmt->body);
+
+        env.LeaveScope();
+        env.LeaveFunction();
+
+        if (!bodyRes)
+        {
+            return bodyRes;
+        }
+        return {};
+    }
+
+    Result<void, Error> Analyzer::analyzeReturnStmt(ReturnStmt *stmt)
+    {
+        if (!currentReturnType)
+        {
+            return std::unexpected(Error(ErrorType::SyntaxError,
+                "return outside function",
+                "remove `return ...`",
+                makeSourceLocation(stmt)));
+        }
+        auto result = analyzeExpr(stmt->value);
+        if (!result)
+        {
+            return result;
+        }
+
+        TypeInfo *valueType = stmt->value->resolvedType;
+        if (currentReturnType != typeCtx.GetAny() && currentReturnType != valueType)
+        {
+            return std::unexpected(Error(ErrorType::TypeError,
+                std::format("return type mismatch: expects '{}', got `{}`",
+                    currentReturnType->name,
+                    stmt->value->resolvedType->name),
+                "none",
+                makeSourceLocation(stmt->value)));
         }
         return {};
     }
@@ -146,7 +309,7 @@ namespace Fig
 
         expr->resolvedType  = sym->type;
         expr->resolvedDepth = sym->depth;
-        expr->isGlobal = (sym->depth == 0);
+        expr->isGlobal      = (sym->depth == 0);
 
         return {};
     }
@@ -161,16 +324,16 @@ namespace Fig
         if (!resR)
             return std::unexpected(resR.error());
 
-        TypeTag lType = expr->left->resolvedType;
-        TypeTag rType = expr->right->resolvedType;
+        TypeInfo *lType = expr->left->resolvedType;
+        TypeInfo *rType = expr->right->resolvedType;
 
         switch (expr->op)
         {
             // 算术族 (+, -, *, /, **)
             case BinaryOperator::Add:
-                if (lType == TypeTag::String && rType == TypeTag::String)
+                if (lType == typeCtx.GetString() && rType == typeCtx.GetString())
                 {
-                    expr->resolvedType = TypeTag::String;
+                    expr->resolvedType = typeCtx.GetString();
                     break;
                 }
                 [[fallthrough]];
@@ -178,18 +341,18 @@ namespace Fig
             case BinaryOperator::Multiply:
             case BinaryOperator::Divide:
             case BinaryOperator::Power:
-                if (lType == TypeTag::Int && rType == TypeTag::Int)
+                if (lType == typeCtx.GetInt() && rType == typeCtx.GetInt())
                 {
-                    expr->resolvedType = TypeTag::Int;
+                    expr->resolvedType = typeCtx.GetInt();
                 }
-                else if ((lType == TypeTag::Int || lType == TypeTag::Double)
-                         && (rType == TypeTag::Int || rType == TypeTag::Double))
+                else if ((lType == typeCtx.GetInt() || lType == typeCtx.GetDouble())
+                         && (rType == typeCtx.GetInt() || rType == typeCtx.GetDouble()))
                 {
-                    expr->resolvedType = TypeTag::Double;
+                    expr->resolvedType = typeCtx.GetDouble();
                 }
-                else if (lType == TypeTag::Any || rType == TypeTag::Any)
+                else if (lType == typeCtx.GetAny() || rType == typeCtx.GetAny())
                 {
-                    expr->resolvedType = TypeTag::Any;
+                    expr->resolvedType = typeCtx.GetAny();
                 }
                 else
                 {
@@ -207,13 +370,13 @@ namespace Fig
             case BinaryOperator::BitXor:
             case BinaryOperator::ShiftLeft:
             case BinaryOperator::ShiftRight:
-                if (lType == TypeTag::Int && rType == TypeTag::Int)
+                if (lType == typeCtx.GetInt() && rType == typeCtx.GetInt())
                 {
-                    expr->resolvedType = TypeTag::Int;
+                    expr->resolvedType = typeCtx.GetInt();
                 }
-                else if (lType == TypeTag::Any || rType == TypeTag::Any)
+                else if (lType == typeCtx.GetAny() || rType == typeCtx.GetAny())
                 {
-                    expr->resolvedType = TypeTag::Any;
+                    expr->resolvedType = typeCtx.GetAny();
                 }
                 else
                 {
@@ -224,7 +387,7 @@ namespace Fig
                 }
                 break;
 
-            // 比较族 (==, !=, <, >, <=, >=)
+                // 比较族 (==, !=, <, >, <=, >=)
 
             case BinaryOperator::Equal:
             case BinaryOperator::NotEqual:
@@ -233,11 +396,11 @@ namespace Fig
             case BinaryOperator::LessEqual:
             case BinaryOperator::GreaterEqual:
             case BinaryOperator::Is:
-                if (lType != TypeTag::Any && rType != TypeTag::Any
+                if (lType != typeCtx.GetAny() && rType != typeCtx.GetAny()
                     && lType != rType) // lType == rType放行
                 {
-                    if (!((lType == TypeTag::Int && rType == TypeTag::Double)
-                            || (lType == TypeTag::Double && rType == TypeTag::Int)))
+                    if (!((lType == typeCtx.GetInt() && rType == typeCtx.GetDouble())
+                            || (lType == typeCtx.GetDouble() && rType == typeCtx.GetInt())))
                     {
                         return std::unexpected(Error(ErrorType::TypeError,
                             "cannot compare different types",
@@ -250,19 +413,19 @@ namespace Fig
                 // 如 1.2 is Int --> false
                 // 1 is Int --> true
 
-                expr->resolvedType = TypeTag::Bool;
+                expr->resolvedType = typeCtx.GetBool();
                 break;
 
             // 逻辑族 (&&, ||)
             case BinaryOperator::LogicalAnd:
             case BinaryOperator::LogicalOr:
-                if (lType == TypeTag::Bool && rType == TypeTag::Bool)
+                if (lType == typeCtx.GetBool() && rType == typeCtx.GetBool())
                 {
-                    expr->resolvedType = TypeTag::Bool;
+                    expr->resolvedType = typeCtx.GetBool();
                 }
-                else if (lType == TypeTag::Any || rType == TypeTag::Any)
+                else if (lType == typeCtx.GetAny() || rType == typeCtx.GetAny())
                 {
-                    expr->resolvedType = TypeTag::Bool;
+                    expr->resolvedType = typeCtx.GetBool();
                 }
                 else
                 {
@@ -294,9 +457,9 @@ namespace Fig
                 // 类型匹配拦截 (纯赋值)
                 if (expr->op == BinaryOperator::Assign)
                 {
-                    if (lType != TypeTag::Any && rType != TypeTag::Any && lType != rType)
+                    if (lType != typeCtx.GetAny() && rType != typeCtx.GetAny() && lType != rType)
                     {
-                        if (!(lType == TypeTag::Double && rType == TypeTag::Int))
+                        if (!(lType == typeCtx.GetDouble() && rType == typeCtx.GetInt()))
                         { // 允许 Int 赋给 Double
                             return std::unexpected(Error(ErrorType::TypeError,
                                 "cannot assign value to variable of different type",
@@ -310,7 +473,7 @@ namespace Fig
 
             // 成员访问 (.)
             case BinaryOperator::MemberAccess:
-                if (lType != TypeTag::Struct && lType != TypeTag::Any)
+                if (lType != typeCtx.GetStruct() && lType != typeCtx.GetAny())
                 {
                     return std::unexpected(Error(ErrorType::TypeError,
                         "member access requires a Struct object",
@@ -319,14 +482,13 @@ namespace Fig
                 }
                 if (expr->right->type != AstType::IdentiExpr)
                 {
-                    return std::unexpected(Error(
-                        ErrorType::SyntaxError,
-                        std::format("expect field name after member access '.', got {}", expr->right->toString()),
+                    return std::unexpected(Error(ErrorType::SyntaxError,
+                        std::format("expect field name after member access '.', got {}",
+                            expr->right->toString()),
                         "none",
-                        makeSourceLocation(expr->right)
-                    ));
+                        makeSourceLocation(expr->right)));
                 }
-                expr->resolvedType = TypeTag::Any;
+                expr->resolvedType = typeCtx.GetAny();
                 break;
 
             default:
@@ -373,6 +535,14 @@ namespace Fig
                 return analyzeWhileStmt(static_cast<WhileStmt *>(stmt));
             }
 
+            case AstType::FnDefStmt: {
+                return analyzeFnDefStmt(static_cast<FnDefStmt *>(stmt));
+            }
+
+            case AstType::ReturnStmt: {
+                return analyzeReturnStmt(static_cast<ReturnStmt *>(stmt));
+            }
+
                 // TODO: 其他语句分析
 
                 // default:
@@ -396,30 +566,30 @@ namespace Fig
                 switch (lit->token.type)
                 {
                     case TokenType::LiteralTrue:
-                    case TokenType::LiteralFalse: lit->resolvedType = TypeTag::Bool; break;
+                    case TokenType::LiteralFalse: lit->resolvedType = typeCtx.GetBool(); break;
 
-                    case TokenType::LiteralNull: lit->resolvedType = TypeTag::Null; break;
+                    case TokenType::LiteralNull: lit->resolvedType = typeCtx.GetNull(); break;
 
                     case TokenType::LiteralNumber: {
                         const String &lexeme = manager.GetSub(lit->token.index, lit->token.length);
                         if (lexeme.contains(U'.') || lexeme.contains(U'e'))
                         {
-                            lit->resolvedType = TypeTag::Double;
+                            lit->resolvedType = typeCtx.GetDouble();
                         }
                         else
                         {
-                            lit->resolvedType = TypeTag::Int;
+                            lit->resolvedType = typeCtx.GetInt();
                         }
                         break;
                     }
 
                     case TokenType::LiteralString: {
-                        lit->resolvedType = TypeTag::String;
+                        lit->resolvedType = typeCtx.GetString();
                         break;
                     }
 
                     default: {
-                        lit->resolvedType = TypeTag::Any;
+                        lit->resolvedType = typeCtx.GetAny();
                         break;
                     }
                 }
@@ -435,7 +605,7 @@ namespace Fig
 
             default:
                 // 对于还没实现的表达式，默认降级为 Any 防止崩溃
-                expr->resolvedType = TypeTag::Any;
+                expr->resolvedType = typeCtx.GetAny();
                 return {};
         }
     }

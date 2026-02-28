@@ -19,11 +19,11 @@ namespace Fig
     // 记录在 Analyzer 中的符号元数据
     struct Symbol
     {
-        String  name;
-        TypeTag type;
-        bool    isPublic;
-        int     depth;      // 词法作用域深度
-        bool    isConstant; // 是否是 const 声明的不可变常量 (用于报错: 尝试修改常量)
+        String    name;
+        TypeInfo *type;
+        bool      isPublic;
+        int       depth;      // 词法作用域深度
+        bool      isConstant; // 是否是 const 声明的不可变常量 (用于报错: 尝试修改常量)
 
         int localId = -1; // Analyzer 虚拟槽位分配
     };
@@ -111,7 +111,7 @@ namespace Fig
         // 符号操作
 
         // 注册符号, 返回分配的 localId。调用前内部执行同级作用域重定义断言
-        int Define(const String &name, TypeTag type, bool isPublic, bool isConst)
+        int Define(const String &name, TypeInfo *type, bool isPublic, bool isConst)
         {
             for (auto it = symbols.rbegin(); it != symbols.rend(); ++it)
             {

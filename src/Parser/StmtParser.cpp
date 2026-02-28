@@ -357,7 +357,8 @@ namespace Fig
             {
                 if (!currentToken().isIdentifier())
                 {
-                    return std::unexpected(makeUnexpectTokenError("fn params", "param name", currentToken()));
+                    return std::unexpected(
+                        makeUnexpectTokenError("fn params", "param name", currentToken()));
                 }
             }
         }
@@ -418,11 +419,34 @@ namespace Fig
             {
                 delete returnType;
             }
-            body = *bodyResult;
+            return std::unexpected(bodyResult.error());
         }
+        body = *bodyResult;
 
         FnDefStmt *fnDef = new FnDefStmt(isPublic, name, params, returnType, body, location);
         return fnDef;
+    }
+
+    Result<ReturnStmt *, Error>
+    Parser::parseReturnStmt() // 由 parseStatement调用, 当前token为 return
+    {
+        StateProtector p(this, {State::ParsingReturn});
+
+        SourceLocation location = makeSourceLocation(consumeToken()); // consume `return`
+        auto           result   = parseExpression();
+        if (!result)
+        {
+            return std::unexpected(result.error());
+        }
+
+        Expr       *value      = *result;
+        ReturnStmt *returnStmt = new ReturnStmt(value, location);
+
+        if (!match(TokenType::Semicolon))
+        {
+            return std::unexpected(makeExpectSemicolonError());
+        }
+        return returnStmt;
     }
 
     Result<Stmt *, Error> Parser::parseStatement()
@@ -469,6 +493,33 @@ namespace Fig
         if (currentToken().type == TokenType::Function)
         {
             return parseFnDefStmt(false);
+        }
+
+        if (currentToken().type == TokenType::Return)
+        {
+            return parseReturnStmt();
+        }
+
+        if (match(TokenType::Break))
+        {
+            SourceLocation location = makeSourceLocation(prevToken());
+            if (!match(TokenType::Semicolon))
+            {
+                return std::unexpected(makeExpectSemicolonError());
+            }
+            BreakStmt *breakStmt = new BreakStmt(location);
+            return breakStmt;
+        }
+
+        if (match(TokenType::Continue))
+        {
+            SourceLocation location = makeSourceLocation(prevToken());
+            if (!match(TokenType::Semicolon))
+            {
+                return std::unexpected(makeExpectSemicolonError());
+            }
+            ContinueStmt *continueStmt = new ContinueStmt(location);
+            return continueStmt;
         }
 
         if (isEOF)

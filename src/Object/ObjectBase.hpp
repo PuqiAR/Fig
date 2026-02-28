@@ -111,11 +111,6 @@ namespace Fig
             return IsDouble() || IsInt();
         }
 
-        [[nodiscard]] constexpr bool IsObject() const
-        {
-            return (v_ & (SIGN_BIT | QNAN_MASK)) == (SIGN_BIT | QNAN_MASK);
-        }
-
         [[nodiscard]] constexpr bool IsNull() const
         {
             return v_ == (QNAN_MASK | TAG_NULL);
@@ -126,6 +121,11 @@ namespace Fig
             return (v_ | 1) == (QNAN_MASK | TAG_TRUE);
         }
 
+        [[nodiscard]] constexpr bool IsObject() const
+        {
+            return (v_ & (SIGN_BIT | QNAN_MASK)) == (SIGN_BIT | QNAN_MASK);
+        }
+        
         // 提取数据 (Unbox / As)
         [[nodiscard]] constexpr double AsDouble() const
         {
@@ -182,33 +182,7 @@ namespace Fig
         // 类函数
 
         [[nodiscard]]
-        constexpr String ToString() const
-        {
-            if (IsNull())
-            {
-                return "null";
-            }
-            else if (IsInt())
-            {
-                return std::to_string(AsInt());
-            }
-            else if (IsDouble())
-            {
-                return std::format("{}", AsDouble());
-            }
-            else if (IsBool())
-            {
-                return (AsBool() ? "true" : "false");
-            }
-            else if (IsObject())
-            {
-                return "Object"; // TODO: 分派
-            }
-            else
-            {
-                return "Unknow";
-            }
-        }
+        constexpr String ToString() const;
     };
 
     /*
@@ -223,15 +197,35 @@ namespace Fig
         Instance,
     };
 
-    struct Struct /* : public Object */; // 结构体基类的定义，前向声明
+    struct StructObject /* : public Object */; // 结构体基类的定义，前向声明
 
     // Total 24 bytes size
     struct Object
     {
         Object    *next;             // 8 bytes: gc链表
-        Struct    *klass;            // 8 bytes: 一切皆对象，父类指针
+        StructObject    *klass;            // 8 bytes: 一切皆对象，父类指针
         ObjectType type;             // 1 byte : 类型
         bool       isMarked = false; // 1 byte : gc标记
         // + 6 bytes padding
+
+        constexpr bool isString() const
+        {
+            return type == ObjectType::String;
+        }
+
+        constexpr bool isFunction() const
+        {
+            return type == ObjectType::Function;
+        }
+
+        constexpr bool isStruct() const
+        {
+            return type == ObjectType::Struct;
+        }
+
+        constexpr bool isInstance() const
+        {
+            return type == ObjectType::Instance;
+        }
     };
 } // namespace Fig
