@@ -16,6 +16,18 @@
 
 namespace Fig
 {
+    struct CallFrame
+    {
+        Proto       *proto;        // 当前执行的原型
+        Instruction *ip;           // 当前指令指针
+        Value       *registerBase; // 寄存器起点
+
+        inline Value getConstant(std::uint16_t idx)
+        {
+            return proto->constants[idx];
+        }
+    };
+
     class VM
     {
     private:
@@ -24,6 +36,8 @@ namespace Fig
         // 一次性分配
         Value registers[MAX_REGISTERS];
 
+        DynArray<CallFrame> frames;
+        CallFrame *currentFrame;
     public:
         VM()
         {
@@ -34,6 +48,26 @@ namespace Fig
         }
 
     private:
+        
+        void pushFrame(Proto *proto, Value *base)
+        {
+            frames.push_back({
+                proto,
+                proto->code.data(),
+                base
+            });
+            currentFrame = &frames.back();
+        }
+
+        void popFrame()
+        {
+            frames.pop_back();
+            if (!frames.empty())
+            {
+                currentFrame = &frames.back();
+            }
+        }
+
         inline OpCode decodeOpCode(Instruction inst)
         {
             return static_cast<OpCode>(inst & 0xFF);
@@ -61,7 +95,7 @@ namespace Fig
 
     public:
         // 执行入口：接收 Proto
-        Result<Value, Error> Execute(Proto *proto);
+        Result<Value, Error> Execute(CompiledModule *);
 
         inline void PrintRegisters()
         {

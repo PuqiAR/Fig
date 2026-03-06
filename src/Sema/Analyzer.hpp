@@ -87,6 +87,7 @@ namespace Fig
 
         Result<void, Error> analyzeIdentiExpr(IdentiExpr *);
         Result<void, Error> analyzeInfixExpr(InfixExpr *);
+        Result<void, Error> analyzeCallExpr(CallExpr *);
 
         Result<void, Error> analyzeStmt(Stmt *);
         Result<void, Error> analyzeExpr(Expr *);

@@ -182,7 +182,7 @@ namespace Fig
         // 类函数
 
         [[nodiscard]]
-        constexpr String ToString() const;
+        String ToString() const;
     };
 
     /*

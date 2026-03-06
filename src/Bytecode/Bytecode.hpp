@@ -20,9 +20,17 @@ namespace Fig
 
     enum class OpCode : std::uint8_t
     {
-        Exit,   // 结束运行
-        LoadK,  // iABx 模式: R[A] = Constants[Bx]
-        Return, // iA 模式: 返回 R[A] 的值
+        Exit,      // 结束运行
+        LoadK,     // iABx 模式: R[A] = Constants[Bx]
+        LoadTrue,  // iABC: R[A] = true
+        LoadFalse, // iABC: R[A] = false
+        LoadNull,  // iABC: R[A] = null
+
+        FastCall, // iABC: A: ProtoIdx, B: 函数起始寄存器
+        Call,     // 动态派发 iABC: A: 函数体对象寄存器 B: 函数起始寄存器
+        Return,   // iABC 模式: 返回 R[A] 的值
+
+        LoadFn, // 惰性装修, iABx: R[A] = new FunctionObject...
 
         Jmp,        // iAsBx: ip += sBx 无条件跳转
         JmpIfFalse, // iAsBx: 如果 R[A] 为假, ip += sBx

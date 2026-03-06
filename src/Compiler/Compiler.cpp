@@ -9,9 +9,8 @@
 
 namespace Fig
 {
-    Result<Proto *, Error> Compiler::Compile(Program *program)
+    Result<CompiledModule *, Error> Compiler::Compile(Program *program)
     {
-        current->proto   = new Proto();
         current->freeReg = 0;
 
         for (Stmt *stmt : program->nodes)
@@ -22,7 +21,16 @@ namespace Fig
                 return std::unexpected(result.error());
             }
         }
+
+        if (mainFuncIndex != -1)
+        {
+            std::uint8_t baseReg = AllocReg();
+            Emit(Op::iABC(OpCode::FastCall, mainFuncIndex, baseReg, 0));
+        }
+
         Emit(Op::iABC(OpCode::Exit, 0, 0, 0)); // 一定要退出,这是虚拟机退出信号,否则ub
-        return current->proto;
+        
+        CompiledModule *compiledModule = new CompiledModule(fileName, allProtos);
+        return compiledModule;
     }
 }; // namespace Fig

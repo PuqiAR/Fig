@@ -19,7 +19,7 @@
 
 namespace Fig
 {
-    // 编译产物
+    // 编译产物-函数
     struct Proto
     {
         DynArray<Instruction> code;
@@ -34,7 +34,7 @@ namespace Fig
         int          depth;   // 物理作用域深度(用于 EndScope 释放寄存器)
     };
 
-    inline constexpr int MAX_LOCALS = 250;
+    inline constexpr int MAX_LOCALS    = 250;
     inline constexpr int MAX_CONSTANTS = UINT16_MAX + 1;
 
     // 任何跨函数、跨模块的编译，都压入弹出这个 State
@@ -58,6 +58,25 @@ namespace Fig
         // 注意：这里不 delete proto，因为 proto 是要作为编译产物吐出去的
     };
 
+    struct CompiledModule
+    {
+        String            name;   // 供调试/打印
+        DynArray<Proto *> protos; // 扁平化函数原型
+
+        CompiledModule(String _name, DynArray<Proto *> _protos) :
+            name(std::move(_name)), protos(std::move(_protos))
+        {
+        }
+
+        ~CompiledModule()
+        {
+            for (auto *p : protos)
+            {
+                delete p;
+            }
+        }
+    };
+
     class Compiler
     {
     private:
@@ -65,7 +84,13 @@ namespace Fig
 
         SourceManager &manager;
         FuncState     *current = nullptr; // 永远指向当前正在编译的上下文
+
+        int mainFuncIndex = -1;
+        HashMap<int, int> globalFuncMap; // localid -> ProtoIdx
+
     public:
+        DynArray<Proto *> allProtos;
+
         struct FuncStateProtector
         {
             Compiler  *compiler;
@@ -89,6 +114,7 @@ namespace Fig
         {
             // 初始化顶级作用域
             current = new FuncState("global", nullptr);
+            allProtos.push_back(current->proto); // 最顶层, bootstrapper
         }
 
         ~Compiler()
@@ -102,7 +128,8 @@ namespace Fig
             }
         }
 
-        Result<Proto *, Error> Compile(Program *program);
+        Result<CompiledModule *, Error> Compile(Program *program);
+
     private:
         void PushState(String _name)
         {
@@ -158,10 +185,9 @@ namespace Fig
 
         std::uint16_t AddConstant(Value v)
         {
-            // TODO: 查重
             auto it =
                 std::find(current->proto->constants.begin(), current->proto->constants.end(), v);
-            if (it != current->proto->constants.end()) 
+            if (it != current->proto->constants.end())
             {
                 return std::distance(current->proto->constants.begin(), it);
             }
@@ -245,6 +271,8 @@ namespace Fig
         Result<std::uint8_t, Error> compileLeftValue(
             Expr *); // 左值对象，可以是变量、结构体字段或模块对象
 
+        Result<std::uint8_t, Error> compileCallExpr(CallExpr *);
+
         Result<std::uint8_t, Error> compileExpr(Expr *);
 
         /* Statements */
@@ -252,6 +280,8 @@ namespace Fig
         Result<void, Error> compileBlockStmt(BlockStmt *);
         Result<void, Error> compileIfStmt(IfStmt *);
         Result<void, Error> compileWhileStmt(WhileStmt *);
+        Result<void, Error> compileFnDefStmt(FnDefStmt *);
+        Result<void, Error> compileReturnStmt(ReturnStmt *);
 
         Result<void, Error> compileStmt(Stmt *);
     };
@@ -271,6 +301,10 @@ namespace Fig
 
         switch (op)
         {
+            case OpCode::Exit: {
+                break;
+            }
+
             case OpCode::Mov: {
                 // iABx 模式
                 std::uint16_t bx = (inst >> 16) & 0xFFFF;
@@ -292,6 +326,22 @@ namespace Fig
                 break;
             }
 
+            case OpCode::FastCall:
+            {
+                std::uint8_t b = (inst >> 16) & 0xFF;
+                std::cout << std::format("Proto{:<3} R[{}]+", a, b);
+                break;
+            }
+            case OpCode::Call:
+            {
+                std::uint8_t b = (inst >> 16) & 0xFF;
+                std::cout << std::format("R{:<3} R[{}]+", a, b);
+                break;
+            }
+
+            case OpCode::LoadTrue:
+            case OpCode::LoadFalse:
+            case OpCode::LoadNull:
             case OpCode::Add:
             case OpCode::Sub:
             case OpCode::Mul:
@@ -308,17 +358,24 @@ namespace Fig
                 std::cout << std::format("R{}", a);
                 break;
             }
-            default: {
-                std::cout << "?";
+
+            case OpCode::LoadFn: {
+                std::uint16_t bx = (inst >> 16) & 0xFFFF;
+                std::cout << std::format("R{:<3} Proto[{}]", a, bx);
                 break;
             }
+
+                // default: {
+                //     std::cout << "?";
+                //     break;
+                // }
         }
         std::cout << '\n';
     }
 
     inline void DumpCode(const DynArray<Instruction> &code)
     {
-        std::cout << "=== Bytecode ===\n";
+        std::cout << "  Bytecode\n";
         for (std::size_t i = 0; i < code.size(); ++i)
         {
             DisassembleInstruction(code[i], i);

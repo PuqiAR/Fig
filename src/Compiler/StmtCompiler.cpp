@@ -175,6 +175,67 @@ namespace Fig
         return {};
     }
 
+    Result<void, Error> Compiler::compileFnDefStmt(FnDefStmt *stmt)
+    {
+        std::uint8_t funcReg = DeclareLocal(stmt->localId);
+
+        // 创建子函数编译状态
+        // 传入 current 作为 enclosing，用于后续支持闭包 Upvalue 查找
+        FuncState childState(stmt->name, current);
+        
+        allProtos.push_back(childState.proto);
+        std::uint16_t protoIdx = static_cast<std::uint16_t>(allProtos.size() - 1);
+
+        globalFuncMap[stmt->localId] = protoIdx; // 把函数的local id映射到protoIdx
+
+        {
+            FuncStateProtector stateGuard(this, &childState);
+
+            AllocReg();
+
+            // 将参数映射为子函数的初始局部变量 (R0, R1...)
+            for (Param *p : stmt->params)
+            {
+                PosParam *posParam = static_cast<PosParam *>(p); // TODO: 其他参数支持...
+                // 按顺序分配寄存器
+                DeclareLocal(posParam->localId);
+            }
+
+            // B编译函数体语句
+            auto bodyRes = compileStmt(stmt->body);
+            if (!bodyRes)
+                return bodyRes;
+
+            // 隐式返回 null
+            std::uint8_t resReg = AllocReg();
+            Emit(Op::iABC(OpCode::LoadNull, resReg, 0, 0));
+            Emit(Op::iABC(OpCode::Return, resReg, 0, 0));
+        }
+
+
+        // 5. 检查是否是 main 函数
+        if (stmt->name == U"main")
+        {
+            this->mainFuncIndex = protoIdx;
+        }
+
+        Emit(Op::iABx(OpCode::LoadFn, funcReg, protoIdx));
+
+        return {};
+    }
+
+    Result<void, Error> Compiler::compileReturnStmt(ReturnStmt *stmt)
+    {
+        auto res = compileExpr(stmt->value);
+        if (!res)
+        {
+            return std::unexpected(res.error());
+        }
+
+        Emit(Op::iABC(OpCode::Return, *res, 0, 0));
+        return {};
+    }
+
     Result<void, Error> Compiler::compileStmt(Stmt *stmt) // 编译语句
     {
         switch (stmt->type)
@@ -205,6 +266,14 @@ namespace Fig
 
             case AstType::WhileStmt: {
                 return compileWhileStmt(static_cast<WhileStmt *>(stmt));
+            }
+
+            case AstType::FnDefStmt: {
+                return compileFnDefStmt(static_cast<FnDefStmt *>(stmt));
+            }
+            
+            case AstType::ReturnStmt: {
+                return compileReturnStmt(static_cast<ReturnStmt *>(stmt));
             }
         }
 

@@ -9,7 +9,7 @@
 
 namespace Fig
 {
-    constexpr String Value::ToString() const
+    String Value::ToString() const
     {
         if (IsNull())
         {

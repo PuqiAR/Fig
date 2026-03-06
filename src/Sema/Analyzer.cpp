@@ -282,7 +282,8 @@ namespace Fig
         }
 
         TypeInfo *valueType = stmt->value->resolvedType;
-        if (currentReturnType != typeCtx.GetAny() && currentReturnType != valueType)
+
+        if (!currentReturnType->isAny() && !valueType->isAny() && currentReturnType != valueType)
         {
             return std::unexpected(Error(ErrorType::TypeError,
                 std::format("return type mismatch: expects '{}', got `{}`",
@@ -500,6 +501,36 @@ namespace Fig
         return {};
     }
 
+    Result<void, Error> Analyzer::analyzeCallExpr(CallExpr *expr)
+    {
+        auto calleeRes = analyzeExpr(expr->callee);
+        if (!calleeRes)
+        {
+            return calleeRes;
+        }
+
+        if (expr->callee->resolvedType != typeCtx.GetAny()
+            && expr->callee->resolvedType != typeCtx.GetFunction())
+        {
+            return std::unexpected(Error(ErrorType::TypeError,
+                std::format("object `{}` is not callable", expr->callee->toString()),
+                "none",
+                makeSourceLocation(expr->callee)));
+        }
+
+        for (auto *arg : expr->args.args)
+        {
+            auto argRes = analyzeExpr(arg);
+            if (!argRes)
+            {
+                return argRes;
+            }
+        }
+        expr->resolvedType = typeCtx.GetAny();
+
+        return {};
+    }
+
     Result<void, Error> Analyzer::analyzeStmt(Stmt *stmt)
     {
         if (!stmt)
@@ -596,10 +627,17 @@ namespace Fig
                 return {};
             }
 
-            case AstType::IdentiExpr: return analyzeIdentiExpr(static_cast<IdentiExpr *>(expr));
+            case AstType::IdentiExpr: {
+                return analyzeIdentiExpr(static_cast<IdentiExpr *>(expr));
+            }
 
-            case AstType::InfixExpr:
+            case AstType::InfixExpr: {
                 return analyzeInfixExpr(static_cast<InfixExpr *>(expr));
+            }
+
+            case AstType::CallExpr: {
+                return analyzeCallExpr(static_cast<CallExpr *>(expr));
+            }
 
                 // TODO: PrefixExpr (前缀), CallExpr (函数调用), MemberExpr (属性访问)
 

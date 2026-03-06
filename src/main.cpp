@@ -50,34 +50,53 @@ int main()
     std::cout << "analyzer: Program OK, PASSED\n";
 
     Compiler    compiler(fileName, manager);
-    const auto &proto_result = compiler.Compile(program);
-    if (!proto_result)
+    const auto &comp_result = compiler.Compile(program);
+    if (!comp_result)
     {
-        ReportError(proto_result.error(), manager);
+        ReportError(comp_result.error(), manager);
         return 1;
     }
+    
+    CompiledModule *compiledModule = *comp_result;
 
-    Proto *proto = *proto_result;
-
-    std::cout << "=== Constant Pool ===" << '\n';
-    for (size_t i = 0; i < proto->constants.size(); ++i)
+    size_t cnt = 0;
+    for (Proto *proto : compiledModule->protos)
     {
-        std::print("[{}] {}\n", i, proto->constants[i].ToString());
+        std::cout << "\n"
+                  << "Proto: " << cnt++ << '\n';
+        std::cout << "  Constant Pool" << '\n';
+        for (size_t i = 0; i < proto->constants.size(); ++i)
+        {
+            std::print("[{}] {}\n", i, proto->constants[i].ToString());
+        }
+
+        DumpCode(proto->code);
+
+        std::cout << "\nMax Stack Size: " << (int) proto->maxStack << std::endl;
     }
-
-    DumpCode(proto->code);
-
-    std::cout << "\nMax Stack Size: " << (int) proto->maxStack << std::endl;
-
+    
     VM vm;
 
-    auto result_ = vm.Execute(proto);
+    using Clock = std::chrono::high_resolution_clock;
+
+    Clock clock;
+
+    auto start = clock.now();
+
+    auto result_ = vm.Execute(compiledModule);
+
+    auto end = clock.now();
+    auto duration = end - start;
+
     if (!result_)
     {
         ReportError(result_.error(), manager);
         return 1;
     }
+
     Value result = *result_;
     std::cout << "result: " << result.ToString() << "\n";
+    std::cout << "execution cost: " << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() << "ms\n";
+    
     vm.PrintRegisters();
 }

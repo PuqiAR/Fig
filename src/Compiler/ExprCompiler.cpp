@@ -65,19 +65,17 @@ namespace Fig
             assert("false" && "CompileLiteral: unsupport literal");
         }
 
-        std::uint8_t  targetReg = AllocReg();
+        std::uint8_t targetReg = AllocReg();
 
         if (current->proto->constants.size() >= MAX_CONSTANTS)
         {
-            return std::unexpected(Error(
-                ErrorType::TooManyConstants,
+            return std::unexpected(Error(ErrorType::TooManyConstants,
                 std::format("constant limit exceeded: {}", MAX_CONSTANTS),
                 "How did you write such code? try global variable or split file",
-                makeSourceLocation(lit)
-            ));
+                makeSourceLocation(lit)));
         }
 
-        std::uint16_t kIndex    = AddConstant(v);
+        std::uint16_t kIndex = AddConstant(v);
 
         Emit(Op::iABx(OpCode::LoadK, targetReg, kIndex));
         return targetReg;
@@ -230,6 +228,75 @@ namespace Fig
                 return 0;
         }
     }
+
+    Result<std::uint8_t, Error> Compiler::compileCallExpr(CallExpr *expr)
+    {
+        bool isStatic = false; // 是否为单纯的 fn(...) 静态函数调用
+        int  protoIdx = -1;
+
+        if (expr->callee->type == AstType::IdentiExpr)
+        {
+            IdentiExpr *id = static_cast<IdentiExpr *>(expr->callee);
+            // 如果是函数名且深度为 0 (全局/扁平函数池)
+            if (id->resolvedType->tag == TypeTag::Function && id->resolvedDepth == 0)
+            {
+                if (globalFuncMap.contains(id->localId))
+                {
+                    isStatic = true;
+                    protoIdx = globalFuncMap[id->localId];
+                }
+            }
+        }
+
+        std::uint8_t baseReg = AllocReg();
+
+        if (!isStatic)
+        {
+            auto calleeRes = compileExpr(expr->callee);
+            if (!calleeRes)
+            {
+                return calleeRes;
+            }
+
+            if (*calleeRes != baseReg)
+            {
+                Emit(Op::iABx(OpCode::Mov, baseReg, *calleeRes));
+            }
+        }
+        
+        for (size_t i = 0; i < expr->args.size(); ++i)
+        {
+            std::uint8_t argTarget = AllocReg();
+            auto argRes = compileExpr(expr->args.args[i]);
+            if (!argRes)
+            {
+                return argRes;
+            }
+
+            if (*argRes != argTarget)
+            {
+                Emit(Op::iABx(OpCode::Mov, argTarget, *argRes));
+            }
+        }
+
+        std::uint8_t expectRet = 1;
+
+        if (isStatic)
+        {
+            Emit(Op::iABC(OpCode::FastCall, (std::uint8_t) protoIdx, baseReg, expectRet));
+        }
+        else
+        {
+            Emit(Op::iABC(OpCode::Call, baseReg, baseReg, expectRet));
+        }
+
+        for (size_t i = 0; i < expr->args.args.size(); ++i)
+        {
+            current->freeReg--;
+        }
+        return baseReg; // 返回值起点
+    }
+
     Result<std::uint8_t, Error> Compiler::compileExpr(
         Expr *expr) // 编译表达式，必定返回一个存放结果的寄存器 ID
     {
@@ -242,6 +309,7 @@ namespace Fig
             case AstType::IdentiExpr: {
                 return compileLeftValue(expr); // 左值直接转换成右值
             }
+
             case AstType::LiteralExpr: {
                 LiteralExpr *lit = static_cast<LiteralExpr *>(expr);
 
@@ -253,8 +321,13 @@ namespace Fig
                 std::uint8_t targetReg = *result;
                 return targetReg;
             }
+
             case AstType::InfixExpr: {
                 return compileInfixExpr(static_cast<InfixExpr *>(expr));
+            }
+
+            case AstType::CallExpr: {
+                return compileCallExpr(static_cast<CallExpr *>(expr));
             }
         }
     }
