@@ -41,7 +41,9 @@ namespace Fig::CoreIO
 
     void InitConsoleIO()
     {
+#ifdef _WIN32
         SetConsoleCP(CP_UTF8);
         SetConsoleOutputCP(CP_UTF8);
+#endif
     }
 };

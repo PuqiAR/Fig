@@ -14,7 +14,7 @@ namespace Fig
         StateProtector p(this, {State::ParsingLiteralExpr});
 
         const Token &literal_token = consumeToken();
-        LiteralExpr *node = new LiteralExpr(literal_token, makeSourceLocation(literal_token));
+        LiteralExpr *node = arena.Allocate<LiteralExpr>(literal_token, makeSourceLocation(literal_token));
         return node;
     }
     Result<IdentiExpr *, Error> Parser::parseIdentiExpr() // 当前token为Identifier调用
@@ -22,7 +22,7 @@ namespace Fig
         StateProtector p(this, {State::ParsingIdentiExpr});
 
         const Token &identifier = consumeToken();
-        IdentiExpr  *node       = new IdentiExpr(
+        IdentiExpr  *node       = arena.Allocate<IdentiExpr>(
             srcManager.GetSub(identifier.index, identifier.length), makeSourceLocation(identifier));
         return node;
     }
@@ -42,7 +42,7 @@ namespace Fig
         }
         Expr *rhs = *rhs_result;
 
-        InfixExpr *node = new InfixExpr(lhs, op, rhs);
+        InfixExpr *node = arena.Allocate<InfixExpr>(lhs, op, rhs);
         return node;
     }
 
@@ -61,7 +61,7 @@ namespace Fig
         }
 
         Expr       *rhs  = *rhs_result;
-        PrefixExpr *node = new PrefixExpr(op, rhs);
+        PrefixExpr *node = arena.Allocate<PrefixExpr>(op, rhs);
         return node;
     }
 
@@ -87,7 +87,7 @@ namespace Fig
         }
         consumeToken(); // consume `]`
 
-        IndexExpr *indexExpr = new IndexExpr(base, *index_result);
+        IndexExpr *indexExpr = arena.Allocate<IndexExpr>(base, *index_result);
         return indexExpr;
     }
 
@@ -104,7 +104,7 @@ namespace Fig
         if (currentToken().type == TokenType::RightParen)
         {
             consumeToken(); // consume `)`
-            return new CallExpr(callee, callArgs);
+            return arena.Allocate<CallExpr>(callee, callArgs);
         }
 
         while (true)
@@ -140,7 +140,7 @@ namespace Fig
             consumeToken(); // consume `,`
         }
 
-        return new CallExpr(callee, callArgs);
+        return arena.Allocate<CallExpr>(callee, callArgs);
     }
 
     Result<Expr *, Error> Parser::parseExpression(BindingPower rbp)

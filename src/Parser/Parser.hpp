@@ -12,6 +12,7 @@
 #include <Error/Error.hpp>
 #include <Lexer/Lexer.hpp>
 #include <Token/Token.hpp>
+#include <Utils/Arena.hpp>
 
 #include <cstddef>
 #include <cstdlib>
@@ -24,6 +25,7 @@ namespace Fig
     class Parser
     {
     private:
+        Arena          arena;
         Lexer         &lexer;
         SourceManager &srcManager;
 

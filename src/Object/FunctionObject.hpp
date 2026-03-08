@@ -9,7 +9,6 @@
 
 #include <Object/ObjectBase.hpp>
 
-
 namespace Fig
 {
     // 运行时闭包对象 (24字节 Base + 8字节 Proto指针 = 32 bytes)
@@ -17,7 +16,9 @@ namespace Fig
     struct Proto;
     struct FunctionObject final : public Object
     {
+        String name;  // 调试使用
         Proto *proto; // 指向编译器生成的只读字节码与常量池
+        std::uint8_t paraCount;
 
         // TODO: 实现闭包时 加一个 Upvalue 指针数组
         // Value* upvalues;

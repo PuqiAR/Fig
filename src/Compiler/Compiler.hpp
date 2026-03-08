@@ -346,7 +346,13 @@ namespace Fig
             case OpCode::Sub:
             case OpCode::Mul:
             case OpCode::Div:
-            case OpCode::Mod: {
+            case OpCode::Mod: 
+            
+            case OpCode::IntFastAdd:
+            case OpCode::IntFastSub:
+            case OpCode::IntFastMul:
+            case OpCode::IntFastDiv:
+            {
                 // iABC 模式：解析 B (16~23 位) 和 C (24~31 位)
                 std::uint8_t b = (inst >> 16) & 0xFF;
                 std::uint8_t c = (inst >> 24) & 0xFF;

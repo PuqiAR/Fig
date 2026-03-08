@@ -11,7 +11,7 @@ namespace Fig
 {
     Result<Program *, Error> Parser::Parse()
     {
-        Program *program = new Program;
+        Program *program = arena.Allocate<Program>();
         while (!isEOF)
         {
             auto result = parseStatement();
@@ -27,5 +27,6 @@ namespace Fig
             program->nodes.push_back(stmt);
         }
         return program;
+    
     }
 }; // namespace Fig

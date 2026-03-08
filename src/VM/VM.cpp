@@ -86,24 +86,37 @@ namespace Fig
         pushFrame(entry, registers);
 
         // 🔥 必须与 Bytecode.hpp 中的 OpCode 枚举严格一一对应！
-        static const void *dispatchTable[] = {&&do_Exit,
+        static const void *dispatchTable[] = {
+            &&do_Exit,
+
             &&do_LoadK,
             &&do_LoadTrue,
             &&do_LoadFalse,
             &&do_LoadNull,
+
             &&do_FastCall,
             &&do_Call,
             &&do_Return,
+
             &&do_LoadFn,
+
             &&do_Jmp,
             &&do_JmpIfFalse,
+
             &&do_Mov,
+
             &&do_Add,
             &&do_Sub,
             &&do_Mul,
             &&do_Div,
             &&do_Mod,
             &&do_BitXor,
+
+            &&do_IntFastAdd,
+            &&do_IntFastSub,
+            &&do_IntFastMul,
+            &&do_IntFastDiv,
+
             &&do_Equal,
             &&do_NotEqual,
             &&do_Greater,
@@ -114,7 +127,7 @@ namespace Fig
 
         Instruction inst;
 
-// 🔥 核心分发引擎：取指 -> 直接查表并 Jump
+// 取指 -> 直接查表并 Jump
 #define DISPATCH()                                                                                 \
     do                                                                                             \
     {                                                                                              \
@@ -122,7 +135,7 @@ namespace Fig
         goto *dispatchTable[inst & 0xFF];                                                          \
     } while (0)
 
-        // 引擎点火！
+        // 引擎点火!! :3
         DISPATCH();
 
     do_Exit: {
@@ -215,6 +228,54 @@ namespace Fig
         assert(false && "VM: Mod and BitXor not fully implemented yet!");
         DISPATCH();
 
+    do_IntFastAdd: {
+        std::uint8_t a = decodeA(inst);
+        std::uint8_t b = decodeB(inst);
+        std::uint8_t c = decodeC(inst);
+
+        Value l = currentFrame->registerBase[b];
+        Value r = currentFrame->registerBase[c];
+
+        currentFrame->registerBase[a] = Value::FromInt(l.AsInt() + r.AsInt());
+        DISPATCH();
+    }
+
+    do_IntFastSub: {
+        std::uint8_t a = decodeA(inst);
+        std::uint8_t b = decodeB(inst);
+        std::uint8_t c = decodeC(inst);
+
+        Value l = currentFrame->registerBase[b];
+        Value r = currentFrame->registerBase[c];
+
+        currentFrame->registerBase[a] = Value::FromInt(l.AsInt() - r.AsInt());
+        DISPATCH();
+    }
+
+    do_IntFastMul: {
+        std::uint8_t a = decodeA(inst);
+        std::uint8_t b = decodeB(inst);
+        std::uint8_t c = decodeC(inst);
+
+        Value l = currentFrame->registerBase[b];
+        Value r = currentFrame->registerBase[c];
+
+        currentFrame->registerBase[a] = Value::FromInt(l.AsInt() * r.AsInt());
+        DISPATCH();
+    }
+
+    do_IntFastDiv: {
+        std::uint8_t a = decodeA(inst);
+        std::uint8_t b = decodeB(inst);
+        std::uint8_t c = decodeC(inst);
+
+        Value l = currentFrame->registerBase[b];
+        Value r = currentFrame->registerBase[c];
+
+        currentFrame->registerBase[a] = Value::FromDouble(l.AsInt() + r.AsInt());
+        DISPATCH();
+    }
+
         BINARY_COMPARE_OP(Equal, ==);
         BINARY_COMPARE_OP(NotEqual, !=);
         BINARY_COMPARE_OP(Greater, >);
@@ -226,5 +287,6 @@ namespace Fig
         assert(false && "Hit Count sentinel!");
         return Value::GetNullInstance();
     }
+
     }
 }; // namespace Fig

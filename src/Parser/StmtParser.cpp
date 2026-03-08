@@ -12,7 +12,7 @@ namespace Fig
     Result<BlockStmt *, Error> Parser::parseBlockStmt() // 当前token为 {
     {
         SourceLocation location = makeSourceLocation(consumeToken()); // consume `{`
-        BlockStmt     *stmt     = new BlockStmt();
+        BlockStmt     *stmt     = arena.Allocate<BlockStmt>();
         while (true)
         {
             if (isEOF)
@@ -94,7 +94,7 @@ namespace Fig
         {
             return std::unexpected(makeExpectSemicolonError());
         }
-        VarDecl *varDecl = new VarDecl(isPublic, name, typeSpeicifer, isInfer, initExpr, location);
+        VarDecl *varDecl = arena.Allocate<VarDecl>(isPublic, name, typeSpeicifer, isInfer, initExpr, location);
         return varDecl;
     }
 
@@ -207,7 +207,7 @@ namespace Fig
                     return std::unexpected(result.error());
                 }
                 BlockStmt  *consequent = *result;
-                ElseIfStmt *elif       = new ElseIfStmt(cond, consequent, elseLocation);
+                ElseIfStmt *elif       = arena.Allocate<ElseIfStmt>(cond, consequent, elseLocation);
                 elifs.push_back(elif);
             }
             else
@@ -233,7 +233,7 @@ namespace Fig
                 alternate = *result;
             }
         }
-        IfStmt *ifStmt = new IfStmt(cond, consequent, elifs, alternate, location);
+        IfStmt *ifStmt = arena.Allocate<IfStmt>(cond, consequent, elifs, alternate, location);
         return ifStmt;
     }
 
@@ -291,7 +291,7 @@ namespace Fig
         }
         BlockStmt *body = *result;
 
-        WhileStmt *whileStmt = new WhileStmt(cond, body, location);
+        WhileStmt *whileStmt = arena.Allocate<WhileStmt>(cond, body, location);
         return whileStmt;
     }
 
@@ -350,7 +350,7 @@ namespace Fig
                 defaultValue = *result;
             }
 
-            PosParam *posParam = new PosParam(name, type, defaultValue, location);
+            PosParam *posParam = arena.Allocate<PosParam>(name, type, defaultValue, location);
             params.push_back(posParam);
 
             if (match(TokenType::Comma))
@@ -423,7 +423,7 @@ namespace Fig
         }
         body = *bodyResult;
 
-        FnDefStmt *fnDef = new FnDefStmt(isPublic, name, params, returnType, body, location);
+        FnDefStmt *fnDef = arena.Allocate<FnDefStmt>(isPublic, name, params, returnType, body, location);
         return fnDef;
     }
 
@@ -440,7 +440,7 @@ namespace Fig
         }
 
         Expr       *value      = *result;
-        ReturnStmt *returnStmt = new ReturnStmt(value, location);
+        ReturnStmt *returnStmt = arena.Allocate<ReturnStmt>(value, location);
 
         if (!match(TokenType::Semicolon))
         {
@@ -507,7 +507,7 @@ namespace Fig
             {
                 return std::unexpected(makeExpectSemicolonError());
             }
-            BreakStmt *breakStmt = new BreakStmt(location);
+            BreakStmt *breakStmt = arena.Allocate<BreakStmt>(location);
             return breakStmt;
         }
 
@@ -518,7 +518,7 @@ namespace Fig
             {
                 return std::unexpected(makeExpectSemicolonError());
             }
-            ContinueStmt *continueStmt = new ContinueStmt(location);
+            ContinueStmt *continueStmt = arena.Allocate<ContinueStmt>(location);
             return continueStmt;
         }
 
@@ -532,7 +532,7 @@ namespace Fig
         {
             return std::unexpected(expr_result.error());
         }
-        ExprStmt *exprStmt = new ExprStmt(*expr_result);
+        ExprStmt *exprStmt = arena.Allocate<ExprStmt>(*expr_result);
         if (!match(TokenType::Semicolon))
         {
             return std::unexpected(makeExpectSemicolonError());

@@ -5,8 +5,6 @@
     @date 2026-02-25
 */
 
-#pragma once
-
 #include <Parser/Parser.hpp>
 
 namespace Fig
@@ -37,7 +35,7 @@ namespace Fig
                 break;
             }
         }
-        NamedTypeExpr *namedTypeExpr = new NamedTypeExpr(path, location);
+        NamedTypeExpr *namedTypeExpr = arena.Allocate<NamedTypeExpr>(path, location);
         return namedTypeExpr;
     }
 

@@ -21,6 +21,7 @@ namespace Fig
     enum class OpCode : std::uint8_t
     {
         Exit,      // 结束运行
+        
         LoadK,     // iABx 模式: R[A] = Constants[Bx]
         LoadTrue,  // iABC: R[A] = true
         LoadFalse, // iABC: R[A] = false
@@ -35,13 +36,19 @@ namespace Fig
         Jmp,        // iAsBx: ip += sBx 无条件跳转
         JmpIfFalse, // iAsBx: 如果 R[A] 为假, ip += sBx
 
-        Mov,    // iABx: R[A] = R[Bx]
+        Mov, // iABx: R[A] = R[Bx]
+
         Add,    // iABC: R[A] = R[B] + R[C]
         Sub,    // iABC: R[A] = R[B] - R[C]
         Mul,    // iABC: R[A] = R[B] * R[C]
         Div,    // iABC: R[A] = R[B] / R[C]
         Mod,    // iABC: R[A] = R[B] % R[C]
         BitXor, // iABC: R[A] = R[B] ^ R[C]
+
+        IntFastAdd, // iABC: R[A] (Int) = R[B] (Int) + R[C] (Int)
+        IntFastSub, // iABC: R[A] (Int) = R[B] (Int) - R[C] (Int)
+        IntFastMul, // iABC: R[A] (Int) = R[B] (Int) * R[C] (Int)
+        IntFastDiv, // iABC: R[A] (Double) = R[B] (Int) / R[C] (Int)
 
         Equal,        // iABC: R[A] = R[B] == R[C]
         NotEqual,     // iABC: R[A] = R[B] != R[C]

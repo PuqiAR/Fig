@@ -33,6 +33,41 @@ namespace Fig
         {
             return tag == TypeTag::Any;
         }
+
+        bool isNull() const
+        {
+            return tag == TypeTag::Null;
+        }
+
+        bool isInt() const
+        {
+            return tag == TypeTag::Int;
+        }
+
+        bool isDouble() const
+        {
+            return tag == TypeTag::Double;
+        }
+
+        bool isBool() const
+        {
+            return tag == TypeTag::Bool;
+        }
+
+        bool isString() const
+        {
+            return tag == TypeTag::String;
+        }
+
+        bool isFunction() const
+        {
+            return tag == TypeTag::Function;
+        }
+
+        bool isStruct() const
+        {
+            return tag == TypeTag::Struct;
+        }
     };
 
     // 全局唯一类型驻留池

@@ -139,13 +139,16 @@ namespace Fig
             return compileAssignment(infix);
         }
 
-        const auto &_lhsReg = compileExpr(infix->left);
+        Expr *left  = infix->left;
+        Expr *right = infix->right;
+
+        const auto &_lhsReg = compileExpr(left);
         if (!_lhsReg)
         {
             return _lhsReg;
         }
         std::uint8_t lhsReg  = *_lhsReg;
-        const auto  &_rhsReg = compileExpr(infix->right);
+        const auto  &_rhsReg = compileExpr(right);
         if (!_rhsReg)
         {
             return _rhsReg;
@@ -156,25 +159,58 @@ namespace Fig
         FreeReg(lhsReg);
 
         std::uint8_t resultReg = AllocReg();
+
         switch (infix->op)
         {
             case BinaryOperator::Add: {
-                Emit(Op::iABC(OpCode::Add, resultReg, lhsReg, rhsReg));
+                if (left->resolvedType == right->resolvedType && left->resolvedType->isInt())
+                {
+                    // Int + Int
+                    Emit(Op::iABC(OpCode::IntFastAdd, resultReg, lhsReg, rhsReg));
+                }
+                else
+                {
+                    Emit(Op::iABC(OpCode::Add, resultReg, lhsReg, rhsReg));
+                }
                 break;
             }
 
             case BinaryOperator::Subtract: {
-                Emit(Op::iABC(OpCode::Sub, resultReg, lhsReg, rhsReg));
+                if (left->resolvedType == right->resolvedType && left->resolvedType->isInt())
+                {
+                    // Int - Int
+                    Emit(Op::iABC(OpCode::IntFastSub, resultReg, lhsReg, rhsReg));
+                }
+                else
+                {
+                    Emit(Op::iABC(OpCode::Sub, resultReg, lhsReg, rhsReg));
+                }
                 break;
             }
 
             case BinaryOperator::Multiply: {
-                Emit(Op::iABC(OpCode::Mul, resultReg, lhsReg, rhsReg));
+                if (left->resolvedType == right->resolvedType && left->resolvedType->isInt())
+                {
+                    // Int * Int
+                    Emit(Op::iABC(OpCode::IntFastMul, resultReg, lhsReg, rhsReg));
+                }
+                else
+                {
+                    Emit(Op::iABC(OpCode::Mul, resultReg, lhsReg, rhsReg));
+                }
                 break;
             }
 
             case BinaryOperator::Divide: {
-                Emit(Op::iABC(OpCode::Div, resultReg, lhsReg, rhsReg));
+                if (left->resolvedType == right->resolvedType && left->resolvedType->isInt())
+                {
+                    // Int / Int
+                    Emit(Op::iABC(OpCode::IntFastDiv, resultReg, lhsReg, rhsReg));
+                }
+                else
+                {
+                    Emit(Op::iABC(OpCode::Div, resultReg, lhsReg, rhsReg));
+                }
                 break;
             }
 
@@ -263,11 +299,11 @@ namespace Fig
                 Emit(Op::iABx(OpCode::Mov, baseReg, *calleeRes));
             }
         }
-        
+
         for (size_t i = 0; i < expr->args.size(); ++i)
         {
             std::uint8_t argTarget = AllocReg();
-            auto argRes = compileExpr(expr->args.args[i]);
+            auto         argRes    = compileExpr(expr->args.args[i]);
             if (!argRes)
             {
                 return argRes;
