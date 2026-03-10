@@ -39,6 +39,10 @@ namespace Fig
                 0     -             UnaryOperators::Count     BinaryOperators::Count
         */
 
+        Value fields[];
+
+
+
         Object *GetUnaryOperator(UnaryOperator _op)
         {
             std::uint8_t idx = static_cast<std::uint8_t>(_op);

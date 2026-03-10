@@ -1,13 +1,11 @@
 /*!
     @file src/VM/VM.cpp
     @brief 虚拟机核心执行引擎实现
-    @author PuqiAR (im@puqiar.top)
-    @date 2026-02-19
 */
 
+#include <Core/Core.hpp>
 #include <VM/VM.hpp>
 
-// Computed GOTO!!!
 #define BINARY_ARITHMETIC_OP(opName, op)                                                           \
     do_##opName:                                                                                   \
     {                                                                                              \
@@ -83,11 +81,11 @@ namespace Fig
     Result<Value, Error> VM::Execute(CompiledModule *compiledModule)
     {
         Proto *entry = compiledModule->protos[0];
-        pushFrame(entry, registers);
+        (void) pushFrame(entry, registers); // 刚开始执行寄存器不会溢出
 
-        // 🔥 必须与 Bytecode.hpp 中的 OpCode 枚举严格一一对应！
-        static const void *dispatchTable[] = {
-            &&do_Exit,
+        // 对齐 Bytecode.hpp 中的 OpCode 顺序
+        static const void *dispatchTable[] = {&&do_Exit,
+            &&do_Exit_MaxRecursionDepthExceeded,
 
             &&do_LoadK,
             &&do_LoadTrue,
@@ -123,11 +121,17 @@ namespace Fig
             &&do_Less,
             &&do_GreaterEqual,
             &&do_LessEqual,
+
+            &&do_GetGlobal,
+            &&do_SetGlobal,
+            &&do_GetUpval,
+            &&do_SetUpval,
+            &&do_Copy,
+
             &&do_Count};
 
         Instruction inst;
 
-// 取指 -> 直接查表并 Jump
 #define DISPATCH()                                                                                 \
     do                                                                                             \
     {                                                                                              \
@@ -139,7 +143,15 @@ namespace Fig
         DISPATCH();
 
     do_Exit: {
-        [[unlikely]] return Value::GetNullInstance();
+        return Value::FromInt(decodeSBx(inst));
+    }
+
+    do_Exit_MaxRecursionDepthExceeded: {
+        CoreIO::GetStdErr() << std::format(
+            "Oops! max recursion depth limit {} exceeded in Fn `{}` , exiting...\n",
+            MAX_RECURSION_DEPTH,
+            (currentFrame - 1)->proto->name); // pushFrame失败了，但currentFrame仍然移动，所以 (currentFrame - 1)是 lastFrame
+        std::exit(static_cast<int>(MAX_RECURSION_DEPTH));
     }
 
     do_LoadK: {
@@ -171,7 +183,9 @@ namespace Fig
         std::uint8_t a       = decodeA(inst);
         Proto       *proto   = compiledModule->protos[a];
         std::uint8_t baseReg = decodeB(inst);
-        pushFrame(proto, currentFrame->registerBase + baseReg);
+
+        currentFrame->ip = pushFrame(proto, currentFrame->registerBase + baseReg);
+
         DISPATCH();
     }
 
@@ -181,16 +195,18 @@ namespace Fig
     }
 
     do_Return: {
-        std::uint8_t a              = decodeA(inst);
-        *currentFrame->registerBase = currentFrame->registerBase[a];
+        std::uint8_t a      = decodeA(inst);
+        Value        retVal = currentFrame->registerBase[a];
+
+        // 此时 registerBase[0] 指向的是 Caller 的 baseReg 槽位
+
+        currentFrame->registerBase[0] = retVal;
         popFrame();
+
         DISPATCH();
     }
 
     do_LoadFn: {
-        // std::uint8_t a = decodeA(inst);
-        // std::uint16_t bx = decodeBx(inst);
-        // TODO: R[a] = new FunctionObject(compiledModule->protos[bx])
         DISPATCH();
     }
 
@@ -272,7 +288,8 @@ namespace Fig
         Value l = currentFrame->registerBase[b];
         Value r = currentFrame->registerBase[c];
 
-        currentFrame->registerBase[a] = Value::FromDouble(l.AsInt() + r.AsInt());
+        currentFrame->registerBase[a] =
+            Value::FromDouble(static_cast<double>(l.AsInt()) / r.AsInt());
         DISPATCH();
     }
 
@@ -283,10 +300,40 @@ namespace Fig
         BINARY_COMPARE_OP(GreaterEqual, >=);
         BINARY_COMPARE_OP(LessEqual, <=);
 
+    do_GetGlobal: {
+        std::uint8_t  a               = decodeA(inst);
+        std::uint16_t bx              = decodeBx(inst);
+        currentFrame->registerBase[a] = globals[bx];
+        DISPATCH();
+    }
+
+    do_SetGlobal: {
+        std::uint8_t  a  = decodeA(inst);
+        std::uint16_t bx = decodeBx(inst);
+        globals[bx]      = currentFrame->registerBase[a];
+        DISPATCH();
+    }
+
+    do_GetUpval: {
+        assert(false && "VM: GetUpval requires FunctionObject (Closure) implementation");
+        DISPATCH();
+    }
+
+    do_SetUpval: {
+        assert(false && "VM: SetUpval requires FunctionObject (Closure) implementation");
+        DISPATCH();
+    }
+
+    do_Copy: {
+        std::uint8_t a                = decodeA(inst);
+        std::uint8_t b                = decodeB(inst);
+        currentFrame->registerBase[a] = currentFrame->registerBase[b];
+        DISPATCH();
+    }
+
     do_Count: {
         assert(false && "Hit Count sentinel!");
         return Value::GetNullInstance();
     }
-
     }
 }; // namespace Fig

@@ -13,11 +13,6 @@ elseif is_plat("windows") then
     -- 2. local dev (Windows + llvm-mingw)
     set_toolchains("mingw") -- llvm-mingw
     add_ldflags("-Wl,--stack,268435456")
-    -- set_toolchains("clang")
-    -- static lib
-    -- add_ldflags("-target x86_64-w64-mingw32", "-static")
-    -- add_cxxflags("-stdlib=libc++")
-    -- add_ldflags("-stdlib=libc++")
 end
 
 set_languages("c++23")
@@ -33,7 +28,6 @@ target("LexerTest")
     add_files("src/Token/Token.cpp")
     add_files("src/Error/Error.cpp")
     add_files("src/Lexer/Lexer.cpp")
-
     add_files("src/Lexer/LexerTest.cpp")
 
 target("ParserTest")
@@ -41,13 +35,11 @@ target("ParserTest")
     add_files("src/Token/Token.cpp")
     add_files("src/Error/Error.cpp")
     add_files("src/Lexer/Lexer.cpp")
-
     add_files("src/Ast/Operator.cpp")
     add_files("src/Parser/ExprParser.cpp")
     add_files("src/Parser/StmtParser.cpp")
     add_files("src/Parser/TypeExprParser.cpp")
     add_files("src/Parser/Parser.cpp")
-
     add_files("src/Parser/ParserTest.cpp")
 
 target("ObjectTest")
@@ -59,13 +51,12 @@ target("AnalyzerTest")
     add_files("src/Token/Token.cpp")
     add_files("src/Error/Error.cpp")
     add_files("src/Lexer/Lexer.cpp")
-
     add_files("src/Ast/Operator.cpp")
     add_files("src/Parser/ExprParser.cpp")
     add_files("src/Parser/StmtParser.cpp")
     add_files("src/Parser/TypeExprParser.cpp")
     add_files("src/Parser/Parser.cpp")
-
+    add_files("src/Sema/Type.cpp")
     add_files("src/Sema/Analyzer.cpp")
     add_files("src/Sema/AnalyzerTest.cpp")
 
@@ -74,21 +65,18 @@ target("CompilerTest")
     add_files("src/Token/Token.cpp")
     add_files("src/Error/Error.cpp")
     add_files("src/Lexer/Lexer.cpp")
-
     add_files("src/Ast/Operator.cpp")
+    add_files("src/Bytecode/Disassembler.cpp")
     add_files("src/Parser/ExprParser.cpp")
     add_files("src/Parser/StmtParser.cpp")
     add_files("src/Parser/TypeExprParser.cpp")
     add_files("src/Parser/Parser.cpp")
-
     add_files("src/Object/Object.cpp")
-
+    add_files("src/Sema/Type.cpp")
     add_files("src/Sema/Analyzer.cpp")
-
     add_files("src/Compiler/ExprCompiler.cpp")
     add_files("src/Compiler/StmtCompiler.cpp")
     add_files("src/Compiler/Compiler.cpp")
-    
     add_files("src/Compiler/CompileTest.cpp")
 
 target("LSP")
@@ -96,17 +84,14 @@ target("LSP")
     add_files("src/Token/Token.cpp")
     add_files("src/Error/Error.cpp")
     add_files("src/Lexer/Lexer.cpp")
-
     add_files("src/Ast/Operator.cpp")
     add_files("src/Parser/ExprParser.cpp")
     add_files("src/Parser/StmtParser.cpp")
     add_files("src/Parser/TypeExprParser.cpp")
     add_files("src/Parser/Parser.cpp")
-
+    add_files("src/Sema/Type.cpp")
     add_files("src/Sema/Analyzer.cpp")
-
     add_files("src/LSP/LSPServer.cpp")
-
     set_filename("Fig-LSP")
 
 target("Fig")
@@ -114,20 +99,17 @@ target("Fig")
     add_files("src/Token/Token.cpp")
     add_files("src/Error/Error.cpp")
     add_files("src/Lexer/Lexer.cpp")
-
     add_files("src/Ast/Operator.cpp")
+    add_files("src/Bytecode/Disassembler.cpp")
     add_files("src/Parser/ExprParser.cpp")
     add_files("src/Parser/StmtParser.cpp")
     add_files("src/Parser/TypeExprParser.cpp")
     add_files("src/Parser/Parser.cpp")
-
     add_files("src/Object/Object.cpp")
-
+    add_files("src/Sema/Type.cpp")
     add_files("src/Sema/Analyzer.cpp")
-
     add_files("src/Compiler/ExprCompiler.cpp")
     add_files("src/Compiler/StmtCompiler.cpp")
     add_files("src/Compiler/Compiler.cpp")
-
     add_files("src/VM/VM.cpp")
     add_files("src/main.cpp")

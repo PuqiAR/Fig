@@ -1,0 +1,4 @@
+struct Point { x: Int, y: Int }
+func main() {
+    var p = new Point{ x: 1, z: 2 }; // 错误：Point 没有字段 z
+}

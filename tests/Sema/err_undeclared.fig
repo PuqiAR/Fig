@@ -1,0 +1,4 @@
+func main() {
+    var x = 10;
+    io.println(y); // 错误：y 未定义
+}

@@ -11,7 +11,6 @@
 #include <Deps/Deps.hpp>
 #include <SourceManager/SourceManager.hpp>
 
-
 #include <source_location>
 
 namespace Fig
@@ -51,6 +50,10 @@ namespace Fig
         // compile errors
         TooManyLocals,
         TooManyConstants,
+        
+        // --- 新增：编译器内部与VM约束 ---
+        RegisterOverflow,
+        InternalError,
     };
 
     const char *ErrorTypeToString(ErrorType type);
@@ -77,6 +80,9 @@ namespace Fig
             location    = _location;
             thrower_loc = _throwerloc;
         }
+
+        // 新增：适配诊断系统的辅助判定
+        bool IsWarning() const { return static_cast<unsigned int>(type) < 2000; }
     };
 
     namespace TerminalColors

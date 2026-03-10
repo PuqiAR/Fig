@@ -1,533 +1,159 @@
 /*!
-    @file src/Sema/Analyzer.hpp
-    @brief 前端类型检查器实现
-    @author PuqiAR (im@puqiar.top)
-    @date 2026-02-23
+    @file src/Sema/Analyzer.cpp
+    @brief 语义分析器实现：实装强类型校验 (Call, Infix, Member, Return, Assign)
 */
 
+#include <Ast/Ast.hpp>
+#include <Ast/Expr/MemberExpr.hpp>
+#include <Ast/Expr/ObjectInitExpr.hpp>
+#include <Ast/Stmt/ImplStmt.hpp>
+#include <Ast/Stmt/InterfaceDefStmt.hpp>
+#include <Ast/Stmt/StructDefStmt.hpp>
 #include <Sema/Analyzer.hpp>
 
 namespace Fig
 {
-    Result<TypeInfo *, Error> Analyzer::resolveType(TypeExpr *typeExpr)
+    struct AnalyzerState
     {
-        NamedTypeExpr *nte  = dynamic_cast<NamedTypeExpr *>(typeExpr);
-        TypeInfo      *type = nullptr;
-        if (nte)
-        {
-            type = typeCtx.ResolveTypePath(nte->path);
-            if (!type)
-            {
-                return std::unexpected(Error(ErrorType::TypeError,
-                    std::format("no such type `{}` exists", nte->toString()),
-                    "none",
-                    makeSourceLocation(typeExpr)));
-            }
-            // ...
-        }
-        else
-        {
-            // ...
-        }
-        return type;
-    }
+        int        loopDepth = 0;
+        FnDefStmt *currentFn = nullptr;
+    } state;
 
-    Result<void, Error> Analyzer::analyzeVarDecl(VarDecl *stmt)
+    struct ScopeGuard
     {
-        auto sym = env.Resolve(stmt->name);
-        if (sym != std::nullopt && sym->depth == env.GetDepth())
+        Environment &env;
+        ScopeGuard(Environment &e, bool isFn) : env(e)
         {
-            return std::unexpected(Error(ErrorType::RedeclarationError,
-                std::format("variable `{}` has already defined in this scope", stmt->name),
-                "change its name",
-                makeSourceLocation(stmt)));
+            env.Push(isFn);
         }
+        ~ScopeGuard()
+        {
+            env.Pop();
+        }
+    };
 
-        TypeInfo *initType = typeCtx.GetNull();
-        if (stmt->initExpr)
+    struct LoopGuard
+    {
+        int &depth;
+        LoopGuard(int &d) : depth(d)
         {
-            const auto &res = analyzeExpr(stmt->initExpr);
-            if (!res)
-            {
-                return res;
-            }
-            initType = stmt->initExpr->resolvedType;
+            depth++;
         }
+        ~LoopGuard()
+        {
+            depth--;
+        }
+    };
 
-        TypeInfo *declaredType = typeCtx.GetAny();
-        if (stmt->typeSpecifier)
+    struct FnStateGuard
+    {
+        FnDefStmt *&current;
+        FnDefStmt  *old;
+        FnStateGuard(FnDefStmt *&c, FnDefStmt *n) : current(c), old(c)
         {
-            auto result = resolveType(stmt->typeSpecifier);
-            if (!result)
-            {
-                return std::unexpected(result.error());
-            }
+            current = n;
+        }
+        ~FnStateGuard()
+        {
+            current = old;
+        }
+    };
 
-            declaredType = *result;
-        }
-
-        if (stmt->isInfer)
-        {
-            declaredType = initType;
-        }
-        else if (stmt->initExpr && declaredType != typeCtx.GetAny() && declaredType != initType)
-        {
-            return std::unexpected(Error(ErrorType::TypeError,
-                std::format("cannot assign type `{}` to variable {} which speicifer type is '{}'",
-                    initType->name,
-                    stmt->name,
-                    declaredType->name),
-                "none",
-                makeSourceLocation(stmt->initExpr)));
-        }
-        stmt->localId = env.Define(stmt->name, declaredType, stmt->isPublic, false);
+    Result<void, Error> Analyzer::Analyze(Program *prog)
+    {
+        ScopeGuard guard(env, false);
+        auto       r1 = pass1(prog);
+        if (!r1)
+            return r1;
+        auto r2 = resolveTypes(prog);
+        if (!r2)
+            return r2;
+        auto r3 = checkBodies(prog);
+        if (!r3)
+            return r3;
         return {};
     }
 
-    Result<void, Error> Analyzer::analyzeIfStmt(IfStmt *stmt)
+    Result<void, Error> Analyzer::pass1(Program *prog)
     {
-        auto condRes = analyzeExpr(stmt->cond);
-        if (!condRes)
+        for (auto *stmt : prog->nodes)
         {
-            return condRes;
-        }
-        if (stmt->cond->resolvedType != typeCtx.GetAny()
-            && stmt->cond->resolvedType != typeCtx.GetBool())
-        {
-            return std::unexpected(Error(ErrorType::TypeError,
-                std::format(
-                    "if condition must be boolean, got `{}`", stmt->cond->resolvedType->name),
-                "ensure condition is boolean",
-                makeSourceLocation(stmt->cond)));
-        }
-        auto consequentRes = analyzeStmt(stmt->consequent);
-        if (!consequentRes)
-        {
-            return consequentRes;
-        }
-
-        for (ElseIfStmt *elif : stmt->elifs)
-        {
-            auto condRes = analyzeExpr(elif->cond);
-            if (elif->cond->resolvedType != typeCtx.GetAny()
-                && elif->cond->resolvedType != typeCtx.GetBool())
+            if (stmt->type == AstType::StructDefStmt)
             {
-                return std::unexpected(Error(ErrorType::TypeError,
-                    std::format("else if condition must be boolean, got `{}`",
-                        elif->cond->resolvedType->name),
-                    "ensure condition is boolean",
-                    makeSourceLocation(elif->cond)));
+                auto *s = static_cast<StructDefStmt *>(stmt);
+                if (globalTypes.contains(s->name))
+                    return std::unexpected(
+                        Error(ErrorType::RedeclarationError, "type redeclared", "", s->location));
+                auto *t = arena.Allocate<StructType>(s->name);
+                typeCtx.allTypes.push_back(t);
+                globalTypes[s->name] = t;
             }
-            auto consequentRes = analyzeStmt(elif->consequent);
-            if (!consequentRes)
+            else if (stmt->type == AstType::FnDefStmt)
             {
-                return consequentRes;
-            }
-        }
-
-        if (stmt->alternate)
-        {
-            auto alternateRes = analyzeStmt(stmt->alternate);
-            if (!alternateRes)
-            {
-                return alternateRes;
+                auto *f = static_cast<FnDefStmt *>(stmt);
+                if (f->name == "main")
+                    hasMain = true;
+                if (globalSymbols.contains(f->name))
+                    return std::unexpected(
+                        Error(ErrorType::RedeclarationError, "func redeclared", "", f->location));
+                Symbol *sym =
+                    arena.Allocate<Symbol>(f->name, Type{}, SymbolLocation::Global, 0, true);
+                globalSymbols[f->name]       = sym;
+                env.current->locals[f->name] = sym;
+                f->resolvedSymbol            = sym;
             }
         }
         return {};
     }
 
-    Result<void, Error> Analyzer::analyzeWhileStmt(WhileStmt *stmt)
+    Result<void, Error> Analyzer::resolveTypes(Program *prog)
     {
-        auto condRes = analyzeExpr(stmt->cond);
-        if (!condRes)
+        for (auto *stmt : prog->nodes)
         {
-            return condRes;
-        }
-
-        if (stmt->cond->resolvedType != typeCtx.GetAny()
-            && stmt->cond->resolvedType != typeCtx.GetBool())
-        {
-            return std::unexpected(Error(ErrorType::TypeError,
-                std::format(
-                    "while condition must be boolean, got `{}`", stmt->cond->resolvedType->name),
-                "ensure condition is boolean",
-                makeSourceLocation(stmt->cond)));
-        }
-
-        auto bodyRes = analyzeStmt(stmt->body);
-        if (!bodyRes)
-        {
-            return bodyRes;
-        }
-        return {};
-    }
-
-    Result<void, Error> Analyzer::analyzeFnDefStmt(FnDefStmt *stmt)
-    {
-        auto sym = env.Resolve(stmt->name);
-        if (sym != std::nullopt && sym->depth == env.GetDepth())
-        {
-            return std::unexpected(Error(ErrorType::RedeclarationError,
-                std::format("function `{}` has already defined in this scope", stmt->name),
-                "change its name",
-                makeSourceLocation(stmt)));
-        }
-
-        stmt->resolvedReturnType = typeCtx.GetAny(); // 默认Any
-        if (stmt->returnType)
-        {
-            auto result = resolveType(stmt->returnType);
-            if (!result)
+            if (stmt->type == AstType::StructDefStmt)
             {
-                return std::unexpected(result.error());
+                auto *s  = static_cast<StructDefStmt *>(stmt);
+                auto *st = static_cast<StructType *>(globalTypes[s->name]);
+                for (auto &f : s->fields)
+                {
+                    auto res = resolveTypeExpr(f.type);
+                    if (!res)
+                        return std::unexpected(res.error());
+                    st->AddField(f.name, *res, f.isPublic);
+                }
             }
-            stmt->resolvedReturnType = *result;
-        }
-
-        stmt->localId = env.Define(stmt->name,
-            typeCtx.GetFunction(),
-            stmt->isPublic,
-            true); // 函数定义语句定义的函数为常量
-
-        env.EnterFunction();
-        env.EnterScope();
-
-        PosParam *lastDefaultValueP = nullptr;
-        for (Param *p : stmt->params)
-        {
-            PosParam *posParam = dynamic_cast<PosParam *>(p);
-            if (posParam)
+            else if (stmt->type == AstType::FnDefStmt)
             {
-                posParam->resolvedType = typeCtx.GetAny();
-                if (posParam->type)
+                auto *f   = static_cast<FnDefStmt *>(stmt);
+                auto  res = resolveTypeExpr(f->returnTypeSpecifier);
+                if (!res)
+                    return std::unexpected(res.error());
+                f->resolvedReturnType = *res;
+
+                DynArray<Type> paramTypes;
+                for (auto *p : f->params)
                 {
-                    auto result = resolveType(posParam->type);
-                    if (!result)
-                    {
-                        return std::unexpected(result.error());
-                    }
-                    posParam->resolvedType = *result;
+                    auto pres = resolveTypeExpr(p->typeSpecifier);
+                    if (!pres)
+                        return std::unexpected(pres.error());
+                    p->resolvedType = *pres;
+                    paramTypes.push_back(*pres);
                 }
 
-                if (!posParam->defaultValue && lastDefaultValueP)
-                {
-                    return std::unexpected(Error(ErrorType::SyntaxError,
-                        std::format("no-default parameter `{}` follows default parameter '{}'",
-                            posParam->name,
-                            lastDefaultValueP->name),
-                        "reorder parameters",
-                        posParam->location));
-                }
-
-                if (posParam->defaultValue)
-                {
-                    lastDefaultValueP = posParam;
-
-                    auto result = analyzeExpr(posParam->defaultValue);
-                    if (!result)
-                    {
-                        return result;
-                    }
-                    if (posParam->resolvedType != typeCtx.GetAny()
-                        && posParam->defaultValue->resolvedType != posParam->resolvedType)
-                    {
-                        return std::unexpected(Error(ErrorType::TypeError,
-                            std::format(
-                                "in function '{}', parameter '{}' expects type '{}', but got default value type `{}`",
-                                stmt->name,
-                                posParam->name,
-                                posParam->resolvedType->name,
-                                posParam->defaultValue->resolvedType->name),
-                            "none",
-                            makeSourceLocation(posParam->defaultValue)));
-                    }
-                }
-
-                posParam->localId =
-                    env.Define(posParam->name, posParam->resolvedType, false, false);
-            }
-            else
-            {
-                // ... 其他参数解析
+                f->resolvedSymbol->type = typeCtx.CreateFuncType(std::move(paramTypes), *res);
             }
         }
-
-        ReturnTypeProtector p(this, stmt->resolvedReturnType);
-
-        auto bodyRes = analyzeStmt(stmt->body);
-
-        env.LeaveScope();
-        env.LeaveFunction();
-
-        if (!bodyRes)
-        {
-            return bodyRes;
-        }
         return {};
     }
 
-    Result<void, Error> Analyzer::analyzeReturnStmt(ReturnStmt *stmt)
+    Result<void, Error> Analyzer::checkBodies(Program *prog)
     {
-        if (!currentReturnType)
+        for (auto *stmt : prog->nodes)
         {
-            return std::unexpected(Error(ErrorType::SyntaxError,
-                "return outside function",
-                "remove `return ...`",
-                makeSourceLocation(stmt)));
+            auto r = analyzeStmt(stmt);
+            if (!r)
+                return r;
         }
-        auto result = analyzeExpr(stmt->value);
-        if (!result)
-        {
-            return result;
-        }
-
-        TypeInfo *valueType = stmt->value->resolvedType;
-
-        if (!currentReturnType->isAny() && !valueType->isAny() && currentReturnType != valueType)
-        {
-            return std::unexpected(Error(ErrorType::TypeError,
-                std::format("return type mismatch: expects '{}', got `{}`",
-                    currentReturnType->name,
-                    stmt->value->resolvedType->name),
-                "none",
-                makeSourceLocation(stmt->value)));
-        }
-        return {};
-    }
-
-    Result<void, Error> Analyzer::analyzeIdentiExpr(IdentiExpr *expr)
-    {
-        auto sym = env.Resolve(expr->name);
-        if (sym == std::nullopt)
-        {
-            return std::unexpected(Error(ErrorType::UseUndeclaredIdentifier,
-                std::format("`{}` has not been defined", expr->name),
-                "none",
-                makeSourceLocation(expr)));
-        }
-        // TODO: 引入 Module 跨文件 import，检查 isPublic
-        expr->localId = sym->localId;
-
-        expr->resolvedType  = sym->type;
-        expr->resolvedDepth = sym->depth;
-        expr->isGlobal      = (sym->depth == 0);
-
-        return {};
-    }
-
-    Result<void, Error> Analyzer::analyzeInfixExpr(InfixExpr *expr)
-    {
-        auto resL = analyzeExpr(expr->left);
-        if (!resL)
-            return std::unexpected(resL.error());
-
-        auto resR = analyzeExpr(expr->right);
-        if (!resR)
-            return std::unexpected(resR.error());
-
-        TypeInfo *lType = expr->left->resolvedType;
-        TypeInfo *rType = expr->right->resolvedType;
-
-        switch (expr->op)
-        {
-            // 算术族 (+, -, *, /, **)
-            case BinaryOperator::Add:
-                if (lType == typeCtx.GetString() && rType == typeCtx.GetString())
-                {
-                    expr->resolvedType = typeCtx.GetString();
-                    break;
-                }
-                [[fallthrough]];
-            case BinaryOperator::Subtract:
-            case BinaryOperator::Multiply:
-            case BinaryOperator::Divide:
-            case BinaryOperator::Power:
-                if (lType == typeCtx.GetInt() && rType == typeCtx.GetInt())
-                {
-                    expr->resolvedType = typeCtx.GetInt();
-                }
-                else if ((lType == typeCtx.GetInt() || lType == typeCtx.GetDouble())
-                         && (rType == typeCtx.GetInt() || rType == typeCtx.GetDouble()))
-                {
-                    expr->resolvedType = typeCtx.GetDouble();
-                }
-                else if (lType == typeCtx.GetAny() || rType == typeCtx.GetAny())
-                {
-                    expr->resolvedType = typeCtx.GetAny();
-                }
-                else
-                {
-                    return std::unexpected(Error(ErrorType::TypeError,
-                        "invalid operands for arithmetic operation",
-                        "ensure both sides are numbers (Int or Double)",
-                        makeSourceLocation(expr->right)));
-                }
-                break;
-
-            // 整数特化族 (%, &, |, ^, <<, >>)
-            case BinaryOperator::Modulo:
-            case BinaryOperator::BitAnd:
-            case BinaryOperator::BitOr:
-            case BinaryOperator::BitXor:
-            case BinaryOperator::ShiftLeft:
-            case BinaryOperator::ShiftRight:
-                if (lType == typeCtx.GetInt() && rType == typeCtx.GetInt())
-                {
-                    expr->resolvedType = typeCtx.GetInt();
-                }
-                else if (lType == typeCtx.GetAny() || rType == typeCtx.GetAny())
-                {
-                    expr->resolvedType = typeCtx.GetAny();
-                }
-                else
-                {
-                    return std::unexpected(Error(ErrorType::TypeError,
-                        "bitwise and modulo operations require Int operands",
-                        "cast operands to Int before operation",
-                        makeSourceLocation(expr->right)));
-                }
-                break;
-
-                // 比较族 (==, !=, <, >, <=, >=)
-
-            case BinaryOperator::Equal:
-            case BinaryOperator::NotEqual:
-            case BinaryOperator::Less:
-            case BinaryOperator::Greater:
-            case BinaryOperator::LessEqual:
-            case BinaryOperator::GreaterEqual:
-            case BinaryOperator::Is:
-                if (lType != typeCtx.GetAny() && rType != typeCtx.GetAny()
-                    && lType != rType) // lType == rType放行
-                {
-                    if (!((lType == typeCtx.GetInt() && rType == typeCtx.GetDouble())
-                            || (lType == typeCtx.GetDouble() && rType == typeCtx.GetInt())))
-                    {
-                        return std::unexpected(Error(ErrorType::TypeError,
-                            "cannot compare different types",
-                            "ensure both sides of the comparison are of the same type",
-                            makeSourceLocation(expr)));
-                    }
-                }
-
-                // TODO: 支持Struct后进行检查，右操作数是 Struct才合理
-                // 如 1.2 is Int --> false
-                // 1 is Int --> true
-
-                expr->resolvedType = typeCtx.GetBool();
-                break;
-
-            // 逻辑族 (&&, ||)
-            case BinaryOperator::LogicalAnd:
-            case BinaryOperator::LogicalOr:
-                if (lType == typeCtx.GetBool() && rType == typeCtx.GetBool())
-                {
-                    expr->resolvedType = typeCtx.GetBool();
-                }
-                else if (lType == typeCtx.GetAny() || rType == typeCtx.GetAny())
-                {
-                    expr->resolvedType = typeCtx.GetBool();
-                }
-                else
-                {
-                    return std::unexpected(Error(ErrorType::TypeError,
-                        "logical operators require Bool operands",
-                        "use boolean expressions",
-                        makeSourceLocation(expr)));
-                }
-                break;
-
-            // 纯赋值与复合赋值族 (=, +=, -=, ...)
-            case BinaryOperator::Assign:
-            case BinaryOperator::AddAssign:
-            case BinaryOperator::SubAssign:
-            case BinaryOperator::MultiplyAssign:
-            case BinaryOperator::DivideAssign:
-            case BinaryOperator::ModuloAssign:
-            case BinaryOperator::BitXorAssign:
-                // 左侧必须是合法的 L-Value
-                if (!isValidLvalue(expr->left))
-                {
-                    return std::unexpected(Error(ErrorType::NotAnLvalue,
-                        "invalid assignment target",
-                        "left side must be a variable, property, or indexable target",
-                        makeSourceLocation(expr->left) // 错误精准定位到左侧节点
-                        ));
-                }
-
-                // 类型匹配拦截 (纯赋值)
-                if (expr->op == BinaryOperator::Assign)
-                {
-                    if (lType != typeCtx.GetAny() && rType != typeCtx.GetAny() && lType != rType)
-                    {
-                        if (!(lType == typeCtx.GetDouble() && rType == typeCtx.GetInt()))
-                        { // 允许 Int 赋给 Double
-                            return std::unexpected(Error(ErrorType::TypeError,
-                                "cannot assign value to variable of different type",
-                                "ensure the assigned value matches the declared type",
-                                makeSourceLocation(expr->right)));
-                        }
-                    }
-                }
-                expr->resolvedType = lType;
-                break;
-
-            // 成员访问 (.)
-            case BinaryOperator::MemberAccess:
-                if (lType != typeCtx.GetStruct() && lType != typeCtx.GetAny())
-                {
-                    return std::unexpected(Error(ErrorType::TypeError,
-                        "member access requires a Struct object",
-                        "check if the left side evaluates to an object",
-                        makeSourceLocation(expr->left)));
-                }
-                if (expr->right->type != AstType::IdentiExpr)
-                {
-                    return std::unexpected(Error(ErrorType::SyntaxError,
-                        std::format("expect field name after member access '.', got {}",
-                            expr->right->toString()),
-                        "none",
-                        makeSourceLocation(expr->right)));
-                }
-                expr->resolvedType = typeCtx.GetAny();
-                break;
-
-            default:
-                return std::unexpected(Error(ErrorType::TypeError,
-                    "unknown binary operator in static analysis",
-                    "this is likely an internal compiler error",
-                    makeSourceLocation(expr)));
-        }
-        return {};
-    }
-
-    Result<void, Error> Analyzer::analyzeCallExpr(CallExpr *expr)
-    {
-        auto calleeRes = analyzeExpr(expr->callee);
-        if (!calleeRes)
-        {
-            return calleeRes;
-        }
-
-        if (expr->callee->resolvedType != typeCtx.GetAny()
-            && expr->callee->resolvedType != typeCtx.GetFunction())
-        {
-            return std::unexpected(Error(ErrorType::TypeError,
-                std::format("object `{}` is not callable", expr->callee->toString()),
-                "none",
-                makeSourceLocation(expr->callee)));
-        }
-
-        for (auto *arg : expr->args.args)
-        {
-            auto argRes = analyzeExpr(arg);
-            if (!argRes)
-            {
-                return argRes;
-            }
-        }
-        expr->resolvedType = typeCtx.GetAny();
-
         return {};
     }
 
@@ -535,128 +161,421 @@ namespace Fig
     {
         if (!stmt)
             return {};
-
         switch (stmt->type)
         {
-            case AstType::VarDecl: return analyzeVarDecl(static_cast<VarDecl *>(stmt));
-
-            case AstType::ExprStmt: {
-                auto *exprStmt = static_cast<ExprStmt *>(stmt);
-                return analyzeExpr(exprStmt->expr); // 表达式语句只需要推导内部表达式即可
-            }
-
             case AstType::BlockStmt: {
-                auto *block = static_cast<BlockStmt *>(stmt);
-                env.EnterScope(); // 进入新大括号，作用域深度 +1
-                for (auto *s : block->nodes)
+                auto      *b = static_cast<BlockStmt *>(stmt);
+                ScopeGuard guard(env, false);
+                for (auto *s : b->nodes)
                 {
-                    auto res = analyzeStmt(s);
+                    if (auto r = analyzeStmt(s); !r)
+                        return r;
+                }
+                break;
+            }
+            case AstType::VarDecl: {
+                auto *v     = static_cast<VarDecl *>(stmt);
+                Type  initT = typeCtx.GetBasic(TypeTag::Any);
+                if (v->initExpr)
+                {
+                    auto res = analyzeExpr(v->initExpr);
                     if (!res)
                         return std::unexpected(res.error());
+                    initT = *res;
                 }
-                env.LeaveScope(); // 离开大括号，自动销毁局部类型记录
-                return {};
-            }
+                Type declT = v->typeSpecifier ? *resolveTypeExpr(v->typeSpecifier) : initT;
 
-            case AstType::IfStmt: {
-                return analyzeIfStmt(static_cast<IfStmt *>(stmt));
-            }
+                // 🔥 强类型校验：赋值拦截
+                if (v->initExpr && !initT.isAssignableTo(declT))
+                {
+                    return std::unexpected(Error(ErrorType::TypeError,
+                        "cannot assign '" + initT.toString() + "' to type '" + declT.toString()
+                            + "'",
+                        "",
+                        v->location));
+                }
 
-            case AstType::WhileStmt: {
-                return analyzeWhileStmt(static_cast<WhileStmt *>(stmt));
+                if (env.current->locals.contains(v->name))
+                    return std::unexpected(
+                        Error(ErrorType::RedeclarationError, "var redeclared", "", v->location));
+                SymbolLocation loc =
+                    env.current->parent ? SymbolLocation::Local : SymbolLocation::Global;
+                int idx = (loc == SymbolLocation::Local) ? env.current->nextLocalId++ : 0;
+                env.current->locals[v->name] =
+                    arena.Allocate<Symbol>(v->name, declT, loc, idx, false);
+                v->localId = idx;
+                break;
             }
-
             case AstType::FnDefStmt: {
-                return analyzeFnDefStmt(static_cast<FnDefStmt *>(stmt));
+                auto        *f = static_cast<FnDefStmt *>(stmt);
+                FnStateGuard fnGuard(state.currentFn, f);
+                ScopeGuard   scopeGuard(env, true);
+                for (auto *p : f->params)
+                {
+                    env.current->locals[p->name] = arena.Allocate<Symbol>(p->name,
+                        p->resolvedType,
+                        SymbolLocation::Local,
+                        env.current->nextLocalId++,
+                        false);
+                }
+                if (auto r = analyzeStmt(f->body); !r)
+                    return r;
+                break;
             }
+            case AstType::IfStmt: {
+                auto *i = static_cast<IfStmt *>(stmt);
 
+                if (auto c = analyzeExpr(i->cond); !c)
+                    return std::unexpected(c.error());
+                else if (!c->isAssignableTo(typeCtx.GetBasic(TypeTag::Bool)))
+                {
+                    return std::unexpected(Error(
+                        ErrorType::TypeError, "condition must be Bool", "", i->cond->location));
+                }
+                if (auto b = analyzeStmt(i->consequent); !b)
+                    return b;
+
+                for (auto *elif : i->elifs)
+                {
+                    if (auto c = analyzeExpr(elif->cond); !c)
+                        return std::unexpected(c.error());
+                    else if (!c->isAssignableTo(typeCtx.GetBasic(TypeTag::Bool)))
+                    {
+                        return std::unexpected(Error(ErrorType::TypeError,
+                            "condition must be Bool",
+                            "",
+                            elif->cond->location));
+                    }
+                    if (auto b = analyzeStmt(elif->consequent); !b)
+                        return b;
+                }
+
+                if (i->alternate)
+                {
+                    if (auto a = analyzeStmt(i->alternate); !a)
+                        return a;
+                }
+                break;
+            }
+            case AstType::WhileStmt: {
+                bool  isWhile = stmt->type == AstType::WhileStmt;
+                Expr *cond    = isWhile ? static_cast<WhileStmt *>(stmt)->cond :
+                                          static_cast<IfStmt *>(stmt)->cond;
+                Stmt *body    = isWhile ? static_cast<WhileStmt *>(stmt)->body :
+                                          static_cast<IfStmt *>(stmt)->consequent;
+
+                if (auto c = analyzeExpr(cond); !c)
+                    return std::unexpected(c.error());
+                else if (!c->isAssignableTo(typeCtx.GetBasic(TypeTag::Bool)))
+                {
+                    return std::unexpected(
+                        Error(ErrorType::TypeError, "condition must be Bool", "", cond->location));
+                }
+
+                if (isWhile)
+                {
+                    LoopGuard loopGuard(state.loopDepth);
+                    if (auto b = analyzeStmt(body); !b)
+                        return b;
+                }
+                else
+                {
+                    if (auto b = analyzeStmt(body); !b)
+                        return b;
+                    auto *i = static_cast<IfStmt *>(stmt);
+                    if (i->alternate)
+                    {
+                        if (auto a = analyzeStmt(i->alternate); !a)
+                            return a;
+                    }
+                }
+                break;
+            }
+            case AstType::BreakStmt:
+            case AstType::ContinueStmt:
+                if (state.loopDepth <= 0)
+                    return std::unexpected(
+                        Error(ErrorType::SyntaxError, "outside loop", "", stmt->location));
+                break;
             case AstType::ReturnStmt: {
-                return analyzeReturnStmt(static_cast<ReturnStmt *>(stmt));
+                auto *rs   = static_cast<ReturnStmt *>(stmt);
+                Type  retT = typeCtx.GetBasic(TypeTag::Null);
+                if (rs->value)
+                {
+                    auto res = analyzeExpr(rs->value);
+                    if (!res)
+                        return std::unexpected(res.error());
+                    retT = *res;
+                }
+                // 🔥 强类型校验：返回值拦截
+                if (state.currentFn && !retT.isAssignableTo(state.currentFn->resolvedReturnType))
+                {
+                    return std::unexpected(Error(ErrorType::TypeError,
+                        "cannot return '" + retT.toString() + "' from function expecting '"
+                            + state.currentFn->resolvedReturnType.toString() + "'",
+                        "",
+                        rs->location));
+                }
+                break;
             }
-
-                // TODO: 其他语句分析
-
-                // default:
-                //     return std::unexpected(Error(ErrorType::TypeError,
-                //         "unsupported statement type in analyzer",
-                //         "internal compiler error",
-                //         makeSourceLocation(stmt)));
+            case AstType::ExprStmt: {
+                auto res = analyzeExpr(static_cast<ExprStmt *>(stmt)->expr);
+                if (!res)
+                    return std::unexpected(res.error());
+                break;
+            }
+            default: break;
         }
         return {};
     }
 
-    Result<void, Error> Analyzer::analyzeExpr(Expr *expr)
+    Result<Type, Error> Analyzer::analyzeExpr(Expr *expr)
     {
         if (!expr)
-            return {};
-
+            return typeCtx.GetBasic(TypeTag::Null);
         switch (expr->type)
         {
             case AstType::LiteralExpr: {
-                auto *lit = static_cast<LiteralExpr *>(expr);
-                switch (lit->token.type)
+                auto t = static_cast<LiteralExpr *>(expr)->literal.type;
+                if (t == TokenType::LiteralNumber)
+                    return expr->resolvedType = typeCtx.GetBasic(TypeTag::Int);
+                if (t == TokenType::LiteralString)
+                    return expr->resolvedType = typeCtx.GetBasic(TypeTag::String);
+                if (t == TokenType::LiteralTrue || t == TokenType::LiteralFalse)
+                    return expr->resolvedType = typeCtx.GetBasic(TypeTag::Bool);
+                return expr->resolvedType = typeCtx.GetBasic(TypeTag::Null);
+            }
+            case AstType::IdentiExpr: {
+                auto *i   = static_cast<IdentiExpr *>(expr);
+                auto  res = resolveSymbolInternal(i->name, i->location, env.current);
+                if (!res)
+                    return std::unexpected(res.error());
+                i->resolvedSymbol         = *res;
+                return expr->resolvedType = (*res)->type;
+            }
+            case AstType::MemberExpr: {
+                auto *m         = static_cast<MemberExpr *>(expr);
+                auto  targetRes = analyzeExpr(m->target);
+                if (!targetRes)
+                    return targetRes;
+
+                Type targetType = *targetRes;
+                if (targetType.is(TypeTag::Any))
+                    return expr->resolvedType = typeCtx.GetBasic(TypeTag::Any);
+                if (!targetType.is(TypeTag::Struct))
+                    return std::unexpected(Error(
+                        ErrorType::TypeError, "member access requires struct", "", m->location));
+
+                auto *st = static_cast<StructType *>(targetType.base);
+                if (!st->fieldMap.contains(m->name))
                 {
-                    case TokenType::LiteralTrue:
-                    case TokenType::LiteralFalse: lit->resolvedType = typeCtx.GetBool(); break;
-
-                    case TokenType::LiteralNull: lit->resolvedType = typeCtx.GetNull(); break;
-
-                    case TokenType::LiteralNumber: {
-                        const String &lexeme = manager.GetSub(lit->token.index, lit->token.length);
-                        if (lexeme.contains(U'.') || lexeme.contains(U'e'))
-                        {
-                            lit->resolvedType = typeCtx.GetDouble();
-                        }
-                        else
-                        {
-                            lit->resolvedType = typeCtx.GetInt();
-                        }
-                        break;
-                    }
-
-                    case TokenType::LiteralString: {
-                        lit->resolvedType = typeCtx.GetString();
-                        break;
-                    }
-
-                    default: {
-                        lit->resolvedType = typeCtx.GetAny();
-                        break;
+                    return std::unexpected(Error(ErrorType::TypeError,
+                        "struct '" + st->name + "' has no field named '" + m->name + "'",
+                        "",
+                        m->location));
+                }
+                // 字段类型
+                return expr->resolvedType = st->fields[st->fieldMap[m->name]].type;
+            }
+            case AstType::ObjectInitExpr: {
+                auto *o   = static_cast<ObjectInitExpr *>(expr);
+                auto  res = resolveTypeExpr(o->typeExpr);
+                if (!res)
+                    return std::unexpected(res.error());
+                if (!res->base || res->base->tag != TypeTag::Struct)
+                    return std::unexpected(
+                        Error(ErrorType::TypeError, "requires struct", "", o->location));
+                auto *st = static_cast<StructType *>(res->base);
+                for (auto &arg : o->args)
+                {
+                    if (!arg.name.empty() && !st->fieldMap.contains(arg.name))
+                        return std::unexpected(
+                            Error(ErrorType::TypeError, "unknown field", "", arg.value->location));
+                    auto r = analyzeExpr(arg.value);
+                    if (!r)
+                        return std::unexpected(r.error());
+                    // 顺手做字段赋值类型检查
+                    if (!arg.name.empty()
+                        && !r->isAssignableTo(st->fields[st->fieldMap[arg.name]].type))
+                    {
+                        return std::unexpected(Error(
+                            ErrorType::TypeError, "field type mismatch", "", arg.value->location));
                     }
                 }
-                return {};
+                return expr->resolvedType = *res;
             }
-
-            case AstType::IdentiExpr: {
-                return analyzeIdentiExpr(static_cast<IdentiExpr *>(expr));
-            }
-
             case AstType::InfixExpr: {
-                return analyzeInfixExpr(static_cast<InfixExpr *>(expr));
-            }
+                auto *in   = static_cast<InfixExpr *>(expr);
+                auto  lRes = analyzeExpr(in->left);
+                if (!lRes)
+                    return lRes;
+                auto rRes = analyzeExpr(in->right);
+                if (!rRes)
+                    return rRes;
+                Type l = *lRes;
+                Type r = *rRes;
 
+                if (in->op == BinaryOperator::Assign)
+                {
+                    if (!r.isAssignableTo(l))
+                        return std::unexpected(Error(ErrorType::TypeError,
+                            "cannot assign '" + r.toString() + "' to '" + l.toString() + "'",
+                            "",
+                            in->location));
+                    return expr->resolvedType = l;
+                }
+
+                if (in->op == BinaryOperator::Equal || in->op == BinaryOperator::NotEqual
+                    || in->op == BinaryOperator::Greater || in->op == BinaryOperator::Less
+                    || in->op == BinaryOperator::GreaterEqual
+                    || in->op == BinaryOperator::LessEqual)
+                {
+                    return expr->resolvedType = typeCtx.GetBasic(TypeTag::Bool);
+                }
+
+                if (l.is(TypeTag::Any) || r.is(TypeTag::Any))
+                    return expr->resolvedType = typeCtx.GetBasic(TypeTag::Any);
+
+                // 🔥 算术操作强检查
+                if (in->op == BinaryOperator::Add && l.is(TypeTag::String) && r.is(TypeTag::String))
+                    return expr->resolvedType = typeCtx.GetBasic(TypeTag::String);
+                if (l.is(TypeTag::Int) && r.is(TypeTag::Int))
+                    return expr->resolvedType = typeCtx.GetBasic(TypeTag::Int);
+                if ((l.is(TypeTag::Int) || l.is(TypeTag::Double))
+                    && (r.is(TypeTag::Int) || r.is(TypeTag::Double)))
+                    return expr->resolvedType = typeCtx.GetBasic(TypeTag::Double);
+
+                return std::unexpected(Error(
+                    ErrorType::TypeError, "invalid types for binary operator", "", in->location));
+            }
             case AstType::CallExpr: {
-                return analyzeCallExpr(static_cast<CallExpr *>(expr));
+                auto *c         = static_cast<CallExpr *>(expr);
+                auto  calleeRes = analyzeExpr(c->callee);
+                if (!calleeRes)
+                    return calleeRes;
+                Type calleeType = *calleeRes;
+
+                DynArray<Type> argTypes;
+                for (auto *a : c->args.args)
+                {
+                    auto ar = analyzeExpr(a);
+                    if (!ar)
+                        return std::unexpected(ar.error());
+                    argTypes.push_back(*ar);
+                }
+
+                if (calleeType.is(TypeTag::Any))
+                    return expr->resolvedType = typeCtx.GetBasic(TypeTag::Any);
+
+                // 🔥 终极函数签名校验
+                if (!calleeType.is(TypeTag::Function))
+                    return std::unexpected(
+                        Error(ErrorType::TypeError, "callee is not a function", "", c->location));
+
+                auto *ft = static_cast<FuncType *>(calleeType.base);
+                if (ft->paramTypes.size() != argTypes.size())
+                {
+                    return std::unexpected(Error(ErrorType::TypeError,
+                        "expected " + std::to_string(ft->paramTypes.size()) + " arguments, got "
+                            + std::to_string(argTypes.size()),
+                        "",
+                        c->location));
+                }
+                for (size_t i = 0; i < argTypes.size(); ++i)
+                {
+                    if (!argTypes[i].isAssignableTo(ft->paramTypes[i]))
+                    {
+                        return std::unexpected(Error(ErrorType::TypeError,
+                            "argument " + std::to_string(i + 1) + " expects '"
+                                + ft->paramTypes[i].toString() + "', got '" + argTypes[i].toString()
+                                + "'",
+                            "",
+                            c->args.args[i]->location));
+                    }
+                }
+                return expr->resolvedType = ft->retType;
             }
-
-                // TODO: PrefixExpr (前缀), CallExpr (函数调用), MemberExpr (属性访问)
-
-            default:
-                // 对于还没实现的表达式，默认降级为 Any 防止崩溃
-                expr->resolvedType = typeCtx.GetAny();
-                return {};
+            default: break;
         }
+        return expr->resolvedType = typeCtx.GetBasic(TypeTag::Any);
     }
 
-    Result<void, Error> Analyzer::Analyze(Program *program)
+    Result<Symbol *, Error> Analyzer::resolveSymbolInternal(
+        const String &name, const SourceLocation &loc, Scope *s)
     {
-        for (auto *stmt : program->nodes)
+        Scope *curr = s;
+        while (curr)
         {
-            auto res = analyzeStmt(stmt);
-            if (!res)
-                return std::unexpected(res.error()); // 遇到任何错误，立刻中断并向上传递
+            if (curr->locals.contains(name))
+                return curr->locals[name];
+            if (curr->isFunctionBoundary)
+                break;
+            curr = curr->parent;
         }
-        return {};
+        if (curr && curr->parent)
+        {
+            auto res = resolveSymbolInternal(name, loc, curr->parent);
+            if (!res)
+                return res;
+            Symbol *outer = *res;
+            if (outer->location == SymbolLocation::Global)
+                return outer;
+            int idx = addUpvalue(curr, outer, outer->location == SymbolLocation::Local);
+            return arena.Allocate<Symbol>(
+                name, outer->type, SymbolLocation::Upvalue, idx, outer->isConst);
+        }
+        if (globalSymbols.contains(name))
+            return globalSymbols[name];
+        return std::unexpected(
+            Error(ErrorType::UseUndeclaredIdentifier, "symbol not found", "", loc));
     }
 
-}; // namespace Fig
+    int Analyzer::addUpvalue(Scope *s, Symbol *t, bool isL)
+    {
+        for (size_t i = 0; i < s->upvalues.size(); ++i)
+            if (s->upvalues[i].target == t)
+                return (int) i;
+        int idx = (int) s->upvalues.size();
+        s->upvalues.push_back({t, idx, isL});
+        return idx;
+    }
+
+    Result<Type, Error> Analyzer::resolveTypeExpr(TypeExpr *texpr)
+    {
+        if (!texpr)
+            return typeCtx.GetBasic(TypeTag::Any);
+        if (texpr->type == AstType::NamedTypeExpr)
+        {
+            auto *n = static_cast<NamedTypeExpr *>(texpr);
+            if (n->path.empty())
+                return typeCtx.GetBasic(TypeTag::Any);
+            String &root = n->path[0];
+            if (root == "Any")
+                return typeCtx.GetBasic(TypeTag::Any);
+            if (root == "Int")
+                return typeCtx.GetBasic(TypeTag::Int);
+            if (root == "Double")
+                return typeCtx.GetBasic(TypeTag::Double);
+            if (root == "String")
+                return typeCtx.GetBasic(TypeTag::String);
+            if (root == "Bool")
+                return typeCtx.GetBasic(TypeTag::Bool);
+            if (root == "Null")
+                return typeCtx.GetBasic(TypeTag::Null);
+
+            if (globalTypes.contains(root))
+                return Type{globalTypes[root], false};
+
+            return std::unexpected(
+                Error(ErrorType::UseUndeclaredIdentifier, "unknown type", "", texpr->location));
+        }
+        if (texpr->type == AstType::NullableTypeExpr)
+        {
+            auto res = resolveTypeExpr(static_cast<NullableTypeExpr *>(texpr)->inner);
+            if (res)
+                res->isNullable = true;
+            return res;
+        }
+        return typeCtx.GetBasic(TypeTag::Any);
+    }
+} // namespace Fig

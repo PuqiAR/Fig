@@ -59,8 +59,12 @@ namespace Fig
 
             case TooManyLocals: return "TooManyLocals";
             case TooManyConstants: return "TooManyConstants";
+
+            case RegisterOverflow: return "RegisterOverflow";
+            case InternalError: return "InternalError";
                 // default: return "Some one forgot to add case to `ErrorTypeToString`";
         }
+        return "UnknownError";
     }
 
     void PrintSystemInfos()

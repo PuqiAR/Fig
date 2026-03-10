@@ -9,7 +9,7 @@
 
 namespace Fig
 {
-    Result<LiteralExpr *, Error> Parser::parseLiteralExpr() // 当前token为literal时调用
+    Result<Expr *, Error> Parser::parseLiteralExpr() // 当前token为literal时调用
     {
         StateProtector p(this, {State::ParsingLiteralExpr});
 
@@ -17,7 +17,7 @@ namespace Fig
         LiteralExpr *node = arena.Allocate<LiteralExpr>(literal_token, makeSourceLocation(literal_token));
         return node;
     }
-    Result<IdentiExpr *, Error> Parser::parseIdentiExpr() // 当前token为Identifier调用
+    Result<Expr *, Error> Parser::parseIdentiExpr() // 当前token为Identifier调用
     {
         StateProtector p(this, {State::ParsingIdentiExpr});
 
@@ -27,7 +27,7 @@ namespace Fig
         return node;
     }
 
-    Result<InfixExpr *, Error> Parser::parseInfixExpr(Expr *lhs) // 当前token为 op
+    Result<Expr *, Error> Parser::parseInfixExpr(Expr *lhs) // 当前token为 op
     {
         StateProtector p(this, {State::ParsingInfixExpr});
 
@@ -46,7 +46,7 @@ namespace Fig
         return node;
     }
 
-    Result<PrefixExpr *, Error> Parser::parsePrefixExpr() // 当前token为op
+    Result<Expr *, Error> Parser::parsePrefixExpr() // 当前token为op
     {
         StateProtector p(this, {State::ParsingPrefixExpr});
 
@@ -65,7 +65,7 @@ namespace Fig
         return node;
     }
 
-    Result<IndexExpr *, Error> Parser::parseIndexExpr(
+    Result<Expr *, Error> Parser::parseIndexExpr(
         Expr *base) // 由 parseExpression调用, 当前token为 `[`
     {
         StateProtector p(this, {State::ParsingIndexExpr});
@@ -91,7 +91,7 @@ namespace Fig
         return indexExpr;
     }
 
-    Result<CallExpr *, Error> Parser::parseCallExpr(
+    Result<Expr *, Error> Parser::parseCallExpr(
         Expr *callee) // 由 parseExpression调用, 当前token为 `(`
     {
         StateProtector p(this, {State::ParsingCallExpr});

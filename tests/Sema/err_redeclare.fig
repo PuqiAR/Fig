@@ -1,0 +1,4 @@
+func main() {
+    var x = 10;
+    var x = 20; // 错误：x 重复定义
+}

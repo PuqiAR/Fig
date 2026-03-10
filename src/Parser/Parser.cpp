@@ -1,8 +1,8 @@
 /*!
     @file src/Parser/Parser.cpp
-    @brief 语法分析器(Pratt + 手动递归下降) 实现
+    @brief 语法分析器实现
     @author PuqiAR (im@puqiar.top)
-    @date 2026-02-14
+    @date 2026-03-08
 */
 
 #include <Parser/Parser.hpp>
@@ -12,21 +12,22 @@ namespace Fig
     Result<Program *, Error> Parser::Parse()
     {
         Program *program = arena.Allocate<Program>();
-        while (!isEOF)
+        
+        while (currentToken().type != TokenType::EndOfFile)
         {
             auto result = parseStatement();
             if (!result)
             {
                 return std::unexpected(result.error());
             }
+            
             Stmt *stmt = *result;
-            if (!stmt)
+            if (stmt)
             {
-                continue;
+                program->nodes.push_back(stmt);
             }
-            program->nodes.push_back(stmt);
         }
+        
         return program;
-    
     }
 }; // namespace Fig

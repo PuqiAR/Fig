@@ -1,370 +1,313 @@
 /*!
     @file src/Compiler/ExprCompiler.cpp
-    @brief 编译器实现(表达式部分)
-    @author PuqiAR (im@puqiar.top)
-    @date 2026-02-19
+    @brief 表达式编译器实现：引入水位线(Watermark)与零拷贝复用机制
 */
 
+#include <Ast/Expr/CallExpr.hpp>
+#include <Ast/Expr/IdentiExpr.hpp>
+#include <Ast/Expr/InfixExpr.hpp>
+#include <Ast/Expr/LiteralExpr.hpp>
 #include <Compiler/Compiler.hpp>
+#include <charconv>
+#include <limits>
+#include <system_error>
+
 
 namespace Fig
 {
-    Result<std::uint8_t, Error> Compiler::compileIdentiExpr(IdentiExpr *ie)
+    static Result<Value, Error> parsePhysicalNumber(const String &raw, const SourceLocation &loc)
     {
-        // TODO: 处理全局变量和闭包 Upvalue
-        std::uint8_t targetReg = current->fastRegMap[ie->localId];
+        char buffer[128];
+        int  j       = 0;
+        bool isFloat = false;
+        for (size_t i = 0; i < raw.length() && j < 127; ++i)
+        {
+            char32_t c = raw[i];
+            if (c == '_')
+                continue;
+            if (c == '.' || c == 'e' || c == 'E')
+                isFloat = true;
+            buffer[j++] = (char) c;
+        }
+        buffer[j] = '\0';
 
-        if (targetReg == UINT8_MAX)
+        if (isFloat)
         {
-            assert(false && "Compiler Bug: Encountered unmapped localId in fastRegMap!");
+            double dVal;
+            auto [ptr, ec] = std::from_chars(buffer, buffer + j, dVal);
+            if (ec != std::errc())
+                return std::unexpected(Error(ErrorType::SyntaxError, "float overflow", "", loc));
+            return Value::FromDouble(dVal);
         }
-        return targetReg;
-    }
-    Result<std::uint8_t, Error> Compiler::compileLiteral(
-        LiteralExpr *lit) // 编译字面量, 负责转换 token -> Value
-    {
-        const Token &token  = lit->token;
-        String       lexeme = manager.GetSub(token.index, token.length);
-
-        if (!token.isLiteral())
+        else
         {
-            assert(false && "CompileLiteral: token is not literal");
-        }
-
-        Value v;
-
-        if (token.type == TokenType::LiteralNull)
-        {
-            v = Value::GetNullInstance();
-        }
-        else if (token.type == TokenType::LiteralTrue)
-        {
-            v = Value::GetTrueInstance();
-        }
-        else if (token.type == TokenType::LiteralFalse)
-        {
-            v = Value::GetFalseInstance();
-        }
-        else if (token.type == TokenType::LiteralNumber)
-        {
-            // TODO: 更换为无异常手写数字解析版本 (charconv也可)
-            if (lexeme.contains(U'.') || lexeme.contains(U'e'))
+            int         base  = 10;
+            const char *start = buffer;
+            if (j > 2 && buffer[0] == '0')
             {
-                // 非整数
-                double d = std::stod(lexeme.toStdString());
-                v        = Value::FromDouble(d);
+                if (buffer[1] == 'x' || buffer[1] == 'X')
+                {
+                    base = 16;
+                    start += 2;
+                }
+                else if (buffer[1] == 'b' || buffer[1] == 'B')
+                {
+                    base = 2;
+                    start += 2;
+                }
+            }
+            int64_t iVal;
+            auto [ptr, ec] = std::from_chars(start, buffer + j, iVal, base);
+            if (ec != std::errc())
+                return std::unexpected(Error(ErrorType::SyntaxError, "integer overflow", "", loc));
+
+            if (iVal >= std::numeric_limits<int32_t>::min()
+                && iVal <= std::numeric_limits<int32_t>::max())
+            {
+                return Value::FromInt(static_cast<int32_t>(iVal));
             }
             else
             {
-                std::int32_t i = std::stoi(lexeme.toStdString());
-                v              = Value::FromInt(i);
+                return Value::FromDouble(static_cast<double>(iVal));
             }
         }
-        else
-        {
-            assert("false" && "CompileLiteral: unsupport literal");
-        }
-
-        std::uint8_t targetReg = AllocReg();
-
-        if (current->proto->constants.size() >= MAX_CONSTANTS)
-        {
-            return std::unexpected(Error(ErrorType::TooManyConstants,
-                std::format("constant limit exceeded: {}", MAX_CONSTANTS),
-                "How did you write such code? try global variable or split file",
-                makeSourceLocation(lit)));
-        }
-
-        std::uint16_t kIndex = AddConstant(v);
-
-        Emit(Op::iABx(OpCode::LoadK, targetReg, kIndex));
-        return targetReg;
     }
-    Result<std::uint8_t, Error> Compiler::compileAssignment(
-        InfixExpr *infix) // 编译赋值，由 CompileInfixExpr调用
+
+    Result<Register, Error> Compiler::compileExpr(Expr *expr, Register target)
     {
-        // op必须为 =
-        const auto &_lhsReg = compileLeftValue(infix->left); // 必须为左值对象
-        if (!_lhsReg)
+        if (expr == nullptr)
         {
-            return _lhsReg;
-        }
-        std::uint8_t lhsReg = *_lhsReg;
-
-        const auto  &_rhsReg = compileExpr(infix->right);
-        std::uint8_t rhsReg  = *_rhsReg;
-
-        FreeReg(rhsReg);
-        switch (infix->op)
-        {
-            case BinaryOperator::Assign: {
-                Emit(Op::iABx(OpCode::Mov, lhsReg, rhsReg)); // lhsReg = rhsReg
-                break;
-            }
-            case BinaryOperator::AddAssign: {
-                Emit(Op::iABC(OpCode::Add, lhsReg, lhsReg, rhsReg)); // lhsReg = lhsReg + rhsReg
-                break;
-            }
-            case BinaryOperator::SubAssign: {
-                Emit(Op::iABC(OpCode::Sub, lhsReg, lhsReg, rhsReg)); // lhsReg = lhsReg - rhsReg
-                break;
-            }
-            case BinaryOperator::MultiplyAssign: {
-                Emit(Op::iABC(OpCode::Mul, lhsReg, lhsReg, rhsReg)); // lhsReg = lhsReg * rhsReg
-                break;
-            }
-            case BinaryOperator::DivideAssign: {
-                Emit(Op::iABC(OpCode::Div, lhsReg, lhsReg, rhsReg)); // lhsReg = lhsReg / rhsReg
-                break;
-            }
-            case BinaryOperator::ModuloAssign: {
-                Emit(Op::iABC(OpCode::Mod, lhsReg, lhsReg, rhsReg)); // lhsReg = lhsReg % rhsReg
-                break;
-            }
-            case BinaryOperator::BitXorAssign: {
-                Emit(Op::iABC(OpCode::BitXor, lhsReg, lhsReg, rhsReg)); // lhsReg = lhsReg ^ rhsReg
-                break;
-            }
-            default: {
-                assert(false && "CompileAssignment: op unsupported yet");
-            }
-        }
-        return lhsReg; // 返回赋值的结果，支持连续赋值
-    }
-    Result<std::uint8_t, Error> Compiler::compileInfixExpr(
-        InfixExpr *infix) // 编译中缀表达式，返回一个存放结果的寄存器 ID
-    {
-        if (infix->op >= BinaryOperator::Assign && infix->op <= BinaryOperator::BitXorAssign)
-        {
-            return compileAssignment(infix);
+            return std::unexpected(
+                Error(ErrorType::InternalError, "null expr in compiler", "", {}));
         }
 
-        Expr *left  = infix->left;
-        Expr *right = infix->right;
-
-        const auto &_lhsReg = compileExpr(left);
-        if (!_lhsReg)
-        {
-            return _lhsReg;
-        }
-        std::uint8_t lhsReg  = *_lhsReg;
-        const auto  &_rhsReg = compileExpr(right);
-        if (!_rhsReg)
-        {
-            return _rhsReg;
-        }
-        std::uint8_t rhsReg = *_rhsReg;
-
-        FreeReg(rhsReg);
-        FreeReg(lhsReg);
-
-        std::uint8_t resultReg = AllocReg();
-
-        switch (infix->op)
-        {
-            case BinaryOperator::Add: {
-                if (left->resolvedType == right->resolvedType && left->resolvedType->isInt())
-                {
-                    // Int + Int
-                    Emit(Op::iABC(OpCode::IntFastAdd, resultReg, lhsReg, rhsReg));
-                }
-                else
-                {
-                    Emit(Op::iABC(OpCode::Add, resultReg, lhsReg, rhsReg));
-                }
-                break;
-            }
-
-            case BinaryOperator::Subtract: {
-                if (left->resolvedType == right->resolvedType && left->resolvedType->isInt())
-                {
-                    // Int - Int
-                    Emit(Op::iABC(OpCode::IntFastSub, resultReg, lhsReg, rhsReg));
-                }
-                else
-                {
-                    Emit(Op::iABC(OpCode::Sub, resultReg, lhsReg, rhsReg));
-                }
-                break;
-            }
-
-            case BinaryOperator::Multiply: {
-                if (left->resolvedType == right->resolvedType && left->resolvedType->isInt())
-                {
-                    // Int * Int
-                    Emit(Op::iABC(OpCode::IntFastMul, resultReg, lhsReg, rhsReg));
-                }
-                else
-                {
-                    Emit(Op::iABC(OpCode::Mul, resultReg, lhsReg, rhsReg));
-                }
-                break;
-            }
-
-            case BinaryOperator::Divide: {
-                if (left->resolvedType == right->resolvedType && left->resolvedType->isInt())
-                {
-                    // Int / Int
-                    Emit(Op::iABC(OpCode::IntFastDiv, resultReg, lhsReg, rhsReg));
-                }
-                else
-                {
-                    Emit(Op::iABC(OpCode::Div, resultReg, lhsReg, rhsReg));
-                }
-                break;
-            }
-
-            case BinaryOperator::Modulo: {
-                Emit(Op::iABC(OpCode::Mod, resultReg, lhsReg, rhsReg));
-                break;
-            }
-
-            case BinaryOperator::Greater: {
-                Emit(Op::iABC(OpCode::Greater, resultReg, lhsReg, rhsReg));
-                break;
-            }
-
-            case BinaryOperator::GreaterEqual: {
-                Emit(Op::iABC(OpCode::GreaterEqual, resultReg, lhsReg, rhsReg));
-                break;
-            }
-
-            case BinaryOperator::Less: {
-                Emit(Op::iABC(OpCode::Less, resultReg, lhsReg, rhsReg));
-                break;
-            }
-
-            case BinaryOperator::LessEqual: {
-                Emit(Op::iABC(OpCode::LessEqual, resultReg, lhsReg, rhsReg));
-                break;
-            }
-
-            case BinaryOperator::Equal: {
-                Emit(Op::iABC(OpCode::Equal, resultReg, lhsReg, rhsReg));
-                break;
-            }
-
-            default: assert(false && "CompileInfixExpr: op unsupported yet");
-        }
-        return resultReg;
-    }
-    Result<std::uint8_t, Error> Compiler::compileLeftValue(
-        Expr *expr) // 左值对象，可以是变量、结构体字段或模块对象
-    {
         switch (expr->type)
         {
-            case AstType::IdentiExpr:
-                return compileIdentiExpr(static_cast<IdentiExpr *>(expr));
-                // TODO: 数组切片(a[0])或对象属性(a.b)
+            case AstType::LiteralExpr: {
+                auto    *l = static_cast<LiteralExpr *>(expr);
+                Register r = (target == NO_REG) ? *allocateReg(l->location) : target;
 
-            default:
-                // Analyzer 有漏洞（编译器内部
-                // 直接崩溃
-                assert(false && "Compiler Bug: Invalid L-value bypassed Analyzer!");
-                return 0;
-        }
-    }
-
-    Result<std::uint8_t, Error> Compiler::compileCallExpr(CallExpr *expr)
-    {
-        bool isStatic = false; // 是否为单纯的 fn(...) 静态函数调用
-        int  protoIdx = -1;
-
-        if (expr->callee->type == AstType::IdentiExpr)
-        {
-            IdentiExpr *id = static_cast<IdentiExpr *>(expr->callee);
-            // 如果是函数名且深度为 0 (全局/扁平函数池)
-            if (id->resolvedType->tag == TypeTag::Function && id->resolvedDepth == 0)
-            {
-                if (globalFuncMap.contains(id->localId))
+                const Token &tok = l->literal;
+                if (tok.type == TokenType::LiteralNumber)
                 {
-                    isStatic = true;
-                    protoIdx = globalFuncMap[id->localId];
+                    auto vRes =
+                        parsePhysicalNumber(manager.GetSub(tok.index, tok.length), l->location);
+                    if (!vRes)
+                        return std::unexpected(vRes.error());
+                    emit(Op::iABx(OpCode::LoadK, r, static_cast<uint16_t>(addConstant(*vRes))));
                 }
+                else if (tok.type == TokenType::LiteralString)
+                {
+                    int kIdx = addConstant(Value::GetNullInstance()); // TODO: String 支持
+                    emit(Op::iABx(OpCode::LoadK, r, static_cast<uint16_t>(kIdx)));
+                }
+                else if (tok.type == TokenType::LiteralNull)
+                {
+                    emit(Op::iABC(OpCode::LoadNull, r, 0, 0));
+                }
+                else if (tok.type == TokenType::LiteralTrue)
+                {
+                    emit(Op::iABC(OpCode::LoadTrue, r, 0, 0));
+                }
+                else if (tok.type == TokenType::LiteralFalse)
+                {
+                    emit(Op::iABC(OpCode::LoadFalse, r, 0, 0));
+                }
+                return r;
             }
-        }
-
-        std::uint8_t baseReg = AllocReg();
-
-        if (!isStatic)
-        {
-            auto calleeRes = compileExpr(expr->callee);
-            if (!calleeRes)
-            {
-                return calleeRes;
-            }
-
-            if (*calleeRes != baseReg)
-            {
-                Emit(Op::iABx(OpCode::Mov, baseReg, *calleeRes));
-            }
-        }
-
-        for (size_t i = 0; i < expr->args.size(); ++i)
-        {
-            std::uint8_t argTarget = AllocReg();
-            auto         argRes    = compileExpr(expr->args.args[i]);
-            if (!argRes)
-            {
-                return argRes;
-            }
-
-            if (*argRes != argTarget)
-            {
-                Emit(Op::iABx(OpCode::Mov, argTarget, *argRes));
-            }
-        }
-
-        std::uint8_t expectRet = 1;
-
-        if (isStatic)
-        {
-            Emit(Op::iABC(OpCode::FastCall, (std::uint8_t) protoIdx, baseReg, expectRet));
-        }
-        else
-        {
-            Emit(Op::iABC(OpCode::Call, baseReg, baseReg, expectRet));
-        }
-
-        for (size_t i = 0; i < expr->args.args.size(); ++i)
-        {
-            current->freeReg--;
-        }
-        return baseReg; // 返回值起点
-    }
-
-    Result<std::uint8_t, Error> Compiler::compileExpr(
-        Expr *expr) // 编译表达式，必定返回一个存放结果的寄存器 ID
-    {
-        switch (expr->type)
-        {
-            case AstType::Stmt:
-            case AstType::Expr:
-            case AstType::AstNode: assert(false && "CompileExpr: bad node type"); break;
 
             case AstType::IdentiExpr: {
-                return compileLeftValue(expr); // 左值直接转换成右值
-            }
+                auto   *i   = static_cast<IdentiExpr *>(expr);
+                Symbol *sym = i->resolvedSymbol;
 
-            case AstType::LiteralExpr: {
-                LiteralExpr *lit = static_cast<LiteralExpr *>(expr);
-
-                auto result = compileLiteral(lit);
-                if (!result)
+                if (sym->location == SymbolLocation::Local)
                 {
-                    return std::unexpected(result.error());
-                }
-                std::uint8_t targetReg = *result;
-                return targetReg;
-            }
+                    // 零拷贝直读：如果是临时求值，直接返回变量的物理槽位，禁止产生副本
+                    if (target == NO_REG)
+                        return static_cast<Register>(sym->index);
 
-            case AstType::InfixExpr: {
-                return compileInfixExpr(static_cast<InfixExpr *>(expr));
+                    // 仅在被强制指定目标（如参数装填）时发射搬运指令
+                    if (target != sym->index)
+                    {
+                        emit(Op::iABx(OpCode::Mov, target, static_cast<uint16_t>(sym->index)));
+                    }
+                    return target;
+                }
+
+                Register r = (target == NO_REG) ? *allocateReg(i->location) : target;
+                if (sym->location == SymbolLocation::Upvalue)
+                {
+                    emit(Op::iABC(OpCode::GetUpval, r, static_cast<uint8_t>(sym->index), 0));
+                }
+                else if (sym->location == SymbolLocation::Global)
+                {
+                    int gId = getGlobalID(i->name);
+                    emit(Op::iABx(OpCode::GetGlobal, r, static_cast<uint16_t>(gId)));
+                }
+                return r;
             }
 
             case AstType::CallExpr: {
-                return compileCallExpr(static_cast<CallExpr *>(expr));
+                auto    *c       = static_cast<CallExpr *>(expr);
+                Register mark    = current->freereg; // 记录调用前的栈顶水位
+                Register baseReg = current->freereg; // 锁定滑窗基址
+
+                // 连续装填参数，占据 baseReg, baseReg+1, baseReg+2...
+                for (auto *arg : c->args.args)
+                {
+                    auto allocRes = allocateReg(arg->location);
+                    if (!allocRes)
+                    {
+                        return allocRes;
+                    }
+
+                    Register argTarget = *allocRes;
+                    auto     res       = compileExpr(arg, argTarget);
+                    if (!res)
+                        return std::unexpected(res.error());
+                }
+
+                if (c->callee->type == AstType::IdentiExpr)
+                {
+                    // 静态去虚化：编译期直接跳板
+                    auto *id       = static_cast<IdentiExpr *>(c->callee);
+                    int   protoIdx = id->resolvedSymbol->index;
+                    emit(Op::iABC(OpCode::FastCall,
+                        static_cast<uint8_t>(protoIdx),
+                        baseReg,
+                        static_cast<uint8_t>(c->args.args.size())));
+                }
+                else
+                {
+                    // 动态闭包调用
+                    auto r_fn = compileExpr(c->callee);
+                    if (!r_fn)
+                        return std::unexpected(r_fn.error());
+                    emit(Op::iABC(
+                        OpCode::Call, *r_fn, baseReg, static_cast<uint8_t>(c->args.args.size())));
+                }
+
+                // 回滚水位线：彻底释放传参时的临时占用
+                current->freereg = mark;
+
+                // 目标对齐：若 target 未指定，allocateReg 将自然复用 baseReg，实现零开销回写
+
+                Register r_dest;
+                if (target == NO_REG)
+                {
+                    auto res = allocateReg(c->location);
+                    if (!res)
+                        return std::unexpected(res.error());
+                    r_dest = *res;
+                }
+                else
+                {
+                    r_dest = target;
+                }
+
+                if (r_dest != baseReg)
+                {
+                    emit(Op::iABx(OpCode::Mov, r_dest, baseReg));
+                }
+
+                return r_dest;
             }
+
+            case AstType::InfixExpr: {
+                auto *in = static_cast<InfixExpr *>(expr);
+                if (in->op == BinaryOperator::Assign)
+                {
+                    auto r_val = compileExpr(in->right, target);
+                    if (!r_val)
+                        return std::unexpected(r_val.error());
+
+                    if (in->left->type == AstType::IdentiExpr)
+                    {
+                        auto   *lid = static_cast<IdentiExpr *>(in->left);
+                        Symbol *sym = lid->resolvedSymbol;
+                        if (sym->location == SymbolLocation::Local)
+                        {
+                            emit(Op::iABx(OpCode::Mov, static_cast<Register>(sym->index), *r_val));
+                        }
+                        else if (sym->location == SymbolLocation::Upvalue)
+                        {
+                            emit(Op::iABC(
+                                OpCode::SetUpval, *r_val, static_cast<Register>(sym->index), 0));
+                        }
+                        else
+                        {
+                            emit(Op::iABx(OpCode::SetGlobal,
+                                *r_val,
+                                static_cast<uint16_t>(getGlobalID(lid->name))));
+                        }
+                    }
+                    return r_val;
+                }
+
+                Register mark = current->freereg; // 记录水位线
+
+                auto r_l = compileExpr(in->left);
+                if (!r_l)
+                    return std::unexpected(r_l.error());
+                auto r_r = compileExpr(in->right);
+                if (!r_r)
+                    return std::unexpected(r_r.error());
+
+                bool isInt = in->left->resolvedType.is(TypeTag::Int)
+                             && in->right->resolvedType.is(TypeTag::Int);
+                OpCode op;
+                switch (in->op)
+                {
+                    case BinaryOperator::Add: op = isInt ? OpCode::IntFastAdd : OpCode::Add; break;
+                    case BinaryOperator::Subtract:
+                        op = isInt ? OpCode::IntFastSub : OpCode::Sub;
+                        break;
+                    case BinaryOperator::Multiply:
+                        op = isInt ? OpCode::IntFastMul : OpCode::Mul;
+                        break;
+                    case BinaryOperator::Divide:
+                        op = isInt ? OpCode::IntFastDiv : OpCode::Div;
+                        break;
+                    case BinaryOperator::Modulo: op = OpCode::Mod; break;
+                    case BinaryOperator::BitXor: op = OpCode::BitXor; break;
+                    case BinaryOperator::Equal: op = OpCode::Equal; break;
+                    case BinaryOperator::NotEqual: op = OpCode::NotEqual; break;
+                    case BinaryOperator::Greater: op = OpCode::Greater; break;
+                    case BinaryOperator::Less: op = OpCode::Less; break;
+                    case BinaryOperator::GreaterEqual: op = OpCode::GreaterEqual; break;
+                    case BinaryOperator::LessEqual: op = OpCode::LessEqual; break;
+                    default:
+                        return std::unexpected(Error(ErrorType::InternalError,
+                            "unsupported binary operator",
+                            "",
+                            in->location));
+                }
+
+                // 释放左右操作数产生的临时寄存器
+                current->freereg = mark;
+
+                // 复用已释放的物理槽位存放计算结果
+                Register r_d;
+                if (target == NO_REG)
+                {
+                    auto res = allocateReg(in->location);
+                    if (!res)
+                        return std::unexpected(res.error());
+                    r_d = *res;
+                }
+                else
+                {
+                    r_d = target;
+                }
+
+                emit(Op::iABC(op, r_d, *r_l, *r_r));
+
+                return r_d;
+            }
+
+            default: break;
         }
+        return std::unexpected(
+            Error(ErrorType::InternalError, "unsupported expr", "", expr->location));
     }
 } // namespace Fig

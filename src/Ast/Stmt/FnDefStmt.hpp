@@ -1,102 +1,47 @@
 /*!
     @file src/Ast/Stmt/FnDefStmt.hpp
-    @brief FnDefStmt定义
-    @author PuqiAR (im@puqiar.top)
-    @date 2026-02-25
+    @brief 函数定义 AST 节点
 */
 
 #pragma once
-
 #include <Ast/Base.hpp>
+#include <Sema/Environment.hpp>
 
 namespace Fig
 {
-    struct Param
-    {
-        String         name;
-        SourceLocation location;
-
-        TypeInfo *resolvedType = nullptr;
-        int       localId      = -1;
-
-        virtual String toString() const = 0;
-    };
-
-    struct PosParam final : public Param
-    {
-        TypeExpr *type;
+    struct Param : public AstNode {
+        String    name;
+        TypeExpr *typeSpecifier;
         Expr     *defaultValue;
-
-        PosParam() {}
-        PosParam(String _name, TypeExpr *_type, Expr *_defaultValue, SourceLocation _location) :
-            type(_type), defaultValue(_defaultValue)
-        {
-            name     = std::move(_name);
-            location = std::move(_location);
-        }
-
-        virtual String toString() const override
-        {
-            return std::format("<Pos {}: {}{}>",
-                name,
-                (type ? type->toString() : "Any"),
-                (defaultValue ? " =" + defaultValue->toString() : ""));
-        }
+        Type      resolvedType;
+        Param() { type = AstType::AstNode; }
+        virtual ~Param() = default;
     };
 
-    /*
-        (public) func foo([name: (type) (= default value)]) (-> return type)
-        {
-            ...
+    struct PosParam final : public Param {
+        PosParam(String _n, TypeExpr *_ts, Expr *_dv, SourceLocation _loc) {
+            name = std::move(_n); typeSpecifier = _ts; defaultValue = _dv; location = std::move(_loc);
         }
+        virtual String toString() const override { return name; }
+    };
 
-    */
-
-    struct FnDefStmt final : public Stmt
-    {
-        String            name;
+    struct FnDefStmt final : public Stmt {
+        String           name;
         DynArray<Param *> params;
-        TypeExpr         *returnType;
-        BlockStmt        *body;
+        TypeExpr        *returnTypeSpecifier;
+        BlockStmt       *body;
+        Type             resolvedReturnType;
+        Symbol          *resolvedSymbol = nullptr; // 连接物理符号
 
-        TypeInfo *resolvedReturnType = nullptr;
-        int       localId            = -1;
-
-        FnDefStmt()
+        FnDefStmt() { type = AstType::FnDefStmt; }
+        FnDefStmt(bool _p, String _n, DynArray<Param *> _pa, TypeExpr *_rt, BlockStmt *_b, SourceLocation _loc)
+            : name(std::move(_n)), params(std::move(_pa)), returnTypeSpecifier(_rt), body(_b)
         {
-            type = AstType::FnDefStmt;
+            type = AstType::FnDefStmt; isPublic = _p; location = std::move(_loc);
         }
 
-        FnDefStmt(bool        _isPublic,
-            String            _name,
-            DynArray<Param *> _params,
-            TypeExpr         *_returnType,
-            BlockStmt        *_body,
-            SourceLocation    _location) :
-            name(std::move(_name)), params(std::move(_params)), returnType(_returnType), body(_body)
-        {
-            type     = AstType::FnDefStmt;
-            isPublic = _isPublic;
-            location = std::move(_location);
-        }
-
-        virtual String toString() const override
-        {
-            String pStr;
-            for (const Param *p : params)
-            {
-                if (p != *params.begin())
-                {
-                    pStr += ", ";
-                }
-                pStr += p->toString();
-            }
-            return std::format("<FnDefStmt {}{}({}) -> {} {{{}}}>",
-                (isPublic ? "public " : ""),
-                name,
-                pStr,
-                (returnType ? returnType->toString() : "Any"),
-                body->toString());
+        virtual String toString() const override {
+            return std::format("<FnDefStmt '{}'>", name);
         }
     };
-}; // namespace Fig
+}

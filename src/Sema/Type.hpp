@@ -1,171 +1,115 @@
 /*!
     @file src/Sema/Type.hpp
-    @brief 前端类型检查的类型定义和类型驻留池
-    @author PuqiAR (im@puqiar.top)
-    @date 2026-02-23
+    @brief 类型系统定义：对齐 NaN-boxing 物理布局
 */
 
 #pragma once
-
 #include <Deps/Deps.hpp>
-#include <cstdint>
+#include <Error/Error.hpp>
 
 namespace Fig
 {
     enum class TypeTag : std::uint8_t
     {
-        Any,  // 动态类型底线
-        Null, // 空值
         Int,
         Double,
-        Bool,
         String,
+        Bool,
+        Null,
+        Any,
         Function,
         Struct,
+        Interface
     };
 
-    struct TypeInfo
+    class BaseType;
+
+    struct Type
     {
+        BaseType *base       = nullptr;
+        bool      isNullable = false;
+
+        bool operator==(const Type &other) const
+        {
+            return base == other.base && isNullable == other.isNullable;
+        }
+        bool operator!=(const Type &other) const
+        {
+            return !(*this == other);
+        }
+
+        bool   is(TypeTag tag) const;
+        String toString() const;
+
+        bool isAssignableTo(const Type &target) const;
+    };
+
+    class BaseType
+    {
+    public:
         TypeTag tag;
-        String  name; // 完整路径序列化, 如 Int, std.file.File
+        String  name;
+        BaseType(TypeTag t, String n) : tag(t), name(std::move(n)) {}
+        virtual ~BaseType() = default;
+    };
 
-        bool isAny() const
+    class FuncType : public BaseType
+    {
+    public:
+        DynArray<Type> paramTypes;
+        Type retType;
+        FuncType(DynArray<Type> params, Type ret) :
+            BaseType(TypeTag::Function, "Function"), paramTypes(std::move(params)), retType(ret)
         {
-            return tag == TypeTag::Any;
-        }
-
-        bool isNull() const
-        {
-            return tag == TypeTag::Null;
-        }
-
-        bool isInt() const
-        {
-            return tag == TypeTag::Int;
-        }
-
-        bool isDouble() const
-        {
-            return tag == TypeTag::Double;
-        }
-
-        bool isBool() const
-        {
-            return tag == TypeTag::Bool;
-        }
-
-        bool isString() const
-        {
-            return tag == TypeTag::String;
-        }
-
-        bool isFunction() const
-        {
-            return tag == TypeTag::Function;
-        }
-
-        bool isStruct() const
-        {
-            return tag == TypeTag::Struct;
         }
     };
 
-    // 全局唯一类型驻留池
+    class StructType : public BaseType
+    {
+    public:
+        struct Field
+        {
+            String name;
+            Type   type;
+            bool   isPublic;
+            int    index;
+        };
+        DynArray<Field>                    fields;
+        HashMap<String, size_t>            fieldMap;
+        HashMap<String, class FnDefStmt *> methods;
+
+        StructType(String n) : BaseType(TypeTag::Struct, std::move(n)) {}
+        void AddField(String name, Type type, bool isPublic)
+        {
+            size_t idx = fields.size();
+            fields.push_back({name, type, isPublic, (int) idx});
+            fieldMap[name] = idx;
+        }
+    };
+
+    class InterfaceType : public BaseType
+    {
+    public:
+        struct MethodSig
+        {
+            String         name;
+            DynArray<Type> params;
+            Type           retType;
+        };
+        HashMap<String, MethodSig> methods;
+        InterfaceType(String n) : BaseType(TypeTag::Interface, std::move(n)) {}
+    };
+
     class TypeContext
     {
-    private:
-        DynArray<TypeInfo *> allTypes;
-
-        // 缓存
-        TypeInfo *typeAny;
-        TypeInfo *typeNull;
-        TypeInfo *typeInt;
-        TypeInfo *typeDouble;
-        TypeInfo *typeBool;
-        TypeInfo *typeString;
-        TypeInfo *typeFunction;
-        TypeInfo *typeStruct;
-
     public:
-        TypeInfo *GetAny()
-        {
-            return typeAny;
-        }
-        TypeInfo *GetNull()
-        {
-            return typeNull;
-        }
-        TypeInfo *GetInt()
-        {
-            return typeInt;
-        }
-        TypeInfo *GetDouble()
-        {
-            return typeDouble;
-        }
-        TypeInfo *GetBool()
-        {
-            return typeBool;
-        }
-        TypeInfo *GetString()
-        {
-            return typeString;
-        }
-        TypeInfo *GetFunction()
-        {
-            return typeFunction;
-        }
-        TypeInfo *GetStruct()
-        {
-            return typeStruct;
-        }
+        DynArray<BaseType *> allTypes;
+        BaseType            *intType, *doubleType, *stringType, *boolType, *anyType, *nullType;
 
-        TypeInfo *ResolveTypePath(const String &fullName)
-        {
-            for (auto *t : allTypes)
-            {
-                if (t->name == fullName)
-                    return t;
-            }
-            return nullptr; // 没找到该类型
-        }
-
-        TypeInfo *ResolveTypePath(const DynArray<String> &path)
-        {
-            // TODO: 支持Module 系统, 查 Module 的导出表
-            String fullName = path.empty() ? "" : path[0];
-            for (size_t i = 1; i < path.size(); ++i)
-            {
-                fullName += "." + path[i];
-            }
-
-            return ResolveTypePath(fullName);
-        }
-
-        ~TypeContext()
-        {
-            for (TypeInfo *t : allTypes)
-                delete t;
-        }
-
-        TypeContext()
-        {
-            typeAny      = createBuiltin(TypeTag::Any, "Any");
-            typeNull     = createBuiltin(TypeTag::Null, "Null");
-            typeInt      = createBuiltin(TypeTag::Int, "Int");
-            typeDouble   = createBuiltin(TypeTag::Double, "Double");
-            typeBool     = createBuiltin(TypeTag::Bool, "Bool");
-            typeString   = createBuiltin(TypeTag::String, "String");
-            typeFunction = createBuiltin(TypeTag::Function, "Function");
-            typeStruct   = createBuiltin(TypeTag::Struct, "Struct");
-        }
-
-    private:
-        TypeInfo *createBuiltin(TypeTag tag, String name)
-        {
-            TypeInfo *t = new TypeInfo{tag, std::move(name)};
-            allTypes.push_back(t);
-            return t;
-        }
+        TypeContext();
+        ~TypeContext();
+    
+        Type GetBasic(TypeTag tag, bool nullable = false);
+        Type CreateFuncType(DynArray<Type> params, Type ret);
     };
-}; // namespace Fig
+} // namespace Fig

@@ -1,48 +1,32 @@
 /*!
     @file src/Ast/Expr/IdentiExpr.hpp
-    @brief IdentiExpr定义
-    @author PuqiAR (im@puqiar.top)
-    @date 2026-02-14
+    @brief 标识符表达式定义
 */
 
 #pragma once
-
 #include <Ast/Base.hpp>
-#include <Deps/Deps.hpp>
+#include <Sema/Environment.hpp>
 
 namespace Fig
 {
-    struct IdentiExpr final : Expr 
+    struct IdentiExpr final : public Expr
     {
-        String name;
-        
-        // Analyzer槽位
-
-        // 寻址空间
-        bool isGlobal = false; // 是否全局, 全局变量存哈希/堆
-
-        // 仅 isGlobal = false 有效
-        int resolvedDepth = -1; // 用于获取闭包上值, -1 代表未解析
-
-        // 栈内槽位
-        int localId = -1; // 局部变量id, -1 未解析
-
+        String  name;
+        Symbol *resolvedSymbol = nullptr; // 语义分析后填充，Compiler 唯一的依赖
 
         IdentiExpr()
         {
             type = AstType::IdentiExpr;
         }
-
-        IdentiExpr(String _name, SourceLocation _loc)
+        IdentiExpr(String _name, SourceLocation _location) : name(std::move(_name))
         {
-            type = AstType::IdentiExpr;
-            name = std::move(_name);
-            location = std::move(_loc);
+            type     = AstType::IdentiExpr;
+            location = std::move(_location);
         }
 
         virtual String toString() const override
         {
-            return std::format("<IdentiExpr: {}>", name);
+            return std::format("<IdentiExpr '{}'>", name);
         }
     };
-};
+} // namespace Fig

@@ -1,36 +1,27 @@
 /*!
     @file src/Ast/Expr/LiteralExpr.hpp
     @brief 字面量表达式定义
-    @author PuqiAR (im@puqiar.top)
-    @date 2026-02-14
 */
 
 #pragma once
-
 #include <Ast/Base.hpp>
 #include <Token/Token.hpp>
 
-#include <Deps/Deps.hpp>
-
 namespace Fig
 {
-    struct LiteralExpr final : Expr
+    struct LiteralExpr final : public Expr
     {
-        Token token;
+        Token literal;
 
-        LiteralExpr()
-        {
-            type = AstType::LiteralExpr;
-        }
-        LiteralExpr(const Token& token, SourceLocation _location) : token(token) 
+        LiteralExpr() { type = AstType::LiteralExpr; }
+        LiteralExpr(const Token &_literal, SourceLocation _location) : literal(_literal)
         {
             type = AstType::LiteralExpr;
             location = std::move(_location);
         }
 
-        virtual String toString() const override
-        {
-            return std::format("<LiteralExpr: {}>", magic_enum::enum_name(token.type));
+        virtual String toString() const override {
+            return std::format("<LiteralExpr: {}>", magic_enum::enum_name(literal.type));
         }
     };
-}; // namespace Fig
+}

@@ -1,5 +1,5 @@
 /*!
-    @file src/Parser/StmtParser.hpp
+    @file src/Parser/StmtParser.cpp
     @brief 语法分析器(Pratt + 手动递归下降) 语句解析实现
     @author PuqiAR (im@puqiar.top)
     @date 2026-02-19
@@ -9,9 +9,9 @@
 
 namespace Fig
 {
-    Result<BlockStmt *, Error> Parser::parseBlockStmt() // 当前token为 {
+    Result<BlockStmt *, Error> Parser::parseBlockStmt()
     {
-        SourceLocation location = makeSourceLocation(consumeToken()); // consume `{`
+        SourceLocation location = makeSourceLocation(consumeToken());
         BlockStmt     *stmt     = arena.Allocate<BlockStmt>();
         while (true)
         {
@@ -35,24 +35,23 @@ namespace Fig
         }
         return stmt;
     }
-    Result<VarDecl *, Error> Parser::parseVarDecl(
-        bool isPublic) // 由 parseStatement调用, 当前token为 var
+
+    Result<VarDecl *, Error> Parser::parseVarDecl(bool isPublic)
     {
         StateProtector p(this, {State::ParsingVarDecl});
 
-        SourceLocation location = makeSourceLocation(consumeToken()); // consume `var`
+        SourceLocation location = makeSourceLocation(consumeToken());
 
         if (currentToken().type != TokenType::Identifier)
         {
             return std::unexpected(makeUnexpectTokenError("VarDecl", "var name", currentToken()));
         }
         const String &name = srcManager.GetSub(currentToken().index, currentToken().length);
-        consumeToken(); // consume name
+        consumeToken();
 
         TypeExpr *typeSpeicifer = nullptr;
-        if (match(TokenType::Colon)) // `:`
+        if (match(TokenType::Colon))
         {
-            // SET_STOP_AT(TokenType::Walrus, TokenType::Assign);
             auto result = parseTypeExpr();
             if (!result)
             {
@@ -72,15 +71,14 @@ namespace Fig
             }
             initExpr = *result;
         }
-        else if (match(TokenType::Walrus)) // :=
+        else if (match(TokenType::Walrus))
         {
-            if (typeSpeicifer) // 指定了类型同时使用 :=
+            if (typeSpeicifer)
             {
                 return std::unexpected(Error(ErrorType::SyntaxError,
                     "used type infer but specifying the type",
                     "change `:=` to '='",
-                    makeSourceLocation(prevToken()) // :=
-                    ));
+                    makeSourceLocation(prevToken())));
             }
             auto result = parseExpression();
             if (!result)
@@ -88,24 +86,25 @@ namespace Fig
                 return std::unexpected(result.error());
             }
             initExpr = *result;
-            isInfer  = true; // 使用类型自动推断 :=
+            isInfer  = true;
         }
         if (!match(TokenType::Semicolon))
         {
             return std::unexpected(makeExpectSemicolonError());
         }
-        VarDecl *varDecl = arena.Allocate<VarDecl>(isPublic, name, typeSpeicifer, isInfer, initExpr, location);
+        VarDecl *varDecl =
+            arena.Allocate<VarDecl>(isPublic, name, typeSpeicifer, isInfer, initExpr, location);
         return varDecl;
     }
 
-    Result<IfStmt *, Error> Parser::parseIfStmt() // 由 parseStatement调用, 当前token is if
+    Result<IfStmt *, Error> Parser::parseIfStmt()
     {
         StateProtector p(this, {State::ParsingIf});
 
-        SourceLocation location = makeSourceLocation(consumeToken()); // consume `if`
+        SourceLocation location = makeSourceLocation(consumeToken());
 
         Expr *cond = nullptr;
-        if (match(TokenType::LeftParen)) // match and consume `(`
+        if (match(TokenType::LeftParen))
         {
             const Token &lpToken = prevToken();
             SET_STOP_AT(TokenType::RightParen, TokenType::LeftBrace);
@@ -116,7 +115,6 @@ namespace Fig
             }
             if (!match(TokenType::RightParen))
             {
-                delete *result;
                 return std::unexpected(Error(ErrorType::SyntaxError,
                     "unclosed parenthese in if condition",
                     "insert `)`",
@@ -155,7 +153,6 @@ namespace Fig
             SourceLocation elseLocation = makeSourceLocation(prevToken());
             if (match(TokenType::If))
             {
-                // else if
                 if (alternate)
                 {
                     return std::unexpected(Error(ErrorType::SyntaxError,
@@ -166,7 +163,7 @@ namespace Fig
 
                 Expr *cond = nullptr;
 
-                if (match(TokenType::LeftParen)) // `(`
+                if (match(TokenType::LeftParen))
                 {
                     const Token &lpToken = prevToken();
 
@@ -178,7 +175,6 @@ namespace Fig
                     }
                     if (!match(TokenType::RightParen))
                     {
-                        delete *result;
                         return std::unexpected(Error(ErrorType::SyntaxError,
                             "unclosed parenthese in if condition",
                             "insert `)`",
@@ -212,7 +208,6 @@ namespace Fig
             }
             else
             {
-                // else
                 if (alternate)
                 {
                     return std::unexpected(Error(ErrorType::SyntaxError,
@@ -237,11 +232,11 @@ namespace Fig
         return ifStmt;
     }
 
-    Result<WhileStmt *, Error> Parser::parseWhileStmt() // 由 parseStatement调用, 当前token为 while
+    Result<WhileStmt *, Error> Parser::parseWhileStmt()
     {
         StateProtector p(this, {State::ParsingWhile});
 
-        SourceLocation location = makeSourceLocation(consumeToken()); // consume `while`
+        SourceLocation location = makeSourceLocation(consumeToken());
 
         Expr *cond = nullptr;
         if (match(TokenType::LeftParen))
@@ -257,7 +252,6 @@ namespace Fig
 
             if (!match(TokenType::RightParen))
             {
-                delete *result;
                 return std::unexpected(Error(ErrorType::SyntaxError,
                     "unclosed parenthese in while condition",
                     "insert ')'",
@@ -278,7 +272,6 @@ namespace Fig
 
         if (currentToken().type != TokenType::LeftBrace)
         {
-            delete cond;
             return std::unexpected(
                 makeUnexpectTokenError("while stmt", "left brace '{'", currentToken()));
         }
@@ -286,7 +279,6 @@ namespace Fig
         auto result = parseBlockStmt();
         if (!result)
         {
-            delete cond;
             return std::unexpected(result.error());
         }
         BlockStmt *body = *result;
@@ -295,11 +287,11 @@ namespace Fig
         return whileStmt;
     }
 
-    Result<DynArray<Param *>, Error> Parser::parseFnParams() // 由 parseFnDefStmt或lambda调用
+    Result<DynArray<Param *>, Error> Parser::parseFnParams()
     {
         StateProtector p(this, {State::ParsingFnDefStmt});
 
-        const Token      &lpToken = consumeToken(); // consume `(`
+        const Token      &lpToken = consumeToken();
         DynArray<Param *> params;
 
         while (true)
@@ -320,10 +312,8 @@ namespace Fig
             SourceLocation location = makeSourceLocation(nToken);
             const String  &name     = srcManager.GetSub(nToken.index, nToken.length);
 
-            // TODO: 支持剩余参数解析...
-
             TypeExpr *type = nullptr;
-            if (match(TokenType::Colon)) // :
+            if (match(TokenType::Colon))
             {
                 auto result = parseTypeExpr();
                 if (!result)
@@ -335,16 +325,12 @@ namespace Fig
 
             Expr *defaultValue = nullptr;
 
-            if (match(TokenType::Assign)) // =
+            if (match(TokenType::Assign))
             {
-                SET_STOP_AT(TokenType::Comma, TokenType::RightParen, TokenType::LeftBrace); // , ) {
+                SET_STOP_AT(TokenType::Comma, TokenType::RightParen, TokenType::LeftBrace);
                 auto result = parseExpression();
                 if (!result)
                 {
-                    if (type)
-                    {
-                        delete type;
-                    }
                     return std::unexpected(result.error());
                 }
                 defaultValue = *result;
@@ -365,18 +351,16 @@ namespace Fig
         return params;
     }
 
-    Result<FnDefStmt *, Error> Parser::parseFnDefStmt(
-        bool isPublic) // 由 parseStatement调用, 当前token为 func
+    Result<FnDefStmt *, Error> Parser::parseFnDefStmt(bool isPublic)
     {
-        SourceLocation location = makeSourceLocation(
-            consumeToken()); // 无论是否加了public, location都设置为 func token (我懒 :D)
+        SourceLocation location = makeSourceLocation(consumeToken());
 
         if (!currentToken().isIdentifier())
         {
             return std::unexpected(
                 makeUnexpectTokenError("fn def stmt", "function name", currentToken()));
         }
-        const Token  &nameToken = consumeToken(); // consume name
+        const Token  &nameToken = consumeToken();
         const String &name      = srcManager.GetSub(nameToken.index, nameToken.length);
 
         if (currentToken().type != TokenType::LeftParen)
@@ -395,7 +379,7 @@ namespace Fig
         params = *paraResult;
 
         TypeExpr *returnType = nullptr;
-        if (match(TokenType::RightArrow)) // ->
+        if (match(TokenType::RightArrow))
         {
             auto result = parseTypeExpr();
             if (!result)
@@ -415,24 +399,20 @@ namespace Fig
 
         if (!bodyResult)
         {
-            if (returnType)
-            {
-                delete returnType;
-            }
             return std::unexpected(bodyResult.error());
         }
         body = *bodyResult;
 
-        FnDefStmt *fnDef = arena.Allocate<FnDefStmt>(isPublic, name, params, returnType, body, location);
+        FnDefStmt *fnDef =
+            arena.Allocate<FnDefStmt>(isPublic, name, params, returnType, body, location);
         return fnDef;
     }
 
-    Result<ReturnStmt *, Error>
-    Parser::parseReturnStmt() // 由 parseStatement调用, 当前token为 return
+    Result<ReturnStmt *, Error> Parser::parseReturnStmt()
     {
         StateProtector p(this, {State::ParsingReturn});
 
-        SourceLocation location = makeSourceLocation(consumeToken()); // consume `return`
+        SourceLocation location = makeSourceLocation(consumeToken());
         auto           result   = parseExpression();
         if (!result)
         {
@@ -455,7 +435,7 @@ namespace Fig
 
         if (currentToken().type == TokenType::Public)
         {
-            consumeToken(); // consume `public`
+            consumeToken();
             if (currentToken().type == TokenType::Variable)
             {
                 return parseVarDecl(true);

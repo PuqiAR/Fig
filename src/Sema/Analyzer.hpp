@@ -1,100 +1,53 @@
 /*!
     @file src/Sema/Analyzer.hpp
-    @brief 前端类型检查器定义
-    @author PuqiAR (im@puqiar.top)
-    @date 2026-02-23
+    @brief 语义分析器定义
 */
 
 #pragma once
 
-#include <Sema/Environment.hpp>
-#include <Sema/Type.hpp>
-
 #include <Ast/Ast.hpp>
-#include <Deps/Deps.hpp>
+#include <Sema/Type.hpp>
+#include <Sema/Environment.hpp>
+#include <Utils/Arena.hpp>
+#include <Error/Diagnostics.hpp>
+#include <SourceManager/SourceManager.hpp>
 
 namespace Fig
 {
     class Analyzer
     {
     private:
-        Environment    env;
+        Arena          arena; 
         SourceManager &manager;
+        TypeContext    typeCtx;
+        Environment    env;
+        Diagnostics    diag;
 
-        TypeContext typeCtx;
+        HashMap<String, BaseType*> globalTypes;
+        HashMap<String, Symbol*>   globalSymbols;
 
-        TypeInfo *currentReturnType = nullptr; // 正在分析的函数，预期返回类型
+        bool hasInit = false;
+        bool hasMain = false;
 
-        struct ReturnTypeProtector
-        {
-            Analyzer *analyzer;
-            TypeInfo *prevCurrentReturnType;
+        // 核心递归查找：解决跨越函数边界的捕获问题
+        Result<Symbol*, Error> resolveSymbolInternal(const String &name, const SourceLocation &loc, Scope* startScope);
 
-            [[nodiscard]]
-            ReturnTypeProtector(Analyzer *_analyzer, TypeInfo *current) :
-                analyzer(_analyzer), prevCurrentReturnType(_analyzer->currentReturnType)
-            {
-                analyzer->currentReturnType = current;
-            }
+        Result<Type, Error> resolveTypeExpr(TypeExpr *texpr);
+        Result<void, Error> pass1(Program *prog);
+        Result<void, Error> resolveTypes(Program *prog); 
+        Result<void, Error> checkBodies(Program *prog);  
 
-            ~ReturnTypeProtector()
-            {
-                analyzer->currentReturnType = prevCurrentReturnType;
-            }
-
-            ReturnTypeProtector(const ReturnTypeProtector &) = delete;
-            ReturnTypeProtector &operator=(const ReturnTypeProtector &) = delete;
-        };
-
-
-        SourceLocation makeSourceLocation(
-            AstNode *ast, std::source_location loc = std::source_location::current())
-        {
-            return SourceLocation(ast->location.sp,
-                ast->location.fileName,
-                "[internal analyzer]",
-                loc.function_name());
-        }
-
-        bool isValidLvalue(Expr *expr)
-        {
-            if (expr->type == AstType::IdentiExpr)
-            {
-                return true;
-            }
-            if (expr->type == AstType::InfixExpr)
-            {
-                InfixExpr *infix = static_cast<InfixExpr *>(expr);
-                if (infix->op == BinaryOperator::MemberAccess)
-                {
-                    return true;
-                }
-            }
-            if (expr->type == AstType::IndexExpr)
-            {
-                return true;
-            }
-            return false;
-        }
-
-        Result<TypeInfo *, Error> resolveType(TypeExpr *);
-
-        Result<void, Error> analyzeVarDecl(VarDecl *);
-        Result<void, Error> analyzeIfStmt(IfStmt *);
-        Result<void, Error> analyzeWhileStmt(WhileStmt *);
-        Result<void, Error> analyzeFnDefStmt(FnDefStmt *);
-        Result<void, Error> analyzeReturnStmt(ReturnStmt *);
-
-        Result<void, Error> analyzeIdentiExpr(IdentiExpr *);
-        Result<void, Error> analyzeInfixExpr(InfixExpr *);
-        Result<void, Error> analyzeCallExpr(CallExpr *);
-
-        Result<void, Error> analyzeStmt(Stmt *);
-        Result<void, Error> analyzeExpr(Expr *);
+        Result<void, Error> analyzeStmt(Stmt *stmt);
+        Result<Type, Error> analyzeExpr(Expr *expr);
+        
+        int addUpvalue(Scope *scope, Symbol *target, bool isLocal);
 
     public:
-        Result<void, Error> Analyze(Program *);
+        Analyzer(SourceManager &m) : manager(m) {}
 
-        Analyzer(SourceManager &_manager) : manager(_manager), typeCtx() {}
+        Result<void, Error> Analyze(Program *prog);
+        
+        Diagnostics& GetDiagnostics() { return diag; }
+        TypeContext& GetTypeContext() { return typeCtx; }
     };
-}; // namespace Fig
+}

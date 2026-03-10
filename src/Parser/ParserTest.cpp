@@ -7,6 +7,7 @@ int main()
 
     String        fileName = "test.fig";
     String        filePath = "T:/Files/Maker/Code/MyCodingLanguage/The Fig Project/Fig/test.fig";
+
     SourceManager srcManager(filePath);
 
     String source = srcManager.Read();

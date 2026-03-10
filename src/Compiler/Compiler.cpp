@@ -1,36 +1,125 @@
 /*!
     @file src/Compiler/Compiler.cpp
-    @brief 编译器实现
-    @author PuqiAR (im@puqiar.top)
-    @date 2026-02-18
+    @brief 编译器主逻辑实现：物理 Bootstrapper 与双步扫描
 */
 
 #include <Compiler/Compiler.hpp>
+#include <Ast/Stmt/FnDefStmt.hpp>
 
 namespace Fig
 {
     Result<CompiledModule *, Error> Compiler::Compile(Program *program)
     {
-        current->freeReg = 0;
+        module           = new CompiledModule();
 
-        for (Stmt *stmt : program->nodes)
+        // 1. 预留 Protos[0] 给 Bootstrapper
+        Proto *bootProto = new Proto();
+        bootProto->name  = "[bootstrapper]";
+        module->protos.push_back(bootProto);
+
+        int initIdx = -1;
+        int mainIdx = -1;
+
+        // 2. 第一步：预扫描顶层函数，锁定物理索引
+        for (auto *stmt : program->nodes)
         {
-            auto result = compileStmt(static_cast<Stmt *>(stmt));
-            if (!result)
+            if (stmt->type == AstType::FnDefStmt)
             {
-                return std::unexpected(result.error());
+                auto  *f        = static_cast<FnDefStmt *>(stmt);
+                int    idx      = (int) module->protos.size();
+                Proto *p        = new Proto();
+                p->name         = f->name;
+                p->numParams    = (uint8_t) f->params.size();
+                p->maxRegisters = p->numParams;
+
+                module->protos.push_back(p);
+
+                // 连接物理符号到索引
+                if (f->resolvedSymbol)
+                {
+                    f->resolvedSymbol->index = idx;
+                }
+
+                if (f->name == "init")
+                    initIdx = idx;
+                if (f->name == "main")
+                    mainIdx = idx;
             }
         }
 
-        if (mainFuncIndex != -1)
+        // 3. 第二步：在 Bootstrapper 环境中编译所有语句
+        FuncState bootState(bootProto, nullptr);
+        current = &bootState;
+
+        for (auto *stmt : program->nodes)
         {
-            std::uint8_t baseReg = AllocReg();
-            Emit(Op::iABC(OpCode::FastCall, mainFuncIndex, baseReg, 0));
+            auto res = compileStmt(stmt);
+            if (!res)
+            {
+                return std::unexpected(res.error());
+            }
         }
 
-        Emit(Op::iABC(OpCode::Exit, 0, 0, 0)); // 一定要退出,这是虚拟机退出信号,否则ub
-        
-        CompiledModule *compiledModule = new CompiledModule(fileName, allProtos);
-        return compiledModule;
+        // 4. 发射 Bootstrapper 引导指令
+        if (initIdx != -1)
+        {
+            emit(Op::iABC(OpCode::FastCall, (uint8_t) initIdx, 0, 0));
+        }
+
+        if (mainIdx != -1)
+        {
+            emit(Op::iABC(OpCode::FastCall, (uint8_t) mainIdx, 0, 0));
+        }
+
+        emit(Op::iAsBx(OpCode::Exit, 0, 0));
+
+        return module;
     }
-}; // namespace Fig
+
+    int Compiler::getGlobalID(const String &name)
+    {
+        if (globalIDMap.contains(name))
+            return globalIDMap[name];
+        int id            = (int) globalIDMap.size();
+        globalIDMap[name] = id;
+        return id;
+    }
+
+    Result<Register, Error> Compiler::allocateReg(const SourceLocation &loc)
+    {
+        if (current->freereg >= MAX_REGISTERS)
+        {
+            return std::unexpected(Error(ErrorType::RegisterOverflow, "too many registers", "", loc));
+        }
+
+        Register reg = current->freereg++;
+        if (reg >= current->proto->maxRegisters)
+        {
+            current->proto->maxRegisters = reg + 1;
+        }
+        return reg;
+    }
+
+    void Compiler::freeReg(Register count)
+    {
+        if (current->freereg >= count)
+        {
+            current->freereg -= count;
+        }
+    }
+
+    int Compiler::addConstant(Value val)
+    {
+        if (current->constantMap.contains(val))
+            return current->constantMap[val];
+        int idx                   = (int) current->proto->constants.size();
+        current->proto->constants.push_back(val);
+        current->constantMap[val] = idx;
+        return idx;
+    }
+
+    void Compiler::emit(Instruction instr)
+    {
+        current->proto->code.push_back(instr);
+    }
+} // namespace Fig

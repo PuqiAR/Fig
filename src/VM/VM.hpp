@@ -31,13 +31,20 @@ namespace Fig
     class VM
     {
     private:
-        static constexpr unsigned int MAX_REGISTERS = 1024;
+        static constexpr unsigned int MAX_REGISTERS       = 1024;
+        static constexpr unsigned int MAX_GLOBALS         = 65536;
+        static constexpr unsigned int MAX_RECURSION_DEPTH = 2233;
+
+        Instruction POISON_MAX_RECURSION_DEPTH_EXCEED_INST;
 
         // 一次性分配
         Value registers[MAX_REGISTERS];
+        Value globals[MAX_GLOBALS];
 
-        DynArray<CallFrame> frames;
+        CallFrame  frames[MAX_RECURSION_DEPTH];
         CallFrame *currentFrame;
+        CallFrame *frameLimit;
+
     public:
         VM()
         {
@@ -45,27 +52,36 @@ namespace Fig
             {
                 registers[i] = Value::GetNullInstance();
             }
+            for (unsigned int i = 0; i < MAX_GLOBALS; ++i)
+            {
+                globals[i] = Value::GetNullInstance();
+            }
+
+            currentFrame = frames;
+            frameLimit   = frames + MAX_RECURSION_DEPTH - 1;
+
+            POISON_MAX_RECURSION_DEPTH_EXCEED_INST =
+                Op::iAsBx(OpCode::Exit_MaxRecursionDepthExceeded, 0, 0);
         }
 
     private:
-        
-        void pushFrame(Proto *proto, Value *base)
+        [[nodiscard]]
+        inline Instruction *pushFrame(Proto *proto, Value *base)
         {
-            frames.push_back({
-                proto,
-                proto->code.data(),
-                base
-            });
-            currentFrame = &frames.back();
+            if (++currentFrame >= frameLimit) [[unlikely]] // 达到最大递归层数
+            {
+                POISON_MAX_RECURSION_DEPTH_EXCEED_INST =
+                    Op::iAsBx(OpCode::Exit_MaxRecursionDepthExceeded, 0, 0);
+                return &POISON_MAX_RECURSION_DEPTH_EXCEED_INST;
+            }
+
+            *currentFrame = CallFrame{proto, proto->code.data(), base};
+            return currentFrame->ip;
         }
 
-        void popFrame()
+        inline void popFrame()
         {
-            frames.pop_back();
-            if (!frames.empty())
-            {
-                currentFrame = &frames.back();
-            }
+            --currentFrame;
         }
 
         inline OpCode decodeOpCode(Instruction inst)

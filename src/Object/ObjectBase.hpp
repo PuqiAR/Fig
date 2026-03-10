@@ -187,7 +187,7 @@ namespace Fig
 
     /*
         C风格继承 + 手动分发
-        禁止任何 virtual 达到最高效率
+        禁止核心使用任何 virtual 达到最高效率
     */
     enum class ObjectType : uint8_t
     {
@@ -227,5 +227,23 @@ namespace Fig
         {
             return type == ObjectType::Instance;
         }
+
+        // 调试输出
+        virtual String toString() const
+        {
+            return "Object";
+        }
     };
 } // namespace Fig
+
+namespace std
+{
+    template <>
+    struct hash<Fig::Value>
+    {
+        std::size_t operator()(const Fig::Value &v) const noexcept
+        {
+            return std::hash<std::uint64_t>()(v.Raw());
+        }
+    };
+} // namespace std

@@ -36,7 +36,7 @@ namespace Fig
 
         ~Arena()
         {
-            // 1. 逆序调用析构函数
+            // 逆序调用析构函数
             DestructorNode *node = destructorHead;
             while (node)
             {
@@ -44,7 +44,7 @@ namespace Fig
                 node = node->next;
             }
 
-            // 2. 释放所有分配的内存块
+            // 释放所有分配的内存块
             for (char *chunk : chunks)
             {
                 delete[] chunk;

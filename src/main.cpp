@@ -1,3 +1,4 @@
+#include <Bytecode/Disassembler.hpp>
 #include <Compiler/Compiler.hpp>
 #include <Core/Core.hpp>
 #include <Deps/Deps.hpp>
@@ -7,11 +8,9 @@
 #include <SourceManager/SourceManager.hpp>
 #include <VM/VM.hpp>
 
-
 #include <chrono>
 #include <iostream>
 #include <print>
-
 
 int main()
 {
@@ -25,68 +24,53 @@ int main()
 
     if (!manager.read)
     {
-        std::cerr << "Couldn't read file";
+        std::cerr << "CRITICAL: Could not read source file: " << filePath << "\n";
         return 1;
     }
 
     Lexer  lexer(manager.GetSource(), fileName);
     Parser parser(lexer, manager, fileName);
 
-    const auto &program_result = parser.Parse();
-    if (!program_result)
+    auto pRes = parser.Parse();
+    if (!pRes)
     {
-        ReportError(program_result.error(), manager);
+        ReportError(pRes.error(), manager);
         return 1;
     }
-    Program *program = *program_result;
+    Program *program = *pRes;
 
-    Analyzer    analyzer(manager);
-    const auto &analyzeResult = analyzer.Analyze(program);
-    if (!analyzeResult)
+    Analyzer analyzer(manager);
+    auto     aRes = analyzer.Analyze(program);
+    if (!aRes)
     {
-        ReportError(analyzeResult.error(), manager);
+        ReportError(aRes.error(), manager);
         return 1;
     }
-    std::cout << "analyzer: Program OK, PASSED\n";
+    std::cout << "Analyzer: Program OK\n";
 
-    Compiler    compiler(fileName, manager);
-    const auto &comp_result = compiler.Compile(program);
-    if (!comp_result)
+    Diagnostics diag;
+    Compiler    compiler(manager, diag);
+    auto        cRes = compiler.Compile(program);
+    if (!cRes)
     {
-        ReportError(comp_result.error(), manager);
+        ReportError(cRes.error(), manager);
         return 1;
     }
-    
-    CompiledModule *compiledModule = *comp_result;
 
-    size_t cnt = 0;
-    for (Proto *proto : compiledModule->protos)
-    {
-        std::cout << "\n"
-                  << "Proto: " << cnt++ << '\n';
-        std::cout << "  Constant Pool" << '\n';
-        for (size_t i = 0; i < proto->constants.size(); ++i)
-        {
-            std::print("[{}] {}\n", i, proto->constants[i].ToString());
-        }
+    CompiledModule *compiledModule = *cRes;
 
-        DumpCode(proto->code);
+    Disassembler::DisassembleModule(compiledModule);
 
-        std::cout << "\nMax Stack Size: " << (int) proto->maxStack << std::endl;
-    }
-    
     VM vm;
-
     using Clock = std::chrono::high_resolution_clock;
-
     Clock clock;
 
-    auto start = clock.now();
-
+    std::cout << "\n--- VM Execution Start ---\n";
+    auto start   = clock.now();
     auto result_ = vm.Execute(compiledModule);
+    auto end     = clock.now();
 
-    auto end = clock.now();
-    auto duration = end - start;
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
     if (!result_)
     {
@@ -94,9 +78,9 @@ int main()
         return 1;
     }
 
-    Value result = *result_;
-    std::cout << "result: " << result.ToString() << "\n";
-    std::cout << "execution cost: " << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() << "ms\n";
-    
+    std::cout << "Result: " << (*result_).ToString() << "\n";
+    std::cout << "Execution Cost: " << duration.count() << "ms\n";
+
     vm.PrintRegisters();
+    return 0;
 }
