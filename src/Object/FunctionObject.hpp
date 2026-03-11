@@ -1,26 +1,40 @@
 /*!
     @file src/Object/FunctionObject.hpp
     @brief 函数对象定义
-    @author PuqiAR (im@puqiar.top)
-    @date 2026-02-28
 */
 
 #pragma once
 
 #include <Object/ObjectBase.hpp>
+#include <Bytecode/Bytecode.hpp>
 
 namespace Fig
 {
-    // 运行时闭包对象 (24字节 Base + 8字节 Proto指针 = 32 bytes)
+    // Upvalue (Stack Open / Heap Closed)
+    struct Upvalue
+    {
+        Value   *location; // Open 状态指向 VM 的 registerBase[x]，Closed 状态指向下面的 closedValue
+        Value    closedValue;       // 栈帧销毁时，数据物理迁移至此
+        Upvalue *next;              // 侵入式链表，供 VM 追踪当前 Open 的 Upvalue
+        std::uint32_t refCount = 0; // 多少个闭包正在使用
+    };
 
-    struct Proto;
     struct FunctionObject final : public Object
     {
-        String name;  // 调试使用
-        Proto *proto; // 指向编译器生成的只读字节码与常量池
-        std::uint8_t paraCount;
+        String        name;
+        Proto        *proto; // 静态只读字节码
+        std::uint8_t  paraCount;
+        std::uint32_t upvalueCount; // 捕获数量
 
-        // TODO: 实现闭包时 加一个 Upvalue 指针数组
-        // Value* upvalues;
+        // 柔性数组
+        Upvalue *upvalues[];
+
+        FunctionObject(const String &_name, Proto *_proto, std::uint32_t _upvalueCount) :
+            name(_name), proto(_proto), paraCount(_proto->numParams), upvalueCount(_upvalueCount)
+        {
+            type = ObjectType::Function;
+        }
+
+        ~FunctionObject() = default;
     };
 } // namespace Fig

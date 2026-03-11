@@ -76,7 +76,7 @@ namespace Fig
         };
         DynArray<Field>                    fields;
         HashMap<String, size_t>            fieldMap;
-        HashMap<String, class FnDefStmt *> methods;
+        HashMap<String, struct FnDefStmt *> methods;
 
         StructType(String n) : BaseType(TypeTag::Struct, std::move(n)) {}
         void AddField(String name, Type type, bool isPublic)

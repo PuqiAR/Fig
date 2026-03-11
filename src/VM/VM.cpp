@@ -150,7 +150,8 @@ namespace Fig
         CoreIO::GetStdErr() << std::format(
             "Oops! max recursion depth limit {} exceeded in Fn `{}` , exiting...\n",
             MAX_RECURSION_DEPTH,
-            (currentFrame - 1)->proto->name); // pushFrame失败了，但currentFrame仍然移动，所以 (currentFrame - 1)是 lastFrame
+            (currentFrame - 1)->proto->name); // pushFrame失败了，但currentFrame仍然移动，所以
+                                              // (currentFrame - 1)是 lastFrame
         std::exit(static_cast<int>(MAX_RECURSION_DEPTH));
     }
 
@@ -191,6 +192,40 @@ namespace Fig
 
     do_Call: {
         // TODO: FunctionObject 动态解包
+
+        std::uint8_t a       = decodeA(inst);
+        std::uint8_t baseReg = decodeB(inst);
+
+        Value callee = currentFrame->registerBase[a];
+
+        FunctionObject *closure = nullptr;
+
+        if (!callee.IsObject())
+        {
+            size_t ipIdx = currentFrame->ip - currentFrame->proto->code.data();
+
+            return std::unexpected(Error(ErrorType::TypeError,
+                std::format("Object `{}` is not callable", callee.ToString()),
+                "none",
+                *currentFrame->proto->locations[ipIdx]));
+        }
+        else
+        {
+            Object *obj = callee.AsObject();
+            if (!obj->isFunction())
+            {
+                size_t ipIdx = currentFrame->ip - currentFrame->proto->code.data();
+
+                return std::unexpected(Error(ErrorType::TypeError,
+                    std::format("Object `{}` is not callable", callee.ToString()),
+                    "none",
+                    *currentFrame->proto->locations[ipIdx]));
+            }
+            closure = static_cast<FunctionObject *>(obj);
+        }
+
+        currentFrame->ip = pushFrame(closure, currentFrame->registerBase + baseReg);
+
         DISPATCH();
     }
 
@@ -198,8 +233,9 @@ namespace Fig
         std::uint8_t a      = decodeA(inst);
         Value        retVal = currentFrame->registerBase[a];
 
-        // 此时 registerBase[0] 指向的是 Caller 的 baseReg 槽位
+        closeUpvalues(currentFrame->registerBase);
 
+        // 此时 registerBase[0] 指向的是 Caller 的 baseReg 槽位
         currentFrame->registerBase[0] = retVal;
         popFrame();
 
@@ -207,6 +243,67 @@ namespace Fig
     }
 
     do_LoadFn: {
+        std::uint8_t  a  = decodeA(inst);
+        std::uint16_t bx = decodeBx(inst);
+
+        Proto *p = compiledModule->protos[bx];
+
+        size_t upValSize = p->upvalues.size();
+        size_t extraSize = upValSize * sizeof(Upvalue *);
+
+        FunctionObject *closure =
+            (FunctionObject *) allocateObject<FunctionObject>(ObjectType::Function, extraSize);
+
+        // CoreIO::GetStdErr() << "DEBUG: p->name = " << p->name << '\n';
+        new (&closure->name) String(p->name); // String非平凡类型，有自己的构造函数
+        closure->proto        = p;
+        closure->paraCount    = p->numParams;
+        closure->upvalueCount = static_cast<std::uint32_t>(upValSize);
+
+        for (size_t i = 0; i < closure->upvalueCount; ++i)
+        {
+            auto &info = p->upvalues[i];
+            if (info.isLocal)
+            {
+                Value   *targetSlot = &currentFrame->registerBase[info.index];
+                Upvalue *prev       = nullptr;
+                Upvalue *curr       = openUpvalues;
+
+                while (curr != nullptr && curr->location > targetSlot)
+                {
+                    prev = curr;
+                    curr = curr->next;
+                }
+
+                if (curr != nullptr && curr->location == targetSlot)
+                {
+                    // 如果别的闭包已经捕获了这个槽位，共享物理指针
+                    closure->upvalues[i] = curr;
+                    ++curr->refCount;
+                }
+                else
+                {
+                    // 首次捕获
+                    Upvalue *uv = new Upvalue;
+
+                    uv->location = targetSlot;
+                    uv->next     = curr;
+                    ++uv->refCount;
+
+                    if (prev == nullptr)
+                        openUpvalues = uv;
+                    else
+                        prev->next = uv;
+                    closure->upvalues[i] = uv;
+                }
+            }
+            else
+            {
+                closure->upvalues[i] = currentFrame->closure->upvalues[info.index];
+            }
+        }
+
+        currentFrame->registerBase[a] = Value::FromObject(closure);
         DISPATCH();
     }
 
@@ -315,12 +412,17 @@ namespace Fig
     }
 
     do_GetUpval: {
-        assert(false && "VM: GetUpval requires FunctionObject (Closure) implementation");
+        std::uint8_t a = decodeA(inst);
+        std::uint8_t b = decodeB(inst);
+
+        currentFrame->registerBase[a] = *(currentFrame->closure->upvalues[b]->location);
         DISPATCH();
     }
 
     do_SetUpval: {
-        assert(false && "VM: SetUpval requires FunctionObject (Closure) implementation");
+        std::uint8_t a                                  = decodeA(inst);
+        std::uint8_t b                                  = decodeB(inst);
+        *(currentFrame->closure->upvalues[b]->location) = currentFrame->registerBase[a]; // copy
         DISPATCH();
     }
 

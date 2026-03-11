@@ -125,7 +125,7 @@ namespace Fig
         {
             return (v_ & (SIGN_BIT | QNAN_MASK)) == (SIGN_BIT | QNAN_MASK);
         }
-        
+
         // 提取数据 (Unbox / As)
         [[nodiscard]] constexpr double AsDouble() const
         {
@@ -165,7 +165,8 @@ namespace Fig
         // 让 VM 的 OP_EQ 指令极简：`if (RA == RB)`
         [[nodiscard]] constexpr bool operator==(const Value &other) const
         {
-            // IEEE 754 规定浮点数有 +0.0 == -0.0 的特殊规则，所以不直接比对raw bits而是转换成 double进行C++比对
+            // IEEE 754 规定浮点数有 +0.0 == -0.0 的特殊规则，所以不直接比对raw bits而是转换成
+            // double进行C++比对
             if (IsDouble() && other.IsDouble())
             {
                 return AsDouble() == other.AsDouble();
@@ -199,13 +200,20 @@ namespace Fig
 
     struct StructObject /* : public Object */; // 结构体基类的定义，前向声明
 
+    enum class GCColor : std::uint8_t
+    {
+        White = 0, // 垃圾（或新对象）！
+        Gray  = 1, // 已发现，子节点待扫描
+        Black = 2, // 存活
+    };
+
     // Total 24 bytes size
     struct Object
     {
-        Object    *next;             // 8 bytes: gc链表
-        StructObject    *klass;            // 8 bytes: 一切皆对象，父类指针
-        ObjectType type;             // 1 byte : 类型
-        bool       isMarked = false; // 1 byte : gc标记
+        Object       *next;                   // 8 bytes: gc链表
+        StructObject *klass;                  // 8 bytes: 一切皆对象，父类指针
+        ObjectType    type;                   // 1 byte : 类型
+        GCColor       color = GCColor::White; // 1 byte : gc标记
         // + 6 bytes padding
 
         constexpr bool isString() const
@@ -226,12 +234,6 @@ namespace Fig
         constexpr bool isInstance() const
         {
             return type == ObjectType::Instance;
-        }
-
-        // 调试输出
-        virtual String toString() const
-        {
-            return "Object";
         }
     };
 } // namespace Fig

@@ -94,24 +94,24 @@ namespace Fig
                         parsePhysicalNumber(manager.GetSub(tok.index, tok.length), l->location);
                     if (!vRes)
                         return std::unexpected(vRes.error());
-                    emit(Op::iABx(OpCode::LoadK, r, static_cast<uint16_t>(addConstant(*vRes))));
+                    emit(Op::iABx(OpCode::LoadK, r, static_cast<uint16_t>(addConstant(*vRes))), &l->location);
                 }
                 else if (tok.type == TokenType::LiteralString)
                 {
                     int kIdx = addConstant(Value::GetNullInstance()); // TODO: String 支持
-                    emit(Op::iABx(OpCode::LoadK, r, static_cast<uint16_t>(kIdx)));
+                    emit(Op::iABx(OpCode::LoadK, r, static_cast<uint16_t>(kIdx)), &l->location);
                 }
                 else if (tok.type == TokenType::LiteralNull)
                 {
-                    emit(Op::iABC(OpCode::LoadNull, r, 0, 0));
+                    emit(Op::iABC(OpCode::LoadNull, r, 0, 0), &l->location);
                 }
                 else if (tok.type == TokenType::LiteralTrue)
                 {
-                    emit(Op::iABC(OpCode::LoadTrue, r, 0, 0));
+                    emit(Op::iABC(OpCode::LoadTrue, r, 0, 0), &l->location);
                 }
                 else if (tok.type == TokenType::LiteralFalse)
                 {
-                    emit(Op::iABC(OpCode::LoadFalse, r, 0, 0));
+                    emit(Op::iABC(OpCode::LoadFalse, r, 0, 0), &l->location);
                 }
                 return r;
             }
@@ -129,7 +129,7 @@ namespace Fig
                     // 仅在被强制指定目标（如参数装填）时发射搬运指令
                     if (target != sym->index)
                     {
-                        emit(Op::iABx(OpCode::Mov, target, static_cast<uint16_t>(sym->index)));
+                        emit(Op::iABx(OpCode::Mov, target, static_cast<uint16_t>(sym->index)), &i->location);
                     }
                     return target;
                 }
@@ -137,12 +137,12 @@ namespace Fig
                 Register r = (target == NO_REG) ? *allocateReg(i->location) : target;
                 if (sym->location == SymbolLocation::Upvalue)
                 {
-                    emit(Op::iABC(OpCode::GetUpval, r, static_cast<uint8_t>(sym->index), 0));
+                    emit(Op::iABC(OpCode::GetUpval, r, static_cast<uint8_t>(sym->index), 0), &i->location);
                 }
                 else if (sym->location == SymbolLocation::Global)
                 {
                     int gId = getGlobalID(i->name);
-                    emit(Op::iABx(OpCode::GetGlobal, r, static_cast<uint16_t>(gId)));
+                    emit(Op::iABx(OpCode::GetGlobal, r, static_cast<uint16_t>(gId)), &i->location);
                 }
                 return r;
             }
@@ -167,30 +167,43 @@ namespace Fig
                         return std::unexpected(res.error());
                 }
 
+                bool isGlobalFastCall = false;
                 if (c->callee->type == AstType::IdentiExpr)
                 {
-                    // 静态去虚化：编译期直接跳板
-                    auto *id       = static_cast<IdentiExpr *>(c->callee);
-                    int   protoIdx = id->resolvedSymbol->index;
-                    emit(Op::iABC(OpCode::FastCall,
-                        static_cast<uint8_t>(protoIdx),
-                        baseReg,
-                        static_cast<uint8_t>(c->args.args.size())));
+                    auto *id = static_cast<IdentiExpr *>(c->callee);
+                    // 只有在全局区的函数，才能使用 FastCall
+                    if (id->resolvedSymbol->location == SymbolLocation::Global)
+                    {
+                        isGlobalFastCall = true;
+                        int protoIdx     = id->resolvedSymbol->index;
+                        emit(Op::iABC(OpCode::FastCall,
+                                 static_cast<uint8_t>(protoIdx),
+                                 baseReg,
+                                 static_cast<uint8_t>(c->args.args.size())),
+                            &c->location);
+                    }
                 }
-                else
+
+                if (!isGlobalFastCall)
                 {
                     // 动态闭包调用
+                    // 先获取闭包对象所在的物理寄存器
                     auto r_fn = compileExpr(c->callee);
                     if (!r_fn)
                         return std::unexpected(r_fn.error());
-                    emit(Op::iABC(
-                        OpCode::Call, *r_fn, baseReg, static_cast<uint8_t>(c->args.args.size())));
+
+                    // 使用动态 Call 指令，RA 是指向堆闭包的寄存器
+                    emit(Op::iABC(OpCode::Call,
+                             *r_fn,
+                             baseReg,
+                             static_cast<uint8_t>(c->args.args.size())),
+                        &c->location);
                 }
 
-                // 回滚水位线：彻底释放传参时的临时占用
+                // 回滚水位线, 释放传参时的临时占用
                 current->freereg = mark;
 
-                // 目标对齐：若 target 未指定，allocateReg 将自然复用 baseReg，实现零开销回写
+                // 目若 target 未指定，allocateReg 将复用 baseReg，实现零开销回写
 
                 Register r_dest;
                 if (target == NO_REG)
@@ -207,7 +220,7 @@ namespace Fig
 
                 if (r_dest != baseReg)
                 {
-                    emit(Op::iABx(OpCode::Mov, r_dest, baseReg));
+                    emit(Op::iABx(OpCode::Mov, r_dest, baseReg), &c->location);
                 }
 
                 return r_dest;
@@ -227,18 +240,18 @@ namespace Fig
                         Symbol *sym = lid->resolvedSymbol;
                         if (sym->location == SymbolLocation::Local)
                         {
-                            emit(Op::iABx(OpCode::Mov, static_cast<Register>(sym->index), *r_val));
+                            emit(Op::iABx(OpCode::Mov, static_cast<Register>(sym->index), *r_val), &lid->location);
                         }
                         else if (sym->location == SymbolLocation::Upvalue)
                         {
                             emit(Op::iABC(
-                                OpCode::SetUpval, *r_val, static_cast<Register>(sym->index), 0));
+                                OpCode::SetUpval, *r_val, static_cast<Register>(sym->index), 0), &lid->location);
                         }
                         else
                         {
                             emit(Op::iABx(OpCode::SetGlobal,
                                 *r_val,
-                                static_cast<uint16_t>(getGlobalID(lid->name))));
+                                static_cast<uint16_t>(getGlobalID(lid->name))), &lid->location);
                         }
                     }
                     return r_val;
@@ -300,7 +313,7 @@ namespace Fig
                     r_d = target;
                 }
 
-                emit(Op::iABC(op, r_d, *r_l, *r_r));
+                emit(Op::iABC(op, r_d, *r_l, *r_r), &in->location);
 
                 return r_d;
             }

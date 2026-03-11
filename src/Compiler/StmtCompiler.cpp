@@ -9,7 +9,6 @@
 #include <Ast/Stmt/WhileStmt.hpp>
 #include <Compiler/Compiler.hpp>
 
-
 namespace Fig
 {
     Result<void, Error> Compiler::compileStmt(Stmt *stmt)
@@ -41,8 +40,10 @@ namespace Fig
                     if (!regRes)
                         return std::unexpected(regRes.error());
 
-                    emit(Op::iABx(
-                        OpCode::SetGlobal, *regRes, static_cast<uint16_t>(getGlobalID(v->name))));
+                    emit(Op::iABx(OpCode::SetGlobal,
+                             *regRes,
+                             static_cast<uint16_t>(getGlobalID(v->name))),
+                        &v->location);
                     current->freereg = mark; // 释放初始化表达式的临时占用
                 }
                 else
@@ -68,8 +69,21 @@ namespace Fig
             case AstType::FnDefStmt: {
                 auto *f = static_cast<FnDefStmt *>(stmt);
 
-                // 物理连线：对接 Compile() 第一阶段预分配的 Proto
-                Proto *p = module->protos[f->resolvedSymbol->index];
+                if (f->protoIndex == -1) // 闭包环境没有被扫到
+                {
+                    Proto *newProto        = new Proto();
+                    newProto->name         = f->name;
+                    newProto->numParams    = static_cast<uint8_t>(f->params.size());
+                    newProto->maxRegisters = newProto->numParams; // 同步水位线
+
+                    f->protoIndex = static_cast<int>(module->protos.size());
+                    module->protos.push_back(newProto);
+                }
+
+                // 获取静态原型 (flat protos)
+                Proto *p = module->protos[f->protoIndex];
+
+                p->upvalues = f->upvalues;
 
                 FuncState  fs(p, current);
                 FuncState *old = current;
@@ -79,13 +93,47 @@ namespace Fig
                 if (!res)
                     return res;
 
-                // 窥孔拦截：防死代码污染
                 if (p->code.empty() || static_cast<OpCode>(p->code.back() & 0xFF) != OpCode::Return)
                 {
-                    emit(Op::iABC(OpCode::Return, 0, 0, 0));
+                    emit(Op::iABC(OpCode::Return, 0, 0, 0), &f->location);
                 }
 
                 current = old;
+
+                // 如果是局部闭包，在当前栈帧分配寄存器并生成 LoadFn
+                if (f->resolvedSymbol->location == SymbolLocation::Local)
+                {
+                    Register targetReg = static_cast<Register>(f->resolvedSymbol->index);
+
+                    while (current->freereg <= targetReg)
+                    {
+                        auto allocRes = allocateReg(f->location);
+                        if (!allocRes)
+                            return std::unexpected(allocRes.error());
+                    }
+
+                    // 生成 LoadFn: RA = 目标寄存器, Bx = Proto 在 module->protos 中的绝对索引
+                    emit(Op::iABx(OpCode::LoadFn, targetReg, static_cast<uint16_t>(f->protoIndex)),
+                        &f->location);
+                }
+                else if (f->resolvedSymbol->location == SymbolLocation::Global)
+                {
+                    auto result = allocateReg(f->location);
+                    if (!result)
+                    {
+                        return std::unexpected(result.error());
+                    }
+
+                    Register r = *result;
+                    emit(Op::iABx(OpCode::LoadFn, r, static_cast<uint16_t>(f->protoIndex)),
+                        &f->location);
+
+                    int gId = getGlobalID(f->name);
+                    emit(Op::iABx(OpCode::SetGlobal, r, static_cast<std::uint16_t>(gId)),
+                        &f->location);
+
+                    freeReg();
+                }
                 break;
             }
 
@@ -99,13 +147,13 @@ namespace Fig
                     return std::unexpected(r_cond.error());
 
                 int jmpToNext = static_cast<int>(current->proto->code.size());
-                emit(Op::iAsBx(OpCode::JmpIfFalse, *r_cond, 0));
+                emit(Op::iAsBx(OpCode::JmpIfFalse, *r_cond, 0), &i->location);
                 current->freereg = mark; // 回收条件表达式临时槽位
 
                 if (auto r = compileStmt(i->consequent); !r)
                     return r;
                 exitJumps.push_back(static_cast<int>(current->proto->code.size()));
-                emit(Op::iAsBx(OpCode::Jmp, 0, 0));
+                emit(Op::iAsBx(OpCode::Jmp, 0, 0), &i->location);
 
                 int targetIdx                   = static_cast<int>(current->proto->code.size());
                 current->proto->code[jmpToNext] = Op::iAsBx(
@@ -119,17 +167,22 @@ namespace Fig
                         return std::unexpected(ec.error());
 
                     int nextElif = static_cast<int>(current->proto->code.size());
-                    emit(Op::iAsBx(OpCode::JmpIfFalse, *ec, 0));
+                    emit(Op::iAsBx(OpCode::JmpIfFalse, *ec, 0), &elif->location);
                     current->freereg = elifMark; // 回收 elif 临时槽位
 
                     if (auto r = compileStmt(elif->consequent); !r)
                         return r;
                     exitJumps.push_back(static_cast<int>(current->proto->code.size()));
-                    emit(Op::iAsBx(OpCode::Jmp, 0, 0));
+                    emit(Op::iAsBx(OpCode::Jmp, 0, 0), &elif->location);
 
-                    int target                     = static_cast<int>(current->proto->code.size());
+                    int target = static_cast<int>(current->proto->code.size());
+
+                    current->proto->code.resize(nextElif);
                     current->proto->code[nextElif] = Op::iAsBx(
                         OpCode::JmpIfFalse, *ec, static_cast<int16_t>(target - nextElif - 1));
+
+                    current->proto->locations.resize(nextElif);
+                    current->proto->locations[nextElif] = &elif->location;
                 }
 
                 if (i->alternate)
@@ -157,14 +210,15 @@ namespace Fig
                     return std::unexpected(r_cond.error());
 
                 int exitJmpIdx = static_cast<int>(current->proto->code.size());
-                emit(Op::iAsBx(OpCode::JmpIfFalse, *r_cond, 0));
+                emit(Op::iAsBx(OpCode::JmpIfFalse, *r_cond, 0), &w->location);
                 current->freereg = mark; // 回收循环条件临时槽位
 
                 if (auto r = compileStmt(w->body); !r)
                     return r;
 
                 int backJmpIdx = static_cast<int>(current->proto->code.size());
-                emit(Op::iAsBx(OpCode::Jmp, 0, static_cast<int16_t>(startIdx - backJmpIdx - 1)));
+                emit(Op::iAsBx(OpCode::Jmp, 0, static_cast<int16_t>(startIdx - backJmpIdx - 1)),
+                    &w->location);
 
                 int endIdx                       = static_cast<int>(current->proto->code.size());
                 current->proto->code[exitJmpIdx] = Op::iAsBx(
@@ -189,11 +243,11 @@ namespace Fig
                     auto r = allocateReg(rs->location);
                     if (!r)
                         return std::unexpected(r.error());
-                    emit(Op::iABC(OpCode::LoadNull, *r, 0, 0));
+                    emit(Op::iABC(OpCode::LoadNull, *r, 0, 0), &rs->location);
                     retReg = *r;
                 }
 
-                emit(Op::iABC(OpCode::Return, retReg, 0, 0));
+                emit(Op::iABC(OpCode::Return, retReg, 0, 0), &rs->location);
                 current->freereg = mark; // 回收返回值计算的占用
                 break;
             }

@@ -25,10 +25,5 @@ namespace Fig
     struct StringObject final : public Object
     {
         String data; // 40 bytes
-
-        virtual String toString() const override
-        {
-            return data;
-        }
     };
 };

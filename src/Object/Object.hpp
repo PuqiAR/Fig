@@ -7,7 +7,8 @@
 
 #pragma once
 
+#include <Object/FunctionObject.hpp>
+#include <Object/InstanceObject.hpp>
 #include <Object/ObjectBase.hpp>
 #include <Object/StringObject.hpp>
 #include <Object/StructObject.hpp>
-#include <Object/FunctionObject.hpp>

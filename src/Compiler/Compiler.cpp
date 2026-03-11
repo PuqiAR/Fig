@@ -3,16 +3,20 @@
     @brief 编译器主逻辑实现：物理 Bootstrapper 与双步扫描
 */
 
-#include <Compiler/Compiler.hpp>
 #include <Ast/Stmt/FnDefStmt.hpp>
+#include <Compiler/Compiler.hpp>
 
 namespace Fig
 {
     Result<CompiledModule *, Error> Compiler::Compile(Program *program)
     {
-        module           = new CompiledModule();
+        module = new CompiledModule();
+        if (program->nodes.empty())
+        {
+            return module;
+        }
 
-        // 1. 预留 Protos[0] 给 Bootstrapper
+        // 预留 Protos[0] 给 Bootstrapper
         Proto *bootProto = new Proto();
         bootProto->name  = "[bootstrapper]";
         module->protos.push_back(bootProto);
@@ -20,17 +24,22 @@ namespace Fig
         int initIdx = -1;
         int mainIdx = -1;
 
-        // 2. 第一步：预扫描顶层函数，锁定物理索引
+        SourceLocation *mainFnLoc = nullptr;
+        SourceLocation *initFnLoc = nullptr;
+
+        // 预扫描顶层函数
         for (auto *stmt : program->nodes)
         {
             if (stmt->type == AstType::FnDefStmt)
             {
                 auto  *f        = static_cast<FnDefStmt *>(stmt);
                 int    idx      = (int) module->protos.size();
+
                 Proto *p        = new Proto();
                 p->name         = f->name;
                 p->numParams    = (uint8_t) f->params.size();
                 p->maxRegisters = p->numParams;
+                f->protoIndex = idx;
 
                 module->protos.push_back(p);
 
@@ -41,13 +50,19 @@ namespace Fig
                 }
 
                 if (f->name == "init")
-                    initIdx = idx;
+                {
+                    initIdx   = idx;
+                    initFnLoc = &stmt->location;
+                }
                 if (f->name == "main")
-                    mainIdx = idx;
+                {
+                    mainIdx   = idx;
+                    mainFnLoc = &stmt->location;
+                }
             }
         }
 
-        // 3. 第二步：在 Bootstrapper 环境中编译所有语句
+        // Bootstrapper 中编译所有语句
         FuncState bootState(bootProto, nullptr);
         current = &bootState;
 
@@ -60,18 +75,18 @@ namespace Fig
             }
         }
 
-        // 4. 发射 Bootstrapper 引导指令
+        // 发射 Bootstrapper 引导指令
         if (initIdx != -1)
         {
-            emit(Op::iABC(OpCode::FastCall, (uint8_t) initIdx, 0, 0));
+            emit(Op::iABC(OpCode::FastCall, (uint8_t) initIdx, 0, 0), initFnLoc);
         }
 
         if (mainIdx != -1)
         {
-            emit(Op::iABC(OpCode::FastCall, (uint8_t) mainIdx, 0, 0));
+            emit(Op::iABC(OpCode::FastCall, (uint8_t) mainIdx, 0, 0), mainFnLoc);
         }
 
-        emit(Op::iAsBx(OpCode::Exit, 0, 0));
+        emit(Op::iAsBx(OpCode::Exit, 0, 0), &program->nodes.back()->location);
 
         return module;
     }
@@ -89,7 +104,8 @@ namespace Fig
     {
         if (current->freereg >= MAX_REGISTERS)
         {
-            return std::unexpected(Error(ErrorType::RegisterOverflow, "too many registers", "", loc));
+            return std::unexpected(
+                Error(ErrorType::RegisterOverflow, "too many registers", "", loc));
         }
 
         Register reg = current->freereg++;
@@ -112,14 +128,15 @@ namespace Fig
     {
         if (current->constantMap.contains(val))
             return current->constantMap[val];
-        int idx                   = (int) current->proto->constants.size();
+        int idx = (int) current->proto->constants.size();
         current->proto->constants.push_back(val);
         current->constantMap[val] = idx;
         return idx;
     }
 
-    void Compiler::emit(Instruction instr)
+    void Compiler::emit(Instruction inst, SourceLocation *loc)
     {
-        current->proto->code.push_back(instr);
+        current->proto->code.push_back(inst);
+        current->proto->locations.push_back(loc);
     }
 } // namespace Fig

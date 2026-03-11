@@ -14,23 +14,6 @@ namespace Fig
 {
     using Register = std::uint8_t;
 
-    struct UpvalueInfo { uint8_t index; bool isLocal; };
-
-    struct Proto
-    {
-        String                name;
-        DynArray<Instruction> code;
-        DynArray<Value>       constants;
-        DynArray<UpvalueInfo> upvalues;
-        uint8_t               maxRegisters = 0;
-        uint8_t               numParams    = 0;
-    };
-
-    struct CompiledModule
-    {
-        DynArray<Proto *> protos;
-    };
-
     class Compiler
     {
     private:
@@ -60,7 +43,7 @@ namespace Fig
         void                    freeReg(Register count = 1);
         int                     addConstant(Value val);
 
-        void emit(Instruction instr);
+        void emit(Instruction inst, SourceLocation *loc);
 
         Result<void, Error>     compileStmt(Stmt *stmt);
         Result<Register, Error> compileExpr(Expr *expr, Register target = NO_REG);

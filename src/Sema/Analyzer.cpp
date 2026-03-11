@@ -206,8 +206,39 @@ namespace Fig
                 v->localId = idx;
                 break;
             }
+
             case AstType::FnDefStmt: {
-                auto        *f = static_cast<FnDefStmt *>(stmt);
+                auto *f = static_cast<FnDefStmt *>(stmt);
+
+                // 3.10: 局部闭包延迟类型推导
+
+                if (!f->resolvedSymbol) // 闭包？
+                {
+                    SymbolLocation loc =
+                        env.current->parent ? SymbolLocation::Local : SymbolLocation::Global;
+                    int idx = (loc == SymbolLocation::Local) ? env.current->nextLocalId++ : 0;
+
+                    Symbol *sym       = arena.Allocate<Symbol>(f->name, Type{}, loc, idx, true);
+                    f->resolvedSymbol = sym;
+                    env.current->locals[f->name] = sym;
+
+                    auto res = resolveTypeExpr(f->returnTypeSpecifier);
+                    if (!res)
+                        return std::unexpected(res.error());
+                    f->resolvedReturnType = *res;
+
+                    DynArray<Type> paramTypes;
+                    for (auto *p : f->params)
+                    {
+                        auto pres = resolveTypeExpr(p->typeSpecifier);
+                        if (!pres)
+                            return std::unexpected(pres.error());
+                        p->resolvedType = *pres;
+                        paramTypes.push_back(*pres);
+                    }
+                    f->resolvedSymbol->type = typeCtx.CreateFuncType(std::move(paramTypes), *res);
+                }
+
                 FnStateGuard fnGuard(state.currentFn, f);
                 ScopeGuard   scopeGuard(env, true);
                 for (auto *p : f->params)
@@ -220,8 +251,15 @@ namespace Fig
                 }
                 if (auto r = analyzeStmt(f->body); !r)
                     return r;
+
+                for (const auto &upval : env.current->upvalues)
+                {
+                    f->upvalues.push_back({static_cast<std::uint8_t>(upval.index), upval.isLocal});
+                }
+
                 break;
             }
+
             case AstType::IfStmt: {
                 auto *i = static_cast<IfStmt *>(stmt);
 
@@ -394,7 +432,7 @@ namespace Fig
                     auto r = analyzeExpr(arg.value);
                     if (!r)
                         return std::unexpected(r.error());
-                    // 顺手做字段赋值类型检查
+                    // 字段赋值类型检查
                     if (!arg.name.empty()
                         && !r->isAssignableTo(st->fields[st->fieldMap[arg.name]].type))
                     {
@@ -436,7 +474,7 @@ namespace Fig
                 if (l.is(TypeTag::Any) || r.is(TypeTag::Any))
                     return expr->resolvedType = typeCtx.GetBasic(TypeTag::Any);
 
-                // 🔥 算术操作强检查
+                // 算术操作强检查
                 if (in->op == BinaryOperator::Add && l.is(TypeTag::String) && r.is(TypeTag::String))
                     return expr->resolvedType = typeCtx.GetBasic(TypeTag::String);
                 if (l.is(TypeTag::Int) && r.is(TypeTag::Int))
@@ -467,7 +505,7 @@ namespace Fig
                 if (calleeType.is(TypeTag::Any))
                     return expr->resolvedType = typeCtx.GetBasic(TypeTag::Any);
 
-                // 🔥 终极函数签名校验
+                // 函数签名校验
                 if (!calleeType.is(TypeTag::Function))
                     return std::unexpected(
                         Error(ErrorType::TypeError, "callee is not a function", "", c->location));

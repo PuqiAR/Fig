@@ -39,9 +39,6 @@ namespace Fig
                 0     -             UnaryOperators::Count     BinaryOperators::Count
         */
 
-        Value fields[];
-
-
 
         Object *GetUnaryOperator(UnaryOperator _op)
         {

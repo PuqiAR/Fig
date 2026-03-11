@@ -42,7 +42,7 @@ namespace Fig
             return true; // Any 逃逸通道
         if (this->is(TypeTag::Null) && target.isNullable)
             return true; // Null 安全赋值
-        return this->base == target.base && (!this->isNullable || target.isNullable); // 严格匹配
+        return this->base == target.base && (!this->isNullable || target.isNullable);
     }
 
     TypeContext::TypeContext()

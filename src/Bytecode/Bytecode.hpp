@@ -5,7 +5,12 @@
 
 #pragma once
 
+#include <Deps/Deps.hpp>
+#include <Object/ObjectBase.hpp>
+#include <Core/SourceLocations.hpp>
+
 #include <cstdint>
+
 
 namespace Fig
 {
@@ -80,4 +85,27 @@ namespace Fig
                    | (static_cast<std::uint32_t>(static_cast<std::uint16_t>(sbx)) << 16);
         }
     } // namespace Op
+
+    struct UpvalueInfo
+    {
+        uint8_t index;
+        bool    isLocal;
+    };
+
+    struct Proto
+    {
+        String                name;
+        DynArray<Instruction> code;
+        DynArray<SourceLocation *> locations;
+        DynArray<Value>       constants;
+        DynArray<UpvalueInfo> upvalues;
+        uint8_t               maxRegisters = 0;
+        uint8_t               numParams    = 0;
+    };
+
+    struct CompiledModule
+    {
+        DynArray<Proto *> protos;
+    };
+
 } // namespace Fig

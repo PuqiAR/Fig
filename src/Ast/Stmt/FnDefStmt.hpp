@@ -6,6 +6,7 @@
 #pragma once
 #include <Ast/Base.hpp>
 #include <Sema/Environment.hpp>
+#include <Bytecode/Bytecode.hpp>
 
 namespace Fig
 {
@@ -32,6 +33,9 @@ namespace Fig
         BlockStmt       *body;
         Type             resolvedReturnType;
         Symbol          *resolvedSymbol = nullptr; // 连接物理符号
+
+        int protoIndex = -1; // 在CompiledModule扁平化protos的下标
+        DynArray<UpvalueInfo> upvalues;
 
         FnDefStmt() { type = AstType::FnDefStmt; }
         FnDefStmt(bool _p, String _n, DynArray<Param *> _pa, TypeExpr *_rt, BlockStmt *_b, SourceLocation _loc)

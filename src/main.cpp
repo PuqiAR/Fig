@@ -81,6 +81,7 @@ int main()
     std::cout << "Result: " << (*result_).ToString() << "\n";
     std::cout << "Execution Cost: " << duration.count() << "ms\n";
 
-    vm.PrintRegisters();
+    vm.PrintRegisters(); 
+    vm.PrintGlobals();
     return 0;
 }
