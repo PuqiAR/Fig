@@ -4,26 +4,27 @@
 */
 
 #include <Bytecode/Disassembler.hpp>
+
 #include <iostream>
 #include <format>
 
 namespace Fig
 {
-    void Disassembler::DisassembleModule(const CompiledModule *module)
+    void Disassembler::DisassembleModule(const CompiledModule *module, std::ostream &stream)
     {
         if (!module) return;
-        std::cout << "--- Module Disassembly ---" << std::endl;
+        stream << "--- Module Disassembly ---" << std::endl;
         for (auto *proto : module->protos)
         {
             DisassembleProto(proto);
         }
     }
 
-    void Disassembler::DisassembleProto(const Proto *proto)
+    void Disassembler::DisassembleProto(const Proto *proto, std::ostream &stream)
     {
         if (!proto) return;
 
-        std::cout << std::format("\n--- Proto: {} (Regs: {}, Params: {}) ---\n", 
+        stream << std::format("\n--- Proto: {} (Regs: {}, Params: {}) ---\n", 
                                  proto->name, proto->maxRegisters, proto->numParams);
 
         for (size_t i = 0; i < proto->code.size(); ++i)
@@ -32,46 +33,46 @@ namespace Fig
             OpCode      op   = static_cast<OpCode>(inst & 0xFF);
             uint8_t     a    = (inst >> 8) & 0xFF;
             
-            std::cout << std::format("[{:04}] {:<12} ", i, magic_enum::enum_name(op));
+            stream << std::format("[{:04}] {:<12} ", i, magic_enum::enum_name(op));
 
             Format fmt = GetFormat(op);
             if (fmt == Format::ABC)
             {
                 uint8_t b = (inst >> 16) & 0xFF;
                 uint8_t c = (inst >> 24) & 0xFF;
-                std::cout << std::format("A:{:<3} B:{:<3} C:{:<3}", a, b, c);
+                stream << std::format("A:{:<3} B:{:<3} C:{:<3}", a, b, c);
             }
             else if (fmt == Format::ABx)
             {
                 uint16_t bx = (inst >> 16) & 0xFFFF;
-                std::cout << std::format("A:{:<3} Bx:{:<5}", a, bx);
+                stream << std::format("A:{:<3} Bx:{:<5}", a, bx);
                 
                 // 自动关联常量池
                 if (op == OpCode::LoadK && bx < proto->constants.size())
                 {
-                    std::cout << std::format(" ; {}", proto->constants[bx].ToString());
+                    stream << std::format(" ; {}", proto->constants[bx].ToString());
                 }
             }
             else if (fmt == Format::AsBx)
             {
                 int16_t sbx = static_cast<int16_t>((inst >> 16) & 0xFFFF);
-                std::cout << std::format("A:{:<3} sBx:{:<5}", a, sbx);
+                stream << std::format("A:{:<3} sBx:{:<5}", a, sbx);
                 
                 // 计算跳转绝对地址
                 if (op == OpCode::Jmp || op == OpCode::JmpIfFalse)
                 {
-                    std::cout << std::format(" ; to [{:04}]", i + sbx + 1);
+                    stream << std::format(" ; to [{:04}]", i + sbx + 1);
                 }
             }
-            std::cout << "\n";
+            stream << "\n";
         }
 
         if (!proto->constants.empty())
         {
-            std::cout << "Constants:\n";
+            stream << "Constants:\n";
             for (size_t i = 0; i < proto->constants.size(); ++i)
             {
-                std::cout << std::format("  [{}] {}\n", i, proto->constants[i].ToString());
+                stream << std::format("  [{}] {}\n", i, proto->constants[i].ToString());
             }
         }
     }

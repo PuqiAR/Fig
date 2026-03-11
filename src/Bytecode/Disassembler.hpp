@@ -9,6 +9,7 @@
 
 #include <Bytecode/Bytecode.hpp>
 #include <Compiler/Compiler.hpp>
+#include <Core/CoreIO.hpp>
 
 namespace Fig
 {
@@ -16,10 +17,10 @@ namespace Fig
     {
     public:
         // 反汇编整个模块
-        static void DisassembleModule(const CompiledModule *module);
+        static void DisassembleModule(const CompiledModule *module, std::ostream & = CoreIO::GetStdOut());
 
         // 反汇编单个函数原型
-        static void DisassembleProto(const Proto *proto);
+        static void DisassembleProto(const Proto *proto, std::ostream & = CoreIO::GetStdOut());
 
     private:
         enum class Format
