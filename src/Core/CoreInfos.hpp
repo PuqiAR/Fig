@@ -46,7 +46,7 @@
 
 #if SIZE_MAX == 18446744073709551615ull
     #define __FCORE_ARCH "64"
-#else 
+#else
     #define __FCORE_ARCH "86"
 #endif
 
@@ -56,12 +56,96 @@ namespace Fig
 {
     namespace Core
     {
-        inline constexpr std::string_view VERSION = __FCORE_VERSION;
-        inline constexpr std::string_view LICENSE = "MIT";
-        inline constexpr std::string_view AUTHOR = "PuqiAR";
-        inline constexpr std::string_view PLATFORM = __FCORE_PLATFORM;
-        inline constexpr std::string_view COMPILER = __FCORE_COMPILER;
+        inline constexpr std::string_view VERSION      = __FCORE_VERSION;
+        inline constexpr std::string_view LICENSE      = "MIT";
+        inline constexpr std::string_view AUTHOR       = "PuqiAR";
+        inline constexpr std::string_view PLATFORM     = __FCORE_PLATFORM;
+        inline constexpr std::string_view COMPILER     = __FCORE_COMPILER;
         inline constexpr std::string_view COMPILE_TIME = __FCORE_COMPILE_TIME;
-        inline constexpr std::string_view ARCH = __FCORE_ARCH;
+        inline constexpr std::string_view ARCH         = __FCORE_ARCH;
+
+        const std::string LOGO = 
+            R"(
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+▒▒▒▒▒██████████▓▒▒▒▒
+▒▒▒▒▒██████████▓▒▒▒▒
+▒▒▒▒▒███▓▒▒▒▒▒▒▒▒▒▒▒
+▒▒▒▒▒█████████▒▒▒▒▒▒
+▒▒▒▒▒█████████▒▒▒▒▒▒
+▒▒▒▒▒███▓▒▒▒▒▒▒▒▒▒▒▒
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+)";
+
+        const std::string LICENSE_TEXT =
+            R"(
+            MIT License (Fig)
+
+Copyright (c) 2026 PuqiAR <im@puqiar.top>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+1. The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+2. This project includes code from the following projects with their respective licenses:
+   - argparse (MIT License)
+     Copyright (c) 2018 Pranav Srinivas Kumar <pranav.srinivas.kumar@gmail.com>
+
+     Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+     The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   - magic_enum (MIT License)
+     Copyright (c) 2019 - 2024 Daniil Goncharov
+
+     Permission is hereby granted, free of charge, to any person obtaining a copy
+     of this software and associated documentation files (the "Software"), to deal
+     in the Software without restriction, including without limitation the rights
+     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+     copies of the Software, and to permit persons to whom the Software is
+     furnished to do so, subject to the following conditions:
+
+     The above copyright notice and this permission notice shall be included in all
+     copies or substantial portions of the Software.
+
+     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+     AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+     SOFTWARE.
+
+   - json (MIT LICENSE) (for LSP Server JSON-RPC)
+     Copyright (c) 2013-2026 Niels Lohmann
+
+     Permission is hereby granted, free of charge, to any person obtaining a copy
+     of this software and associated documentation files (the "Software"), to deal
+     in the Software without restriction, including without limitation the rights
+     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+     copies of the Software, and to permit persons to whom the Software is
+     furnished to do so, subject to the following conditions:
+
+     The above copyright notice and this permission notice shall be included in all
+     copies or substantial portions of the Software.
+
+     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+     AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+     SOFTWARE.
+)";
+
     }; // namespace Core
 }; // namespace Fig
