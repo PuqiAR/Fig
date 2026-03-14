@@ -87,7 +87,7 @@ namespace Fig
         {String("try"), TokenType::Try},
         {String("catch"), TokenType::Catch},
         {String("throw"), TokenType::Throw},
-        {String("Finally"), TokenType::Finally},
+        {String("finally"), TokenType::Finally},
         {String("as"), TokenType::As},
         {String("true"), TokenType::LiteralTrue},
         {String("false"), TokenType::LiteralFalse},

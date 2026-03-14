@@ -38,7 +38,7 @@ namespace Fig
 
         void PrintInfo()
         {
-            out << std::format("Fig {} copyright (c) 2025-2026 PuqiAR, under the {} License",
+            out << std::format("Fig {}, copyright (c) 2025-2026 PuqiAR, under the {} License\n",
                 Core::VERSION,
                 Core::LICENSE);
             out << std::format("Build time: {} [{} x{} on {}]\n",
