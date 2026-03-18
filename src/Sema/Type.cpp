@@ -39,10 +39,15 @@ namespace Fig
     bool Type::isAssignableTo(const Type &target) const
     {
         if (target.is(TypeTag::Any) || this->is(TypeTag::Any))
-            return true; // Any 逃逸通道
+        {
+            return true; // Any 逃逸
+        }
         if (this->is(TypeTag::Null) && target.isNullable)
+        {
             return true; // Null 安全赋值
-        return this->base == target.base && (!this->isNullable || target.isNullable);
+        }
+        
+        return *this->base == *target.base && (!this->isNullable || target.isNullable);
     }
 
     TypeContext::TypeContext()
@@ -65,7 +70,9 @@ namespace Fig
     TypeContext::~TypeContext()
     {
         for (auto t : allTypes)
+        {
             delete t;
+        }
     }
 
     Type TypeContext::GetBasic(TypeTag tag, bool nullable)

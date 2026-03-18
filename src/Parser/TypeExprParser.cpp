@@ -25,9 +25,11 @@ namespace Fig
             if (match(TokenType::Dot))
             {
                 if (!currentToken().isIdentifier())
-                    return std::unexpected(makeUnexpectTokenError("Type", "identifier", currentToken()));
+                    return std::unexpected(
+                        makeUnexpectTokenError("Type", "identifier", currentToken()));
             }
-            else break;
+            else
+                break;
         }
 
         DynArray<TypeExpr *> arguments;
@@ -36,16 +38,72 @@ namespace Fig
             while (true)
             {
                 auto result = parseTypeExpr();
-                if (!result) return std::unexpected(result.error());
+                if (!result)
+                    return std::unexpected(result.error());
                 arguments.push_back(*result);
 
-                if (match(TokenType::Greater)) break; // `>`
+                if (match(TokenType::Greater))
+                    break; // `>`
                 if (!match(TokenType::Comma))
-                    return std::unexpected(makeUnexpectTokenError("TypeArgs", "'>' or ','", currentToken()));
+                    return std::unexpected(
+                        makeUnexpectTokenError("TypeArgs", "'>' or ','", currentToken()));
             }
         }
 
         return arena.Allocate<NamedTypeExpr>(path, arguments, location);
+    }
+
+    Result<TypeExpr *, Error> Parser::parseFnTypeExpr()
+    {
+        StateProtector p(this, {State::ParsingFnTypeExpr});
+        SourceLocation location = makeSourceLocation(consumeToken()); // consume `func`
+        if (!match(TokenType::LeftParen))                             // `(`
+        {
+            return std::unexpected(
+                makeUnexpectTokenError("FnTypeExpr", "lparen (", currentToken()));
+        }
+
+        DynArray<TypeExpr *> paraTypes;
+
+        while (true)
+        {
+            auto result = parseTypeExpr();
+            if (!result)
+            {
+                return result;
+            }
+            paraTypes.push_back(*result);
+
+            if (match(TokenType::RightParen))
+            {
+                break;
+            }
+            else if (isEOF)
+            {
+                return std::unexpected(
+                    makeUnexpectTokenError("FnTypeExpr", "rparen )", currentToken()));
+            }
+            if (!match(TokenType::Comma))
+            {
+                return std::unexpected(
+                    makeUnexpectTokenError("FnTypeExpr", "comma ,", currentToken()));
+            }
+        }
+
+        TypeExpr *returnType = nullptr;
+
+        if (match(TokenType::RightArrow)) // ->
+        {
+            auto result = parseTypeExpr();
+            if (!result)
+            {
+                return result;
+            }
+            returnType = *result;
+        }
+
+        FnTypeExpr *fnTypeExpr = arena.Allocate<FnTypeExpr>(paraTypes, returnType);
+        return fnTypeExpr;
     }
 
     // 解析主入口: 处理 `?` 后缀
@@ -53,21 +111,35 @@ namespace Fig
     {
         TypeExpr *base = nullptr;
 
-        // 目前只支持命名类型 (以后可以加函数类型 (Int)->Int)
         if (currentToken().isIdentifier())
         {
-            auto res = parseNamedTypeExpr();
-            if (!res) return std::unexpected(res.error());
-            base = *res;
+            auto result = parseNamedTypeExpr();
+            if (!result)
+            {
+                return result;
+            }
+            base = *result;
         }
-        else return std::unexpected(makeUnexpectTokenError("TypeExpr", "name", currentToken()));
-
-        // 空安全处理: Int?? 也可以，但 Analyzer 会规范化它
-        while (match(TokenType::Question))
+        else if (currentToken().type == TokenType::Function)
         {
-            base = arena.Allocate<NullableTypeExpr>(base, makeSourceLocation(prevToken()));
+            auto result = parseFnTypeExpr();
+            if (!result)
+            {
+                return result;
+            }
+            base = *result;
+        }
+        else
+        {
+            return std::unexpected(makeUnexpectTokenError("TypeExpr", "name", currentToken()));
+        }
+
+        // type (?)
+        if (currentToken().type == TokenType::Question) // ?
+        {
+            base = arena.Allocate<NullableTypeExpr>(base, makeSourceLocation(consumeToken())); // consume `?`
         }
 
         return base;
     }
-}
+} // namespace Fig

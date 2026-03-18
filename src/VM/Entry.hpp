@@ -9,5 +9,14 @@
 
 namespace Fig::Entry
 {
-    void RunFromPath(const String &);
+    struct Config
+    {
+        enum Mode
+        {
+            Debug,
+            Normal
+        } mode;
+        bool dump;
+    };
+    void RunFromPath(const String &, const Config &conf);
 };

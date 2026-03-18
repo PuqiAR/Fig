@@ -5,7 +5,6 @@
     @date 2026-03-13
 */
 
-
 #include <VM/Entry.hpp>
 
 #include <filesystem>
@@ -13,15 +12,17 @@
 #include <Core/Core.hpp>
 #include <SourceManager/SourceManager.hpp>
 
+#include <Bytecode/Disassembler.hpp>
+#include <Compiler/Compiler.hpp>
 #include <Lexer/Lexer.hpp>
 #include <Parser/Parser.hpp>
 #include <Sema/Analyzer.hpp>
-#include <Compiler/Compiler.hpp>
 #include <VM/VM.hpp>
+
 
 namespace Fig::Entry
 {
-    void RunFromPath(const String &path)
+    void RunFromPath(const String &path, const Config &conf)
     {
         namespace fs = std::filesystem;
 
@@ -49,10 +50,10 @@ namespace Fig::Entry
             CoreIO::GetStdErr() << "Could not read file: " << path << '\n';
             std::exit(1);
         }
-        
+
         const String &source = manager.GetSource();
 
-        Lexer lexer(source, fileName);
+        Lexer  lexer(source, fileName);
         Parser parser(lexer, manager, fileName);
 
         auto parse_result = parser.Parse();
@@ -64,7 +65,7 @@ namespace Fig::Entry
         Program *program = *parse_result;
 
         Analyzer analyer(manager);
-        auto analyze_result = analyer.Analyze(program);
+        auto     analyze_result = analyer.Analyze(program);
 
         if (!analyze_result)
         {
@@ -73,7 +74,7 @@ namespace Fig::Entry
         }
 
         Diagnostics diagnostics;
-        Compiler compiler(manager, diagnostics);
+        Compiler    compiler(manager, diagnostics);
 
         auto compile_result = compiler.Compile(program);
         diagnostics.EmitAll(manager);
@@ -85,6 +86,13 @@ namespace Fig::Entry
         }
 
         CompiledModule *compiledModule = *compile_result;
+
+        if (conf.dump)
+        {
+            Disassembler disassembler;
+            disassembler.DisassembleModule(compiledModule);
+            return;
+        }
 
         VM vm;
 

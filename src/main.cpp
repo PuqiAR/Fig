@@ -22,6 +22,7 @@ int main(int argc, char **argv)
     argparser.AddFlag('h', "help").Help("Print the help message");
     argparser.AddFlag('v', "version").Help("Show toolchain version");
     argparser.AddFlag("license").Help("Print the license text");
+    argparser.AddFlag("dump").Help("Dump the bytecode");
 
     auto res = argparser.Parse(argc, argv);
     if (!res)
@@ -35,6 +36,7 @@ int main(int argc, char **argv)
     bool showHelp    = args.HasFlag("help");
     bool showVersion = args.HasFlag("version");
     bool showLicense = args.HasFlag("license");
+    bool dump        = args.HasFlag("dump");
 
     if (showHelp)
     {
@@ -77,8 +79,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    Entry::Config config
+    {
+        .mode = Entry::Config::Normal,
+        .dump = dump
+    };
+
     const String &path = positionals.front();
-    Entry::RunFromPath(path);
+    Entry::RunFromPath(path, config);
 
     return 0;
 }

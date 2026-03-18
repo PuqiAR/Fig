@@ -64,4 +64,37 @@ namespace Fig
             return std::format("<NullableTypeExpr '{}?'>", inner->toString());
         }
     };
+
+    struct FnTypeExpr final : public TypeExpr
+    {
+        // func (paratypes...) -> return_type
+
+        DynArray<TypeExpr *> paraTypes;
+        TypeExpr *returnType;
+
+        FnTypeExpr(DynArray<TypeExpr *> _paraTypes, TypeExpr *_returnType) :
+            paraTypes(std::move(_paraTypes)), returnType(_returnType)
+        {
+            type = AstType::FnTypeExpr;
+        }
+
+        virtual String toString() const override
+        {
+            String detail = "<FnTypeExpr 'func (";
+
+            for (auto &pt : paraTypes)
+            {
+                if (pt != paraTypes.front())
+                {
+                    detail += ", ";
+                }
+                detail += pt->toString();
+            }
+            detail += ") -> ";
+            detail += returnType->toString();
+            detail += "'>";
+            
+            return detail;
+        }
+    };
 } // namespace Fig

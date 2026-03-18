@@ -51,6 +51,11 @@ namespace Fig
         String  name;
         BaseType(TypeTag t, String n) : tag(t), name(std::move(n)) {}
         virtual ~BaseType() = default;
+
+        bool operator==(const BaseType &other) const
+        {
+            return tag == other.tag && name == other.name;
+        }
     };
 
     class FuncType : public BaseType
@@ -61,6 +66,11 @@ namespace Fig
         FuncType(DynArray<Type> params, Type ret) :
             BaseType(TypeTag::Function, "Function"), paramTypes(std::move(params)), retType(ret)
         {
+        }
+
+        bool operator==(const FuncType &other) const
+        {
+            return paramTypes == other.paramTypes && retType == other.retType;    
         }
     };
 
@@ -85,6 +95,11 @@ namespace Fig
             fields.push_back({name, type, isPublic, (int) idx});
             fieldMap[name] = idx;
         }
+
+        bool operator==(const StructType &other) const
+        {
+            return this == &other; // 即使是两个完全一样的struct, 也认作不同的type
+        }
     };
 
     class InterfaceType : public BaseType
@@ -98,6 +113,11 @@ namespace Fig
         };
         HashMap<String, MethodSig> methods;
         InterfaceType(String n) : BaseType(TypeTag::Interface, std::move(n)) {}
+
+        bool operator==(const InterfaceType &other) const
+        {
+            return this == &other; // 即使是两个完全一样的interface, 也认作不同的type
+        }
     };
 
     class TypeContext

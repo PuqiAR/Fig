@@ -130,6 +130,7 @@ namespace Fig
                 ParsingBreak,
                 ParsingContinue,
                 ParsingNamedTypeExpr,
+                ParsingFnTypeExpr,
             } type                               = StateType::Standby;
             std::unordered_set<TokenType> stopAt = {};
         };
@@ -228,6 +229,7 @@ namespace Fig
 
         Result<TypeExpr *, Error> parseTypeExpr();
         Result<TypeExpr *, Error> parseNamedTypeExpr();
+        Result<TypeExpr *, Error> parseFnTypeExpr();
 
         Result<Expr *, Error> parseExpression(BindingPower = 0);
         Result<Expr *, Error> parseLiteralExpr();

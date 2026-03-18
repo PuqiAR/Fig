@@ -345,7 +345,7 @@ namespace Fig
                         return std::unexpected(res.error());
                     retT = *res;
                 }
-                // 🔥 强类型校验：返回值拦截
+                // 返回值拦截校验
                 if (state.currentFn && !retT.isAssignableTo(state.currentFn->resolvedReturnType))
                 {
                     return std::unexpected(Error(ErrorType::TypeError,
@@ -513,10 +513,10 @@ namespace Fig
                 auto *ft = static_cast<FuncType *>(calleeType.base);
                 if (ft->paramTypes.size() != argTypes.size())
                 {
-                    return std::unexpected(Error(ErrorType::TypeError,
-                        "expected " + std::to_string(ft->paramTypes.size()) + " arguments, got "
-                            + std::to_string(argTypes.size()),
-                        "",
+                    return std::unexpected(Error(ErrorType::SyntaxError,
+                        std::format(
+                            "expected {} arguments, go {}", ft->paramTypes.size(), argTypes.size()),
+                        "none",
                         c->location));
                 }
                 for (size_t i = 0; i < argTypes.size(); ++i)
@@ -607,13 +607,46 @@ namespace Fig
             return std::unexpected(
                 Error(ErrorType::UseUndeclaredIdentifier, "unknown type", "", texpr->location));
         }
-        if (texpr->type == AstType::NullableTypeExpr)
+        else if (texpr->type == AstType::NullableTypeExpr)
         {
             auto res = resolveTypeExpr(static_cast<NullableTypeExpr *>(texpr)->inner);
-            if (res)
-                res->isNullable = true;
+            if (!res)
+            {
+                return res;
+            }
+
+            res->isNullable = true;
             return res;
         }
+        else if (texpr->type == AstType::FnTypeExpr)
+        {
+            auto f = static_cast<FnTypeExpr *>(texpr);
+
+            DynArray<Type> paraTypes;
+            Type           returnType = typeCtx.GetBasic(TypeTag::Any);
+
+            for (auto &pt : f->paraTypes)
+            {
+                auto result = resolveTypeExpr(pt);
+                if (!result)
+                {
+                    return result;
+                }
+                paraTypes.push_back(*result);
+            }
+
+            if (f->returnType)
+            {
+                auto result = resolveTypeExpr(f->returnType);
+                if (!result)
+                {
+                    return result;
+                }
+                returnType = *result;
+            }
+            return typeCtx.CreateFuncType(paraTypes, returnType);
+        }
+
         return typeCtx.GetBasic(TypeTag::Any);
     }
 } // namespace Fig

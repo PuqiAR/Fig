@@ -48,7 +48,8 @@ namespace Fig
         /* Type Expressions */
         TypeExpr,
         NamedTypeExpr,
-        NullableTypeExpr
+        NullableTypeExpr,
+        FnTypeExpr,
     };
 
     struct AstNode
