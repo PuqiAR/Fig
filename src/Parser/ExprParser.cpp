@@ -14,7 +14,8 @@ namespace Fig
         StateProtector p(this, {State::ParsingLiteralExpr});
 
         const Token &literal_token = consumeToken();
-        LiteralExpr *node = arena.Allocate<LiteralExpr>(literal_token, makeSourceLocation(literal_token));
+        LiteralExpr *node =
+            arena.Allocate<LiteralExpr>(literal_token, makeSourceLocation(literal_token));
         return node;
     }
     Result<Expr *, Error> Parser::parseIdentiExpr() // 当前token为Identifier调用
@@ -65,8 +66,8 @@ namespace Fig
         return node;
     }
 
-    Result<Expr *, Error> Parser::parseIndexExpr(
-        Expr *base) // 由 parseExpression调用, 当前token为 `[`
+    Result<Expr *, Error>
+    Parser::parseIndexExpr(Expr *base) // 由 parseExpression调用, 当前token为 `[`
     {
         StateProtector p(this, {State::ParsingIndexExpr});
 
@@ -80,7 +81,8 @@ namespace Fig
 
         if (currentToken().type != TokenType::RightBracket) // `]`
         {
-            return std::unexpected(Error(ErrorType::SyntaxError,
+            return std::unexpected(Error(
+                ErrorType::SyntaxError,
                 "unclosed brackets",
                 "insert `]`",
                 makeSourceLocation(lbracket_token)));
@@ -91,12 +93,13 @@ namespace Fig
         return indexExpr;
     }
 
-    Result<Expr *, Error> Parser::parseCallExpr(
-        Expr *callee) // 由 parseExpression调用, 当前token为 `(`
+    Result<Expr *, Error>
+    Parser::parseCallExpr(Expr *callee) // 由 parseExpression调用, 当前token为 `(`
     {
         StateProtector p(this, {State::ParsingCallExpr});
 
         const Token &lparen_token = consumeToken(); // consume `(`
+        const SourceLocation &location = makeSourceLocation(lparen_token);
 
         FnCallArgs callArgs;
 
@@ -104,14 +107,15 @@ namespace Fig
         if (currentToken().type == TokenType::RightParen)
         {
             consumeToken(); // consume `)`
-            return arena.Allocate<CallExpr>(callee, callArgs);
+            return arena.Allocate<CallExpr>(callee, callArgs, location);
         }
 
         while (true)
         {
             if (currentToken().type == TokenType::EndOfFile)
             {
-                return std::unexpected(Error(ErrorType::SyntaxError,
+                return std::unexpected(Error(
+                    ErrorType::SyntaxError,
                     "fn call has unclosed parenthese",
                     "insert `)`",
                     makeSourceLocation(lparen_token)));
@@ -131,7 +135,8 @@ namespace Fig
 
             if (currentToken().type != TokenType::Comma)
             {
-                return std::unexpected(Error(ErrorType::SyntaxError,
+                return std::unexpected(Error(
+                    ErrorType::SyntaxError,
                     "expected `,` or `)` in argument list",
                     "insert `,`",
                     makeSourceLocation(currentToken())));
@@ -140,7 +145,186 @@ namespace Fig
             consumeToken(); // consume `,`
         }
 
-        return arena.Allocate<CallExpr>(callee, callArgs);
+        return arena.Allocate<CallExpr>(callee, callArgs, location);
+    }
+
+    Result<Expr *, Error> Parser::parseNewExpr()
+    {
+        // new type{...}
+        StateProtector p(this, {State::ParsingNewExpr});
+
+        SourceLocation location = makeSourceLocation(consumeToken()); // consume `new`
+
+        SET_STOP_AT(TokenType::LeftBrace); // {
+        auto type_result = parseTypeExpr();
+        if (!type_result)
+        {
+            return std::unexpected(type_result.error());
+        }
+        TypeExpr *type = *type_result;
+
+        if (!match(TokenType::LeftBrace))
+        {
+            return std::unexpected(makeUnexpectTokenError("NewExpr", "lbrace {", currentToken()));
+        }
+
+        const Token &lb_token = prevToken();
+
+        /*
+            Positional:
+                new Point{1, 2}
+            Named:
+                new Point{x = 1, y = 2}
+        */
+
+        DynArray<NewExpr::Arg> args;
+
+        while (true)
+        {
+            if (isEOF)
+            {
+                return std::unexpected(Error(
+                    ErrorType::SyntaxError,
+                    "unclosed `{` in new expr",
+                    "insert '}'",
+                    makeSourceLocation(lb_token)
+                ));
+            }
+            if (args.empty() && match(TokenType::RightBrace)) // 空参
+            {
+                break;
+            }
+
+            if (currentToken().isIdentifier() && peekToken().type == TokenType::Assign)
+            {
+                const Token &name_token = consumeToken();
+                const String &name = srcManager.GetSub(name_token.index, name_token.length);
+                consumeToken(); // consume `=`
+
+                SET_STOP_AT(TokenType::Comma, TokenType::RightBrace); // , / }
+                auto result = parseExpression();
+                if (!result)
+                {
+                    return result;
+                }
+
+                args.push_back(NewExpr::Arg{
+                    name,
+                    *result
+                });
+            }
+            else 
+            {
+                SET_STOP_AT(TokenType::Comma, TokenType::RightBrace); // , / }
+                auto result = parseExpression();
+                if (!result)
+                {
+                    return result;
+                }
+
+                args.push_back(NewExpr::Arg{
+                    .value = *result
+                });
+            }
+            
+
+            if (match(TokenType::Comma))
+            {
+                continue;
+            }
+
+            if (match(TokenType::RightBrace))
+            {
+                break;
+            }
+        }
+
+        NewExpr *newExpr = arena.Allocate<NewExpr>(type, args, location);
+        return newExpr;
+    }
+
+    Result<Expr *, Error> Parser::parseLambdaExpr()
+    {
+        StateProtector p(this, {State::ParsingLambdaExpr});
+
+        SourceLocation location = makeSourceLocation(consumeToken()); // consume `func`
+
+        if (currentToken().isIdentifier())
+        {
+            return std::unexpected(Error(
+                ErrorType::SyntaxError,
+                "lambda expression should not have a name",
+                "remove the name",
+                makeSourceLocation(currentToken())));
+        }
+
+        if (currentToken().type != TokenType::LeftParen)
+        {
+            return std::unexpected(
+                makeUnexpectTokenError("fn def stmt", "lparen '('", currentToken()));
+        }
+
+        DynArray<Param *> params;
+
+        auto paraResult = parseFnParams();
+        if (!paraResult)
+        {
+            return std::unexpected(paraResult.error());
+        }
+        params = *paraResult;
+
+        TypeExpr *returnType = nullptr;
+        Token     rightArrowToken;
+        if (match(TokenType::RightArrow)) // ->
+        {
+            rightArrowToken = consumeToken();
+
+            auto result = parseTypeExpr();
+            if (!result)
+            {
+                return std::unexpected(result.error());
+            }
+            returnType = *result;
+        }
+
+        if (match(TokenType::DoubleArrow)) // =>
+        {
+            if (returnType)
+            {
+                return std::unexpected(Error(
+                    ErrorType::SyntaxError,
+                    "use of expr body but specified return type in lambda expr",
+                    "remove `-> ...`",
+                    makeSourceLocation(rightArrowToken)));
+            }
+            auto result = parseExpression();
+            if (!result)
+            {
+                return result;
+            }
+
+            Expr       *expr = *result;
+            LambdaExpr *lambda =
+                arena.Allocate<LambdaExpr>(params, returnType, expr, true, location);
+            return lambda;
+        }
+        else if (currentToken().type == TokenType::LeftBrace)
+        {
+            auto result = parseBlockStmt();
+            if (!result)
+            {
+                return std::unexpected(result.error());
+            }
+
+            LambdaExpr *lambda =
+                arena.Allocate<LambdaExpr>(params, returnType, *result, false, location);
+            return lambda;
+        }
+        else
+        {
+            return std::unexpected(
+                makeUnexpectTokenError("LambdaExpr", "darrow => / lbrace {", currentToken()));
+        }
     }
 
     Result<Expr *, Error> Parser::parseExpression(BindingPower rbp)
@@ -186,17 +370,39 @@ namespace Fig
             const Token &rparen_token = consumeToken(); // consume `)`
             if (rparen_token.type != TokenType::RightParen)
             {
-                return std::unexpected(Error(ErrorType::SyntaxError,
+                return std::unexpected(Error(
+                    ErrorType::SyntaxError,
                     "unclosed parenthese",
                     "insert `)`",
                     makeSourceLocation(lparen_token)));
             }
             lhs = *expr_result;
         }
+        else if (token.type == TokenType::Function)
+        {
+            auto result = parseLambdaExpr();
+            if (!result)
+            {
+                return result;
+            }
+
+            lhs = *result;
+        }
+        else if (token.type == TokenType::New)
+        {
+            auto result = parseNewExpr();
+            if (!result)
+            {
+                return result;
+            }
+
+            lhs = *result;
+        }
 
         if (!lhs)
         {
-            return std::unexpected(Error(ErrorType::ExpectedExpression,
+            return std::unexpected(Error(
+                ErrorType::ExpectedExpression,
                 "expected expression",
                 "insert expressions",
                 makeSourceLocation(prevToken())));
@@ -253,10 +459,11 @@ namespace Fig
             }
             else
             {
-                return std::unexpected(Error(ErrorType::ExpectedExpression,
-                    "expression unexpectedly ended",
-                    "insert expressions",
-                    makeSourceLocation(token)));
+                // return std::unexpected(Error(ErrorType::ExpectedExpression,
+                //     "expression unexpectedly ended",
+                //     "insert expressions",
+                //     makeSourceLocation(token)));
+                return lhs;
             }
         }
         return lhs;

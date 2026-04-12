@@ -9,6 +9,46 @@
 
 namespace Fig
 {
+    Result<decltype(StructDefStmt::typeParameters), Error> Parser::parseTypeParameters()
+    {
+        StateProtector                          p(this, {State::ParsingTypeParameters});
+        decltype(StructDefStmt::typeParameters) tp;
+
+        const Token &lab = consumeToken(); // consume `<`
+
+        while (true)
+        {
+            if (isEOF)
+            {
+                return std::unexpected(Error(
+                    ErrorType::SyntaxError,
+                    "unclosed `<` in type parameters",
+                    "insert '>'",
+                    makeSourceLocation(lab)));
+            }
+            if (match(TokenType::Greater)) // >
+            {
+                break;
+            }
+            if (!currentToken().isIdentifier())
+            {
+                return std::unexpected(
+                    makeUnexpectTokenError("TypeParams", "tp name", currentToken()));
+            }
+
+            const Token  &name_tok = consumeToken();
+            const String &name     = srcManager.GetSub(name_tok.index, name_tok.length);
+            tp.push_back(name);
+
+            if (!match(TokenType::Comma))
+            {
+                return std::unexpected(makeUnexpectTokenError(
+                    "TypeParams", "comma or type parameter", currentToken()));
+            }
+        }
+        return tp;
+    }
+
     // 解析基础命名类型与泛型: List<Int>
     Result<TypeExpr *, Error> Parser::parseNamedTypeExpr()
     {
@@ -137,7 +177,8 @@ namespace Fig
         // type (?)
         if (currentToken().type == TokenType::Question) // ?
         {
-            base = arena.Allocate<NullableTypeExpr>(base, makeSourceLocation(consumeToken())); // consume `?`
+            base = arena.Allocate<NullableTypeExpr>(
+                base, makeSourceLocation(consumeToken())); // consume `?`
         }
 
         return base;

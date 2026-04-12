@@ -5,7 +5,6 @@
 
 #include <Ast/Ast.hpp>
 #include <Ast/Expr/MemberExpr.hpp>
-#include <Ast/Expr/ObjectInitExpr.hpp>
 #include <Ast/Stmt/ImplStmt.hpp>
 #include <Ast/Stmt/InterfaceDefStmt.hpp>
 #include <Ast/Stmt/StructDefStmt.hpp>
@@ -82,8 +81,11 @@ namespace Fig
             {
                 auto *s = static_cast<StructDefStmt *>(stmt);
                 if (globalTypes.contains(s->name))
+                {
                     return std::unexpected(
                         Error(ErrorType::RedeclarationError, "type redeclared", "", s->location));
+                }
+
                 auto *t = arena.Allocate<StructType>(s->name);
                 typeCtx.allTypes.push_back(t);
                 globalTypes[s->name] = t;
@@ -92,10 +94,14 @@ namespace Fig
             {
                 auto *f = static_cast<FnDefStmt *>(stmt);
                 if (f->name == "main")
+                {
                     hasMain = true;
+                }
                 if (globalSymbols.contains(f->name))
+                {
                     return std::unexpected(
                         Error(ErrorType::RedeclarationError, "func redeclared", "", f->location));
+                }
                 Symbol *sym =
                     arena.Allocate<Symbol>(f->name, Type{}, SymbolLocation::Global, 0, true);
                 globalSymbols[f->name]       = sym;
@@ -118,7 +124,9 @@ namespace Fig
                 {
                     auto res = resolveTypeExpr(f.type);
                     if (!res)
+                    {
                         return std::unexpected(res.error());
+                    }
                     st->AddField(f.name, *res, f.isPublic);
                 }
             }
@@ -185,10 +193,11 @@ namespace Fig
                 }
                 Type declT = v->typeSpecifier ? *resolveTypeExpr(v->typeSpecifier) : initT;
 
-                // 🔥 强类型校验：赋值拦截
+                // 赋值拦截
                 if (v->initExpr && !initT.isAssignableTo(declT))
                 {
-                    return std::unexpected(Error(ErrorType::TypeError,
+                    return std::unexpected(Error(
+                        ErrorType::TypeError,
                         "cannot assign '" + initT.toString() + "' to type '" + declT.toString()
                             + "'",
                         "",
@@ -210,7 +219,7 @@ namespace Fig
             case AstType::FnDefStmt: {
                 auto *f = static_cast<FnDefStmt *>(stmt);
 
-                // 3.10: 局部闭包延迟类型推导
+                // 局部闭包延迟类型推导
 
                 if (!f->resolvedSymbol) // 闭包？
                 {
@@ -243,7 +252,8 @@ namespace Fig
                 ScopeGuard   scopeGuard(env, true);
                 for (auto *p : f->params)
                 {
-                    env.current->locals[p->name] = arena.Allocate<Symbol>(p->name,
+                    env.current->locals[p->name] = arena.Allocate<Symbol>(
+                        p->name,
                         p->resolvedType,
                         SymbolLocation::Local,
                         env.current->nextLocalId++,
@@ -279,7 +289,8 @@ namespace Fig
                         return std::unexpected(c.error());
                     else if (!c->isAssignableTo(typeCtx.GetBasic(TypeTag::Bool)))
                     {
-                        return std::unexpected(Error(ErrorType::TypeError,
+                        return std::unexpected(Error(
+                            ErrorType::TypeError,
                             "condition must be Bool",
                             "",
                             elif->cond->location));
@@ -330,11 +341,15 @@ namespace Fig
                 break;
             }
             case AstType::BreakStmt:
-            case AstType::ContinueStmt:
+            case AstType::ContinueStmt: {
                 if (state.loopDepth <= 0)
+                {
                     return std::unexpected(
                         Error(ErrorType::SyntaxError, "outside loop", "", stmt->location));
+                }
                 break;
+            }
+
             case AstType::ReturnStmt: {
                 auto *rs   = static_cast<ReturnStmt *>(stmt);
                 Type  retT = typeCtx.GetBasic(TypeTag::Null);
@@ -345,10 +360,11 @@ namespace Fig
                         return std::unexpected(res.error());
                     retT = *res;
                 }
-                // 返回值拦截校验
+                // 返回值校验
                 if (state.currentFn && !retT.isAssignableTo(state.currentFn->resolvedReturnType))
                 {
-                    return std::unexpected(Error(ErrorType::TypeError,
+                    return std::unexpected(Error(
+                        ErrorType::TypeError,
                         "cannot return '" + retT.toString() + "' from function expecting '"
                             + state.currentFn->resolvedReturnType.toString() + "'",
                         "",
@@ -407,7 +423,8 @@ namespace Fig
                 auto *st = static_cast<StructType *>(targetType.base);
                 if (!st->fieldMap.contains(m->name))
                 {
-                    return std::unexpected(Error(ErrorType::TypeError,
+                    return std::unexpected(Error(
+                        ErrorType::TypeError,
                         "struct '" + st->name + "' has no field named '" + m->name + "'",
                         "",
                         m->location));
@@ -415,14 +432,18 @@ namespace Fig
                 // 字段类型
                 return expr->resolvedType = st->fields[st->fieldMap[m->name]].type;
             }
-            case AstType::ObjectInitExpr: {
-                auto *o   = static_cast<ObjectInitExpr *>(expr);
+            case AstType::NewExpr: {
+                auto *o   = static_cast<NewExpr *>(expr);
                 auto  res = resolveTypeExpr(o->typeExpr);
                 if (!res)
+                {
                     return std::unexpected(res.error());
+                }
                 if (!res->base || res->base->tag != TypeTag::Struct)
+                {
                     return std::unexpected(
                         Error(ErrorType::TypeError, "requires struct", "", o->location));
+                }
                 auto *st = static_cast<StructType *>(res->base);
                 for (auto &arg : o->args)
                 {
@@ -431,7 +452,9 @@ namespace Fig
                             Error(ErrorType::TypeError, "unknown field", "", arg.value->location));
                     auto r = analyzeExpr(arg.value);
                     if (!r)
+                    {
                         return std::unexpected(r.error());
+                    }
                     // 字段赋值类型检查
                     if (!arg.name.empty()
                         && !r->isAssignableTo(st->fields[st->fieldMap[arg.name]].type))
@@ -456,7 +479,8 @@ namespace Fig
                 if (in->op == BinaryOperator::Assign)
                 {
                     if (!r.isAssignableTo(l))
-                        return std::unexpected(Error(ErrorType::TypeError,
+                        return std::unexpected(Error(
+                            ErrorType::TypeError,
                             "cannot assign '" + r.toString() + "' to '" + l.toString() + "'",
                             "",
                             in->location));
@@ -511,11 +535,13 @@ namespace Fig
                         Error(ErrorType::TypeError, "callee is not a function", "", c->location));
 
                 auto *ft = static_cast<FuncType *>(calleeType.base);
+                
                 if (ft->paramTypes.size() != argTypes.size())
                 {
-                    return std::unexpected(Error(ErrorType::SyntaxError,
+                    return std::unexpected(Error(
+                        ErrorType::SyntaxError,
                         std::format(
-                            "expected {} arguments, go {}", ft->paramTypes.size(), argTypes.size()),
+                            "expected {} arguments, got {}", ft->paramTypes.size(), argTypes.size()),
                         "none",
                         c->location));
                 }
@@ -523,7 +549,8 @@ namespace Fig
                 {
                     if (!argTypes[i].isAssignableTo(ft->paramTypes[i]))
                     {
-                        return std::unexpected(Error(ErrorType::TypeError,
+                        return std::unexpected(Error(
+                            ErrorType::TypeError,
                             "argument " + std::to_string(i + 1) + " expects '"
                                 + ft->paramTypes[i].toString() + "', got '" + argTypes[i].toString()
                                 + "'",
@@ -533,13 +560,86 @@ namespace Fig
                 }
                 return expr->resolvedType = ft->retType;
             }
+
+            case AstType::LambdaExpr: {
+                auto l = static_cast<LambdaExpr *>(expr);
+
+                Type returnType = typeCtx.GetBasic(TypeTag::Any);
+
+                if (l->returnType)
+                {
+                    auto tres = resolveTypeExpr(l->returnType);
+                    if (!tres)
+                    {
+                        return tres;
+                    }
+
+                    returnType = *tres;
+                }
+
+                FnDefStmt *f = arena.Allocate<FnDefStmt>(
+                    false, "LambdaFn", l->params, l->returnType, nullptr, l->location);
+
+                FnStateGuard fnGuard(state.currentFn, f);
+                ScopeGuard   scopeGuard(env, true);
+
+                DynArray<Type> paramTypes;
+                for (auto *p : l->params)
+                {
+                    auto pres = resolveTypeExpr(p->typeSpecifier);
+                    if (!pres)
+                    {
+                        return pres;
+                    }
+                    p->resolvedType = *pres;
+                    paramTypes.push_back(*pres);
+
+                    env.current->locals[p->name] = arena.Allocate<Symbol>(
+                        p->name,
+                        p->resolvedType,
+                        SymbolLocation::Local,
+                        env.current->nextLocalId++,
+                        false);
+                }
+
+                if (l->isExprBody)
+                {
+                    Expr *expr = static_cast<Expr *>(l->body);
+                    if (auto r = analyzeExpr(expr); !r)
+                    {
+                        return r;
+                    }
+                    if (!expr->resolvedType.isAssignableTo(state.currentFn->resolvedReturnType))
+                    {
+                        return std::unexpected(Error(
+                            ErrorType::TypeError,
+                            "cannot return '" + state.currentFn->resolvedReturnType.toString()
+                                + "' from lambda function expecting '"
+                                + state.currentFn->resolvedReturnType.toString() + "'",
+                            "",
+                            expr->location));
+                    }
+                }
+                else
+                {
+                    Stmt *stmt = static_cast<Stmt *>(l->body);
+                    if (auto r = analyzeStmt(stmt); !r)
+                    {
+                        return std::unexpected(r.error());
+                    }
+                }
+
+                return l->resolvedType = typeCtx.CreateFuncType(paramTypes, returnType);
+            }
+
             default: break;
         }
+
         return expr->resolvedType = typeCtx.GetBasic(TypeTag::Any);
     }
 
-    Result<Symbol *, Error> Analyzer::resolveSymbolInternal(
-        const String &name, const SourceLocation &loc, Scope *s)
+    Result<Symbol *, Error>
+    Analyzer::resolveSymbolInternal(const String &name, const SourceLocation &loc, Scope *s)
     {
         Scope *curr = s;
         while (curr)

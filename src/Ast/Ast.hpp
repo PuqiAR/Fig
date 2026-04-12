@@ -11,13 +11,19 @@
 #include <Ast/Expr/IdentiExpr.hpp>
 #include <Ast/Expr/IndexExpr.hpp>
 #include <Ast/Expr/InfixExpr.hpp>
+#include <Ast/Expr/LambdaExpr.hpp>
 #include <Ast/Expr/LiteralExpr.hpp>
+#include <Ast/Expr/MemberExpr.hpp>
+#include <Ast/Expr/NewExpr.hpp>
 #include <Ast/Expr/PrefixExpr.hpp>
 
 #include <Ast/Stmt/ControlFlowStmts.hpp>
 #include <Ast/Stmt/ExprStmt.hpp>
 #include <Ast/Stmt/FnDefStmt.hpp>
 #include <Ast/Stmt/IfStmt.hpp>
+#include <Ast/Stmt/ImplStmt.hpp>
+#include <Ast/Stmt/InterfaceDefStmt.hpp>
+#include <Ast/Stmt/StructDefStmt.hpp>
 #include <Ast/Stmt/VarDecl.hpp>
 #include <Ast/Stmt/WhileStmt.hpp>
 #include <Ast/TypeExpr.hpp>

@@ -18,13 +18,19 @@ int main()
     }
 
     Lexer  lexer(source, fileName);
-    Parser parser(lexer, srcManager, fileName);
+
+    Diagnostics diagnostics;
+    Parser parser(lexer, srcManager, fileName, diagnostics);
+
     auto   result = parser.Parse();
     if (!result)
     {
         ReportError(result.error(), srcManager);
         return 1;
     }
+
+    diagnostics.EmitAll(srcManager);
+
     Program *program = *result;
     for (Stmt *stmt : program->nodes)
     {

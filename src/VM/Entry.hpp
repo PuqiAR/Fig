@@ -17,6 +17,7 @@ namespace Fig::Entry
             Normal
         } mode;
         bool dump;
+        bool pregs;
     };
     void RunFromPath(const String &, const Config &conf);
 };

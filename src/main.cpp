@@ -23,6 +23,7 @@ int main(int argc, char **argv)
     argparser.AddFlag('v', "version").Help("Show toolchain version");
     argparser.AddFlag("license").Help("Print the license text");
     argparser.AddFlag("dump").Help("Dump the bytecode");
+    argparser.AddFlag("pregs").Help("Print vm non-null registers");
 
     auto res = argparser.Parse(argc, argv);
     if (!res)
@@ -37,6 +38,7 @@ int main(int argc, char **argv)
     bool showVersion = args.HasFlag("version");
     bool showLicense = args.HasFlag("license");
     bool dump        = args.HasFlag("dump");
+    bool pregs       = args.HasFlag("pregs");
 
     if (showHelp)
     {
@@ -46,10 +48,12 @@ int main(int argc, char **argv)
 
     if (showVersion)
     {
-        out << std::format("Fig {}, copyright (c) 2025-2026 PuqiAR, under the {} License\n",
+        out << std::format(
+            "Fig {}, copyright (c) 2025-2026 PuqiAR, under the {} License\n",
             Core::VERSION,
             Core::LICENSE);
-        out << std::format("Build time: {} [{} x{} on {}]\n",
+        out << std::format(
+            "Build time: {} [{} x{} on {}]\n",
             Core::COMPILE_TIME,
             Core::COMPILER,
             Core::ARCH,
@@ -79,11 +83,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    Entry::Config config
-    {
-        .mode = Entry::Config::Normal,
-        .dump = dump
-    };
+    Entry::Config config{.mode = Entry::Config::Normal, .dump = dump, .pregs = pregs};
 
     const String &path = positionals.front();
     Entry::RunFromPath(path, config);

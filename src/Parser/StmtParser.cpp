@@ -17,7 +17,8 @@ namespace Fig
         {
             if (isEOF)
             {
-                return std::unexpected(Error(ErrorType::SyntaxError,
+                return std::unexpected(Error(
+                    ErrorType::SyntaxError,
                     "unclosed braces in block stmt",
                     "insert '}'",
                     location));
@@ -75,7 +76,8 @@ namespace Fig
         {
             if (typeSpeicifer)
             {
-                return std::unexpected(Error(ErrorType::SyntaxError,
+                return std::unexpected(Error(
+                    ErrorType::SyntaxError,
                     "used type infer but specifying the type",
                     "change `:=` to '='",
                     makeSourceLocation(prevToken())));
@@ -115,7 +117,8 @@ namespace Fig
             }
             if (!match(TokenType::RightParen))
             {
-                return std::unexpected(Error(ErrorType::SyntaxError,
+                return std::unexpected(Error(
+                    ErrorType::SyntaxError,
                     "unclosed parenthese in if condition",
                     "insert `)`",
                     makeSourceLocation(lpToken)));
@@ -155,7 +158,8 @@ namespace Fig
             {
                 if (alternate)
                 {
-                    return std::unexpected(Error(ErrorType::SyntaxError,
+                    return std::unexpected(Error(
+                        ErrorType::SyntaxError,
                         "else if after else",
                         "remove else if",
                         elseLocation));
@@ -175,7 +179,8 @@ namespace Fig
                     }
                     if (!match(TokenType::RightParen))
                     {
-                        return std::unexpected(Error(ErrorType::SyntaxError,
+                        return std::unexpected(Error(
+                            ErrorType::SyntaxError,
                             "unclosed parenthese in if condition",
                             "insert `)`",
                             makeSourceLocation(lpToken)));
@@ -210,7 +215,8 @@ namespace Fig
             {
                 if (alternate)
                 {
-                    return std::unexpected(Error(ErrorType::SyntaxError,
+                    return std::unexpected(Error(
+                        ErrorType::SyntaxError,
                         "duplicate else in if stmt",
                         "remove it",
                         elseLocation));
@@ -252,7 +258,8 @@ namespace Fig
 
             if (!match(TokenType::RightParen))
             {
-                return std::unexpected(Error(ErrorType::SyntaxError,
+                return std::unexpected(Error(
+                    ErrorType::SyntaxError,
                     "unclosed parenthese in while condition",
                     "insert ')'",
                     makeSourceLocation(lpToken)));
@@ -289,8 +296,6 @@ namespace Fig
 
     Result<DynArray<Param *>, Error> Parser::parseFnParams()
     {
-        StateProtector p(this, {State::ParsingFnDefStmt});
-
         const Token      &lpToken = consumeToken();
         DynArray<Param *> params;
 
@@ -298,7 +303,8 @@ namespace Fig
         {
             if (isEOF)
             {
-                return std::unexpected(Error(ErrorType::SyntaxError,
+                return std::unexpected(Error(
+                    ErrorType::SyntaxError,
                     "unclosed parenthese in function parameters",
                     "insert ')'",
                     makeSourceLocation(lpToken)));
@@ -353,6 +359,7 @@ namespace Fig
 
     Result<FnDefStmt *, Error> Parser::parseFnDefStmt(bool isPublic)
     {
+        StateProtector p(this, {State::ParsingFnDefStmt});
         SourceLocation location = makeSourceLocation(consumeToken());
 
         if (!currentToken().isIdentifier())
@@ -389,19 +396,49 @@ namespace Fig
             returnType = *result;
         }
 
-        if (currentToken().type != TokenType::LeftBrace)
+        BlockStmt *body = nullptr;
+        if (match(TokenType::DoubleArrow)) // =>
+        {
+            auto result = parseExpression();
+            if (!result)
+            {
+                return std::unexpected(result.error());
+            }
+
+            // if (!match(TokenType::Semicolon)) // ;
+            // {
+            //     return std::unexpected(makeExpectSemicolonError(prevToken()));
+            // }
+
+            if (match(TokenType::Semicolon))
+            {
+                diagnostics.Report(Error(
+                    ErrorType::UnnecessarySemicolon,
+                    "`;` is unnecessary in this context",
+                    "try remove `;`",
+                    makeSourceLocation(prevToken())));
+            }
+
+            Expr       *expr       = *result;
+            ReturnStmt *returnStmt = arena.Allocate<ReturnStmt>(expr, expr->location);
+
+            body = arena.Allocate<BlockStmt>();
+            body->nodes.push_back(returnStmt);
+        }
+        else if (currentToken().type == TokenType::LeftBrace)
+        {
+            auto bodyResult = parseBlockStmt();
+            if (!bodyResult)
+            {
+                return std::unexpected(bodyResult.error());
+            }
+            body = *bodyResult;
+        }
+        else
         {
             return std::unexpected(
-                makeUnexpectTokenError("fn def stmt", "function body '{'", currentToken()));
+                makeUnexpectTokenError("fn def stmt", "function body '=>' / '{'", currentToken()));
         }
-        BlockStmt *body       = nullptr;
-        auto       bodyResult = parseBlockStmt();
-
-        if (!bodyResult)
-        {
-            return std::unexpected(bodyResult.error());
-        }
-        body = *bodyResult;
 
         FnDefStmt *fnDef =
             arena.Allocate<FnDefStmt>(isPublic, name, params, returnType, body, location);
@@ -429,6 +466,127 @@ namespace Fig
         return returnStmt;
     }
 
+    Result<Stmt *, Error> Parser::parseStructDef(bool isPublic)
+    {
+        StateProtector p(this, {State::ParsingStructDef});
+
+        SourceLocation location = makeSourceLocation(consumeToken()); // consume `struct`
+        if (!currentToken().isIdentifier())
+        {
+            return std::unexpected(
+                makeUnexpectTokenError("StructDef", "struct name", currentToken()));
+        }
+
+        const Token  &name_tok = consumeToken(); // consume name
+        const String &name     = srcManager.GetSub(name_tok.index, name_tok.length);
+
+        StructDefStmt *stDef = arena.Allocate<StructDefStmt>();
+
+        if (currentToken().type == TokenType::Less) // <
+        {
+            auto result = parseTypeParameters();
+            if (!result)
+            {
+                return std::unexpected(result.error());
+            }
+
+            stDef->typeParameters = *result;
+        }
+
+        if (!match(TokenType::LeftBrace))
+        {
+            return std::unexpected(
+                makeUnexpectTokenError("StructDef", "lbrace '{'", currentToken()));
+        }
+
+        const Token &lb_tok = prevToken(); // `{`
+
+        while (true)
+        {
+            if (isEOF)
+            {
+                return std::unexpected(Error(
+                    ErrorType::SyntaxError,
+                    "unclosed braces in struct def",
+                    "insert '}'",
+                    makeSourceLocation(lb_tok)));
+            }
+            if (match(TokenType::RightBrace))
+            {
+                break;
+            }
+
+            // (public) field_name (: Type) (= expr) / (:= expr)
+
+            bool isPublic = match(TokenType::Public);
+            if (currentToken().isIdentifier())
+            {
+                const Token  &name_tok   = consumeToken();
+                const String &field_name = srcManager.GetSub(name_tok.index, name_tok.length);
+
+                if (match(TokenType::Walrus)) // :=
+                {
+                    auto result = parseExpression();
+                    if (!result)
+                    {
+                        return std::unexpected(result.error());
+                    }
+
+                    stDef->fields.push_back(
+                        StructDefStmt::Field{isPublic, true, field_name, nullptr, *result});
+                }
+                else
+                {
+                    TypeExpr *type     = nullptr;
+                    Expr     *initExpr = nullptr;
+
+                    if (match(TokenType::Colon)) // :
+                    {
+                        auto result = parseTypeExpr();
+                        if (!result)
+                        {
+                            return std::unexpected(result.error());
+                        }
+                        type = *result;
+                    }
+
+                    if (match(TokenType::Assign))
+                    {
+                        auto result = parseExpression();
+                        if (!result)
+                        {
+                            return std::unexpected(result.error());
+                        }
+                        initExpr = *result;
+                    }
+                    stDef->fields.push_back(
+                        StructDefStmt::Field{isPublic, false, field_name, type, initExpr});
+                }
+                if (!match(TokenType::Semicolon))
+                {
+                    return std::unexpected(makeExpectSemicolonError());
+                }
+            }
+            else if (currentToken().type == TokenType::Function)
+            {
+                auto result = parseFnDefStmt(isPublic);
+                if (!result)
+                {
+                    return result;
+                }
+
+                stDef->methods.push_back(*result);
+            }
+            else
+            {
+                return std::unexpected(
+                    makeUnexpectTokenError("StructDef", "field or method", currentToken()));
+            }
+        }
+
+        return stDef;
+    }
+
     Result<Stmt *, Error> Parser::parseStatement()
     {
         StateProtector p(this, {State::Standby});
@@ -444,6 +602,11 @@ namespace Fig
             if (currentToken().type == TokenType::Function)
             {
                 return parseFnDefStmt(true);
+            }
+
+            if (currentToken().type == TokenType::Struct)
+            {
+                return parseStructDef(true);
             }
 
             return std::unexpected(
@@ -470,9 +633,14 @@ namespace Fig
             return parseWhileStmt();
         }
 
-        if (currentToken().type == TokenType::Function)
+        if (currentToken().type == TokenType::Function && peekToken().isIdentifier())
         {
             return parseFnDefStmt(false);
+        }
+
+        if (currentToken().type == TokenType::Struct)
+        {
+            return parseStructDef(false);
         }
 
         if (currentToken().type == TokenType::Return)
@@ -505,6 +673,15 @@ namespace Fig
         if (isEOF)
         {
             return nullptr;
+        }
+
+        if (currentToken().type == TokenType::Semicolon)
+        {
+            return std::unexpected(Error(
+                ErrorType::SyntaxError,
+                "null statement is not allowed here",
+                "remove `;`",
+                makeSourceLocation(currentToken())));
         }
 
         const auto &expr_result = parseExpression();

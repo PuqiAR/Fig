@@ -12,7 +12,6 @@
 #include <limits>
 #include <system_error>
 
-
 namespace Fig
 {
     static Result<Value, Error> parsePhysicalNumber(const String &raw, const SourceLocation &loc)
@@ -94,7 +93,9 @@ namespace Fig
                         parsePhysicalNumber(manager.GetSub(tok.index, tok.length), l->location);
                     if (!vRes)
                         return std::unexpected(vRes.error());
-                    emit(Op::iABx(OpCode::LoadK, r, static_cast<uint16_t>(addConstant(*vRes))), &l->location);
+                    emit(
+                        Op::iABx(OpCode::LoadK, r, static_cast<uint16_t>(addConstant(*vRes))),
+                        &l->location);
                 }
                 else if (tok.type == TokenType::LiteralString)
                 {
@@ -129,7 +130,9 @@ namespace Fig
                     // 仅在被强制指定目标（如参数装填）时发射搬运指令
                     if (target != sym->index)
                     {
-                        emit(Op::iABx(OpCode::Mov, target, static_cast<uint16_t>(sym->index)), &i->location);
+                        emit(
+                            Op::iABx(OpCode::Mov, target, static_cast<uint16_t>(sym->index)),
+                            &i->location);
                     }
                     return target;
                 }
@@ -137,7 +140,9 @@ namespace Fig
                 Register r = (target == NO_REG) ? *allocateReg(i->location) : target;
                 if (sym->location == SymbolLocation::Upvalue)
                 {
-                    emit(Op::iABC(OpCode::GetUpval, r, static_cast<uint8_t>(sym->index), 0), &i->location);
+                    emit(
+                        Op::iABC(OpCode::GetUpval, r, static_cast<uint8_t>(sym->index), 0),
+                        &i->location);
                 }
                 else if (sym->location == SymbolLocation::Global)
                 {
@@ -176,10 +181,12 @@ namespace Fig
                     {
                         isGlobalFastCall = true;
                         int protoIdx     = id->resolvedSymbol->index;
-                        emit(Op::iABC(OpCode::FastCall,
-                                 static_cast<uint8_t>(protoIdx),
-                                 baseReg,
-                                 static_cast<uint8_t>(c->args.args.size())),
+                        emit(
+                            Op::iABC(
+                                OpCode::FastCall,
+                                static_cast<uint8_t>(protoIdx),
+                                baseReg,
+                                static_cast<uint8_t>(c->args.args.size())),
                             &c->location);
                     }
                 }
@@ -193,10 +200,12 @@ namespace Fig
                         return std::unexpected(r_fn.error());
 
                     // 使用动态 Call 指令，RA 是指向堆闭包的寄存器
-                    emit(Op::iABC(OpCode::Call,
-                             *r_fn,
-                             baseReg,
-                             static_cast<uint8_t>(c->args.args.size())),
+                    emit(
+                        Op::iABC(
+                            OpCode::Call,
+                            *r_fn,
+                            baseReg,
+                            static_cast<uint8_t>(c->args.args.size())),
                         &c->location);
                 }
 
@@ -240,18 +249,25 @@ namespace Fig
                         Symbol *sym = lid->resolvedSymbol;
                         if (sym->location == SymbolLocation::Local)
                         {
-                            emit(Op::iABx(OpCode::Mov, static_cast<Register>(sym->index), *r_val), &lid->location);
+                            emit(
+                                Op::iABx(OpCode::Mov, static_cast<Register>(sym->index), *r_val),
+                                &lid->location);
                         }
                         else if (sym->location == SymbolLocation::Upvalue)
                         {
-                            emit(Op::iABC(
-                                OpCode::SetUpval, *r_val, static_cast<Register>(sym->index), 0), &lid->location);
+                            emit(
+                                Op::iABC(
+                                    OpCode::SetUpval, *r_val, static_cast<Register>(sym->index), 0),
+                                &lid->location);
                         }
                         else
                         {
-                            emit(Op::iABx(OpCode::SetGlobal,
-                                *r_val,
-                                static_cast<uint16_t>(getGlobalID(lid->name))), &lid->location);
+                            emit(
+                                Op::iABx(
+                                    OpCode::SetGlobal,
+                                    *r_val,
+                                    static_cast<uint16_t>(getGlobalID(lid->name))),
+                                &lid->location);
                         }
                     }
                     return r_val;
@@ -290,7 +306,8 @@ namespace Fig
                     case BinaryOperator::GreaterEqual: op = OpCode::GreaterEqual; break;
                     case BinaryOperator::LessEqual: op = OpCode::LessEqual; break;
                     default:
-                        return std::unexpected(Error(ErrorType::InternalError,
+                        return std::unexpected(Error(
+                            ErrorType::InternalError,
                             "unsupported binary operator",
                             "",
                             in->location));
@@ -316,6 +333,65 @@ namespace Fig
                 emit(Op::iABC(op, r_d, *r_l, *r_r), &in->location);
 
                 return r_d;
+            }
+
+            case AstType::LambdaExpr: {
+                auto l = static_cast<LambdaExpr *>(expr);
+
+                Proto *proto = new Proto;
+                proto->name  = l->toString();
+
+                FuncState  fs(proto, current);
+                FuncState *old = current;
+                current        = &fs;
+
+                if (l->isExprBody)
+                {
+                    auto result = compileExpr(static_cast<Expr *>(l->body));
+                    if (!result)
+                    {
+                        return result;
+                    }
+
+                    emit(Op::iABC(OpCode::Return, *result, 0, 0), &l->location);
+                }
+                else
+                {
+                    auto result = compileStmt(static_cast<BlockStmt *>(l->body));
+                    if (!result)
+                    {
+                        return std::unexpected(result.error());
+                    }
+                    auto _r = allocateReg(l->body->location);
+                    if (!_r)
+                    {
+                        return _r;
+                    }
+
+                    Register r = *_r;
+                    emit(Op::iABC(OpCode::LoadNull, r, 0, 0), &l->body->location);
+                    emit(Op::iABC(OpCode::Return, r, 0, 0), &l->body->location);
+                }
+
+                int protoIndex = (int) module->protos.size();
+                module->protos.push_back(proto);
+
+                current = old;
+                if (target == NO_REG)
+                {
+                    auto _r = allocateReg(expr->location);
+                    if (!_r)
+                    {
+                        return _r;
+                    }
+                    emit(Op::iABx(OpCode::LoadFn, *_r, protoIndex), &l->body->location);
+                    return *_r;
+                }
+                else
+                {
+                    emit(Op::iABx(OpCode::LoadFn, target, protoIndex), &l->body->location);
+                }
+                return target;
             }
 
             default: break;

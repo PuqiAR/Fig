@@ -11,7 +11,7 @@
 
 namespace Fig
 {
-    struct ObjectInitExpr final : public Expr
+    struct NewExpr final : public Expr
     {
         struct Arg
         {
@@ -21,20 +21,20 @@ namespace Fig
         TypeExpr     *typeExpr;
         DynArray<Arg> args;
 
-        ObjectInitExpr()
+        NewExpr()
         {
-            type = AstType::ObjectInitExpr;
+            type = AstType::NewExpr;
         }
-        ObjectInitExpr(TypeExpr *_te, DynArray<Arg> _args, SourceLocation _loc) :
+        NewExpr(TypeExpr *_te, DynArray<Arg> _args, SourceLocation _loc) :
             typeExpr(_te), args(std::move(_args))
         {
-            type     = AstType::ObjectInitExpr;
+            type     = AstType::NewExpr;
             location = std::move(_loc);
         }
 
         virtual String toString() const override
         {
-            String res = "<ObjectInitExpr 'new " + typeExpr->toString() + "{";
+            String res = "<NewExpr 'new " + typeExpr->toString() + "{";
             for (size_t i = 0; i < args.size(); ++i)
             {
                 if (!args[i].name.empty())

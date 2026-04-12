@@ -20,7 +20,12 @@ void runTest(const std::string &path)
     }
 
     Lexer  lexer(source, String(path));
-    Parser parser(lexer, srcManager, String(path));
+
+    Diagnostics diagnostics;
+
+    Parser parser(lexer, srcManager, String(path), diagnostics);
+
+    diagnostics.EmitAll(srcManager);
 
     auto pRes = parser.Parse();
     if (!pRes)

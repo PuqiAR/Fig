@@ -9,6 +9,7 @@
 
 #include <Ast/Ast.hpp>
 #include <Deps/Deps.hpp>
+#include <Error/Diagnostics.hpp>
 #include <Error/Error.hpp>
 #include <Lexer/Lexer.hpp>
 #include <Token/Token.hpp>
@@ -32,6 +33,8 @@ namespace Fig
 
         String fileName;
         bool   isEOF = false;
+
+        Diagnostics &diagnostics;
 
         // 惰性获取下一个 Token，跳过注释
         Token nextToken()
@@ -116,12 +119,16 @@ namespace Fig
             enum StateType : std::uint8_t
             {
                 Standby,
+
                 ParsingLiteralExpr,
                 ParsingIdentiExpr,
                 ParsingInfixExpr,
                 ParsingPrefixExpr,
                 ParsingIndexExpr,
                 ParsingCallExpr,
+                ParsingLambdaExpr,
+                ParsingNewExpr,
+
                 ParsingVarDecl,
                 ParsingIf,
                 ParsingWhile,
@@ -129,6 +136,9 @@ namespace Fig
                 ParsingReturn,
                 ParsingBreak,
                 ParsingContinue,
+                ParsingStructDef,
+
+                ParsingTypeParameters,
                 ParsingNamedTypeExpr,
                 ParsingFnTypeExpr,
             } type                               = StateType::Standby;
@@ -138,7 +148,8 @@ namespace Fig
     private:
         const std::unordered_set<TokenType> &getBaseTerminators()
         {
-            static const std::unordered_set<TokenType> baseTerminators = {TokenType::Semicolon,
+            static const std::unordered_set<TokenType> baseTerminators{
+                TokenType::Semicolon,
                 TokenType::RightParen,
                 TokenType::RightBracket,
                 TokenType::RightBrace,
@@ -201,32 +212,55 @@ namespace Fig
         SourceLocation makeSourceLocation(const Token &tok)
         {
             auto [line, column] = srcManager.GetLineColumn(tok.index);
-            // 物理防爆盾：防止因解析错位导致的异常列号引起终端 OOM
+            // 防止因解析错位导致的异常列号引起终端 OOM
             if (column > 5000)
                 column = 1;
-            return SourceLocation(SourcePosition(line, column, tok.length),
+            return SourceLocation(
+                SourcePosition(line, column, tok.length),
                 fileName,
                 "[internal parser]",
                 magic_enum::enum_name(currentState().type).data());
         }
 
-        inline Error makeUnexpectTokenError(const String &stmt, const String &exp, const Token &got)
+        inline Error makeUnexpectTokenError(
+            const String        &stmt,
+            const String        &exp,
+            const Token         &got,
+            std::source_location th_loc = std::source_location::current())
         {
-            return Error(ErrorType::SyntaxError,
+            return Error(
+                ErrorType::SyntaxError,
                 std::format(
                     "expect '{}' in {}, got `{}`", exp, stmt, magic_enum::enum_name(got.type)),
                 "none",
-                makeSourceLocation(got));
+                makeSourceLocation(got),
+                th_loc);
         }
 
-        inline Error makeExpectSemicolonError()
+        inline Error
+        makeExpectSemicolonError(std::source_location th_loc = std::source_location::current())
         {
-            return Error(ErrorType::SyntaxError,
+            return Error(
+                ErrorType::SyntaxError,
                 "expect ';' after statement",
                 "insert ';'",
-                makeSourceLocation(currentToken()));
+                makeSourceLocation(currentToken()),
+                th_loc);
         }
 
+        inline Error makeExpectSemicolonError(
+            const Token &token, std::source_location th_loc = std::source_location::current())
+        {
+            return Error(
+                ErrorType::SyntaxError,
+                "expect ';' after statement",
+                "insert ';'",
+                makeSourceLocation(token),
+                th_loc);
+        }
+
+        Result<decltype(StructDefStmt::typeParameters), Error> parseTypeParameters();
+        
         Result<TypeExpr *, Error> parseTypeExpr();
         Result<TypeExpr *, Error> parseNamedTypeExpr();
         Result<TypeExpr *, Error> parseFnTypeExpr();
@@ -239,6 +273,7 @@ namespace Fig
         Result<Expr *, Error> parseIndexExpr(Expr *);
         Result<Expr *, Error> parseCallExpr(Expr *);
         Result<Expr *, Error> parseNewExpr();
+        Result<Expr *, Error> parseLambdaExpr();
 
         Result<BlockStmt *, Error>       parseBlockStmt();
         Result<VarDecl *, Error>         parseVarDecl(bool);
@@ -255,8 +290,8 @@ namespace Fig
         Result<Stmt *, Error> parseStatement();
 
     public:
-        Parser(Lexer &_lexer, SourceManager &_src, String _file) :
-            lexer(_lexer), srcManager(_src), fileName(std::move(_file))
+        Parser(Lexer &_lexer, SourceManager &_src, String _file, Diagnostics &_diagnostics) :
+            lexer(_lexer), srcManager(_src), fileName(std::move(_file)), diagnostics(_diagnostics)
         {
             pushState(State());
         }

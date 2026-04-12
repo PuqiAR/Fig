@@ -47,9 +47,10 @@ namespace Fig
             type = AstType::CallExpr;
         }
 
-        CallExpr(Expr *_callee, FnCallArgs _args) : callee(_callee), args(std::move(_args))
+        CallExpr(Expr *_callee, FnCallArgs _args, SourceLocation _location) : callee(_callee), args(std::move(_args))
         {
             type = AstType::CallExpr;
+            location = std::move(_location);
         }
 
         virtual String toString() const override

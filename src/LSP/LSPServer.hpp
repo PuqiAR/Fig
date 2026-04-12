@@ -138,14 +138,22 @@ namespace Fig
             manager.LoadFromMemory(sourceCode);
 
             Lexer  lexer(sourceCode, "");
-            Parser parser(lexer, manager, "");
 
-            // 1. 语法检查拦截
+            Diagnostics diagnostics;
+
+            Parser parser(lexer, manager, "", diagnostics);
+
+            //  语法检查拦截
             auto parserResult = parser.Parse();
             if (!parserResult)
             {
                 SendDiagnostics(uri, &parserResult.error());
                 return;
+            }
+
+            for (auto &diag : diagnostics.GetErrors())
+            {
+                SendDiagnostics(uri, &diag);
             }
 
             Program *program = *parserResult;
@@ -160,7 +168,12 @@ namespace Fig
                 return;
             }
 
-            // 3. 一切完美，发射空数组清空过去的错误红线
+            for (auto &diag : analyzer.GetDiagnostics().GetErrors())
+            {
+                SendDiagnostics(uri, &diag);
+            }
+
+            // 一切完美，发射空数组清空过去的错误红线
             SendDiagnostics(uri, nullptr);
         }
     };

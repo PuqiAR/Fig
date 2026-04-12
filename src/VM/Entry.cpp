@@ -54,7 +54,10 @@ namespace Fig::Entry
         const String &source = manager.GetSource();
 
         Lexer  lexer(source, fileName);
-        Parser parser(lexer, manager, fileName);
+
+        Diagnostics diagnostics;
+
+        Parser parser(lexer, manager, fileName, diagnostics);
 
         auto parse_result = parser.Parse();
         if (!parse_result)
@@ -73,7 +76,6 @@ namespace Fig::Entry
             std::exit(1);
         }
 
-        Diagnostics diagnostics;
         Compiler    compiler(manager, diagnostics);
 
         auto compile_result = compiler.Compile(program);
@@ -91,7 +93,6 @@ namespace Fig::Entry
         {
             Disassembler disassembler;
             disassembler.DisassembleModule(compiledModule);
-            return;
         }
 
         VM vm;
@@ -101,6 +102,11 @@ namespace Fig::Entry
         {
             ReportError(execute_result.error(), manager);
             std::exit(1);
+        }
+
+        if (conf.pregs)
+        {
+            vm.PrintRegisters();
         }
 
         delete compiledModule;

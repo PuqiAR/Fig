@@ -24,6 +24,8 @@ namespace Fig
     {
         /* Minor */
         UnusedSymbol = 0,
+        UnnecessarySemicolon,
+        TrailingComma,
 
         /* Medium */
         MayBeNull = 1001,
@@ -51,7 +53,7 @@ namespace Fig
         TooManyLocals,
         TooManyConstants,
         
-        // --- 新增：编译器内部与VM约束 ---
+        // 编译器内部约束
         RegisterOverflow,
         InternalError,
     };

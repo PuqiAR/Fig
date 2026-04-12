@@ -209,7 +209,10 @@ namespace Fig
                 String source(buf);
 
                 Lexer  lexer(buf, fileName);
-                Parser parser(lexer, manager, fileName);
+
+                Diagnostics diagnostics;
+
+                Parser parser(lexer, manager, fileName, diagnostics);
 
                 auto _program = parser.Parse();
                 if (!_program)
@@ -223,13 +226,15 @@ namespace Fig
                 Analyzer analyzer(manager);
                 auto     result = analyzer.Analyze(program);
 
+                analyzer.GetDiagnostics().EmitAll(manager);
+
                 if (!result)
                 {
                     PrintError(result.error(), source);
                     continue;
                 }
 
-                Compiler compiler(manager, analyzer.GetDiagnostics());
+                Compiler compiler(manager, diagnostics);
 
                 auto compile_result = compiler.Compile(program);
                 if (!compile_result)
@@ -237,6 +242,8 @@ namespace Fig
                     PrintError(compile_result.error(), source);
                     continue;
                 }
+
+                diagnostics.EmitAll(manager);
 
                 CompiledModule *compiledModule = *compile_result;
 

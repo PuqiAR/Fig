@@ -13,9 +13,12 @@ namespace Fig
     {
         struct Field
         {
+            bool isPublic;
+            bool typeInfer;
+
             String    name;
             TypeExpr *type;
-            bool      isPublic;
+            Expr *initExpr;
         };
         bool                  isPublic;
         String                name;

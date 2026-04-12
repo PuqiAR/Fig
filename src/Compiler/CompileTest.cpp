@@ -27,7 +27,11 @@ int main()
     }
 
     Lexer  lexer(source, filePath);
-    Parser parser(lexer, sm, filePath);
+
+    Diagnostics diagnostics;
+    Parser parser(lexer, sm, filePath, diagnostics);
+
+    diagnostics.EmitAll(sm);
 
     auto pRes = parser.Parse();
     if (!pRes)

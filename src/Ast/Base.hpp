@@ -29,7 +29,8 @@ namespace Fig
         IndexExpr,
         CallExpr,
         MemberExpr,     // obj.prop
-        ObjectInitExpr, // new Point{}
+        NewExpr, // new Point{}
+        LambdaExpr,
 
         /* Statements */
         ExprStmt,
