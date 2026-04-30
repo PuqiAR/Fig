@@ -75,7 +75,7 @@ namespace Fig
                 stream << std::format("  [{}] {}\n", i, proto->constants[i].ToString());
             }
         }
-        stream << "--- End Disassembly ---";
+        stream << "--- End Disassembly ---\n";
     }
 
     Disassembler::Format Disassembler::GetFormat(OpCode op)

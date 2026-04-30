@@ -1,6 +1,6 @@
 /*!
     @file src/Compiler/ExprCompiler.cpp
-    @brief 表达式编译器实现：引入水位线(Watermark)与零拷贝复用机制
+    @brief 表达式编译器实现：水位线控制Register与零拷贝复用机制
 */
 
 #include <Ast/Expr/CallExpr.hpp>
@@ -19,46 +19,69 @@ namespace Fig
         char buffer[128];
         int  j       = 0;
         bool isFloat = false;
+
         for (size_t i = 0; i < raw.length() && j < 127; ++i)
         {
             char32_t c = raw[i];
             if (c == '_')
                 continue;
+
+            // 检查开头的无效字符
+            if (j == 0 && (c == '.' || c == 'e' || c == 'E'))
+                return std::unexpected(
+                    Error(ErrorType::SyntaxError, "unexpected leading character", "", loc));
+
             if (c == '.' || c == 'e' || c == 'E')
                 isFloat = true;
             buffer[j++] = (char) c;
         }
         buffer[j] = '\0';
 
+        // 检查16进制/2进制前缀
+        bool        isHexOrBin = false;
+        int         base       = 10;
+        const char *start      = buffer;
+
+        if (j >= 2 && buffer[0] == '0')
+        {
+            if (buffer[1] == 'x' || buffer[1] == 'X')
+            {
+                base = 16;
+                start += 2;
+                isHexOrBin = true;
+            }
+            else if (buffer[1] == 'b' || buffer[1] == 'B')
+            {
+                base = 2;
+                start += 2;
+                isHexOrBin = true;
+            }
+        }
+
         if (isFloat)
         {
+            // 如果既有浮点标记又是0x开头，可能是16进制浮点
+            auto fmt =
+                (isHexOrBin && base == 16) ? std::chars_format::hex : std::chars_format::general;
+
             double dVal;
-            auto [ptr, ec] = std::from_chars(buffer, buffer + j, dVal);
-            if (ec != std::errc())
-                return std::unexpected(Error(ErrorType::SyntaxError, "float overflow", "", loc));
+            auto [ptr, ec] = std::from_chars(start, buffer + j, dVal, fmt);
+
+            if (ec != std::errc() || ptr != buffer + j)
+                return std::unexpected(
+                    Error(ErrorType::SyntaxError, "invalid float literal", "", loc));
+
             return Value::FromDouble(dVal);
         }
-        else
+        else if (isHexOrBin)
         {
-            int         base  = 10;
-            const char *start = buffer;
-            if (j > 2 && buffer[0] == '0')
-            {
-                if (buffer[1] == 'x' || buffer[1] == 'X')
-                {
-                    base = 16;
-                    start += 2;
-                }
-                else if (buffer[1] == 'b' || buffer[1] == 'B')
-                {
-                    base = 2;
-                    start += 2;
-                }
-            }
+            // 16进制或2进制整数
             int64_t iVal;
             auto [ptr, ec] = std::from_chars(start, buffer + j, iVal, base);
-            if (ec != std::errc())
-                return std::unexpected(Error(ErrorType::SyntaxError, "integer overflow", "", loc));
+
+            if (ec != std::errc() || ptr != buffer + j)
+                return std::unexpected(
+                    Error(ErrorType::SyntaxError, "integer overflow or invalid literal", "", loc));
 
             if (iVal >= std::numeric_limits<int32_t>::min()
                 && iVal <= std::numeric_limits<int32_t>::max())
@@ -68,6 +91,27 @@ namespace Fig
             else
             {
                 return Value::FromDouble(static_cast<double>(iVal));
+            }
+        }
+        else
+        {
+            // 10进制数字，可能是整数或浮点数
+            double dVal;
+            auto [ptr, ec] = std::from_chars(start, buffer + j, dVal, std::chars_format::general);
+
+            if (ec != std::errc() || ptr != buffer + j)
+                return std::unexpected(
+                    Error(ErrorType::SyntaxError, "invalid number literal", "", loc));
+
+            // 检查是否是整数(没有小数部分且不超出int32范围)
+            if (dVal == std::floor(dVal) && dVal >= std::numeric_limits<int32_t>::min()
+                && dVal <= std::numeric_limits<int32_t>::max())
+            {
+                return Value::FromInt(static_cast<int32_t>(dVal));
+            }
+            else
+            {
+                return Value::FromDouble(dVal);
             }
         }
     }
@@ -287,30 +331,61 @@ namespace Fig
                 OpCode op;
                 switch (in->op)
                 {
-                    case BinaryOperator::Add: op = isInt ? OpCode::IntFastAdd : OpCode::Add; break;
-                    case BinaryOperator::Subtract:
-                        op = isInt ? OpCode::IntFastSub : OpCode::Sub;
+                    case BinaryOperator::Add: {
+                        op = (isInt ? (OpCode::IntFastAdd) : (OpCode::Add));
                         break;
-                    case BinaryOperator::Multiply:
-                        op = isInt ? OpCode::IntFastMul : OpCode::Mul;
+                    }
+                    case BinaryOperator::Subtract: {
+                        op = (isInt ? (OpCode::IntFastSub) : (OpCode::Sub));
                         break;
-                    case BinaryOperator::Divide:
-                        op = isInt ? OpCode::IntFastDiv : OpCode::Div;
+                    }
+                    case BinaryOperator::Multiply: {
+                        op = (isInt ? (OpCode::IntFastMul) : (OpCode::Mul));
                         break;
-                    case BinaryOperator::Modulo: op = OpCode::Mod; break;
-                    case BinaryOperator::BitXor: op = OpCode::BitXor; break;
-                    case BinaryOperator::Equal: op = OpCode::Equal; break;
-                    case BinaryOperator::NotEqual: op = OpCode::NotEqual; break;
-                    case BinaryOperator::Greater: op = OpCode::Greater; break;
-                    case BinaryOperator::Less: op = OpCode::Less; break;
-                    case BinaryOperator::GreaterEqual: op = OpCode::GreaterEqual; break;
-                    case BinaryOperator::LessEqual: op = OpCode::LessEqual; break;
-                    default:
+                    }
+                    case BinaryOperator::Divide: {
+                        op = (isInt ? (OpCode::IntFastDiv) : (OpCode::Div));
+                        break;
+                    }
+                    case BinaryOperator::Modulo: {
+                        op = OpCode::Mod;
+                        break;
+                    }
+                    case BinaryOperator::BitXor: {
+                        op = OpCode::BitXor;
+                        break;
+                    }
+                    case BinaryOperator::Equal: {
+                        op = OpCode::Equal;
+                        break;
+                    }
+                    case BinaryOperator::NotEqual: {
+                        op = OpCode::NotEqual;
+                        break;
+                    }
+                    case BinaryOperator::Greater: {
+                        op = OpCode::Greater;
+                        break;
+                    }
+                    case BinaryOperator::Less: {
+                        op = OpCode::Less;
+                        break;
+                    }
+                    case BinaryOperator::GreaterEqual: {
+                        op = OpCode::GreaterEqual;
+                        break;
+                    }
+                    case BinaryOperator::LessEqual: {
+                        op = OpCode::LessEqual;
+                        break;
+                    }
+                    default: {
                         return std::unexpected(Error(
                             ErrorType::InternalError,
                             "unsupported binary operator",
                             "",
                             in->location));
+                    }
                 }
 
                 // 释放左右操作数产生的临时寄存器

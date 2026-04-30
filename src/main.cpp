@@ -19,11 +19,13 @@ int main(int argc, char **argv)
 
     ArgParser::ArgumentParser argparser("Fig", "Fig Toolchain");
 
+    argparser.AddFlag('r', "repl");
     argparser.AddFlag('h', "help").Help("Print the help message");
     argparser.AddFlag('v', "version").Help("Show toolchain version");
     argparser.AddFlag("license").Help("Print the license text");
     argparser.AddFlag("dump").Help("Dump the bytecode");
     argparser.AddFlag("pregs").Help("Print vm non-null registers");
+    argparser.AddFlag("time").Help("Print the execution time");
 
     auto res = argparser.Parse(argc, argv);
     if (!res)
@@ -34,11 +36,13 @@ int main(int argc, char **argv)
 
     auto &args = *res;
 
+    bool runRepl     = args.HasFlag("repl");
     bool showHelp    = args.HasFlag("help");
     bool showVersion = args.HasFlag("version");
     bool showLicense = args.HasFlag("license");
     bool dump        = args.HasFlag("dump");
     bool pregs       = args.HasFlag("pregs");
+    bool time        = args.HasFlag("time");
 
     if (showHelp)
     {
@@ -72,6 +76,11 @@ int main(int argc, char **argv)
         return 0;
     }
 
+    if (runRepl)
+    {
+        return Entry::RunRepl();
+    }
+
     if (posSize > 1)
     {
         err << "Error: Too more positionals, expect 1. Use Fig [Fig source code file (.fig)]\n";
@@ -83,7 +92,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    Entry::Config config{.mode = Entry::Config::Normal, .dump = dump, .pregs = pregs};
+    Entry::Config config{.mode = Entry::Config::Normal, .dump = dump, .pregs = pregs, .time = time};
 
     const String &path = positionals.front();
     Entry::RunFromPath(path, config);

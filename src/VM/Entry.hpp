@@ -18,6 +18,9 @@ namespace Fig::Entry
         } mode;
         bool dump;
         bool pregs;
+        bool time;
     };
+
     void RunFromPath(const String &, const Config &conf);
+    std::uint32_t RunRepl();
 };

@@ -329,7 +329,7 @@ namespace Fig
                     Op::iAsBx(OpCode::Exit_MaxRecursionDepthExceeded, 0, 0);
                 return &POISON_MAX_RECURSION_DEPTH_EXCEED_INST;
             }
-
+            [[likely]]
             *currentFrame = CallFrame{nullptr, proto, proto->code.data(), base};
             return currentFrame->ip;
         }
@@ -343,7 +343,7 @@ namespace Fig
                     Op::iAsBx(OpCode::Exit_MaxRecursionDepthExceeded, 0, 0);
                 return &POISON_MAX_RECURSION_DEPTH_EXCEED_INST;
             }
-
+            [[likely]]
             *currentFrame = CallFrame{closure, closure->proto, closure->proto->code.data(), base};
             return currentFrame->ip;
         }

@@ -38,15 +38,18 @@ namespace Fig
 
         void PrintInfo()
         {
-            out << std::format("Fig {}, copyright (c) 2025-2026 PuqiAR, under the {} License\n",
+            out << std::format(
+                "Fig {}, copyright (c) 2025-2026 PuqiAR, under the {} License\n",
                 Core::VERSION,
                 Core::LICENSE);
-            out << std::format("Build time: {} [{} x{} on {}]\n",
+            out << std::format(
+                "Build time: {} [{} x{} on {}]\n",
                 Core::COMPILE_TIME,
                 Core::COMPILER,
                 Core::ARCH,
                 Core::PLATFORM);
             out << "Type '#exit' to exit, '#clear' to clear the the screen, '#license' to see the full license, '#logo' to see a GREAT logo\n";
+            out << '\n';
         }
 
         void ClearConsole()
@@ -146,17 +149,58 @@ namespace Fig
                 ++rline;
             }
         }
+        // void PrintError(const Error &error, const String &source)
+        // {
+        //     err << "Oops! An error occurred!";
+        //     err << "🔥 " << 'E' << static_cast<int>(error.type) << ": " << error.message << '\n';
+        //     err << "Line " << rline << ", `" << source << "`\n";
+        //     err << "Suggestion: " << error.suggestion << '\n';
+        //     err << std::format(
+        //         "Thrower: {} ({}:{}:{})\n",
+        //         error.thrower_loc.function_name(),
+        //         error.thrower_loc.file_name(),
+        //         error.thrower_loc.line(),
+        //         error.thrower_loc.column());
+        // }
+
         void PrintError(const Error &error, const String &source)
         {
-            err << "Oops! An error occurred!";
-            err << "🔥 " << 'E' << static_cast<int>(error.type) << ": " << error.message << '\n';
-            err << "Line " << rline << ", `" << source << "`\n";
-            err << "Suggestion: " << error.suggestion << '\n';
-            err << std::format("Thrower: {} ({}:{}:{})\n",
-                error.thrower_loc.function_name(),
-                error.thrower_loc.file_name(),
-                error.thrower_loc.line(),
-                error.thrower_loc.column());
+            static constexpr const char *MinorColor    = "\033[38;2;138;227;198m";
+            static constexpr const char *MediumColor   = "\033[38;2;255;199;95m";
+            static constexpr const char *CriticalColor = "\033[38;2;255;107;107m";
+
+            namespace TC      = TerminalColors;
+            std::ostream &err = CoreIO::GetStdErr();
+
+            uint8_t level = ErrorLevel(error.type);
+            // const char *level_name = (level == 1 ? "Minor" : (level == 2 ? "Medium" :
+            // "Critical"));
+            const char *const &level_color =
+                (level == 1 ? MinorColor : (level == 2 ? MediumColor : CriticalColor));
+
+            err << "\n";
+            err << "🔥 "
+                << level_color
+                //<< '(' << level_name << ')'
+                << 'E' << static_cast<int>(error.type) << TC::Reset << ": " << level_color
+                << ErrorTypeToString(error.type) << TC::Reset << '\n';
+
+            const SourceLocation &location = error.location;
+
+            err << TC::DarkGray << "  ┌─> Fn " << TC::Cyan << '\'' << location.packageName << '.'
+                << location.functionName << '\'' << " " << location.fileName << " (" << TC::DarkGray
+                << location.sp.line << ":" << location.sp.column << TC::Cyan << ')' << TC::Reset
+                << '\n';
+            err << TC::DarkGray << "  │" << '\n' << "  │" << TC::Reset << '\n';
+            err << TC::DarkGray << "  └─ " << TC::Reset;
+            err << source << "\n";
+
+            err << "\n";
+            err << "❓ " << TC::DarkGray << "Thrower: " << error.thrower_loc.function_name() << " ("
+                << error.thrower_loc.file_name() << ":" << error.thrower_loc.line() << ")"
+                << TC::Reset << "\n";
+            err << "💡 " << TC::Blue << "Suggestion: " << error.suggestion << TC::Reset;
+            err << '\n';
         }
 
         unsigned int Start() // exit code: unsigned int
@@ -208,7 +252,7 @@ namespace Fig
 
                 String source(buf);
 
-                Lexer  lexer(buf, fileName);
+                Lexer lexer(buf, fileName);
 
                 Diagnostics diagnostics;
 
