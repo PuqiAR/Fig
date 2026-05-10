@@ -15,6 +15,10 @@ elseif is_plat("windows") then
     add_ldflags("-Wl,--stack,268435456")
 end
 
+if is_mode("release") then
+    set_optimize("fastest")
+end
+
 set_languages("c++23")
 add_includedirs("src")
 

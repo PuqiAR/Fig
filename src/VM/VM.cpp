@@ -209,8 +209,9 @@ namespace Fig
                 "none",
                 *currentFrame->proto->locations[ipIdx]));
         }
-        else
+        else [[likely]]
         {
+
             Object *obj = callee.AsObject();
             if (!obj->isFunction())
             {
