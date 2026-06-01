@@ -1,5 +1,7 @@
 # Fig
 
+## tmd赶工代码质量太差了暑假我要重构
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./Logo/LogoDark.svg">
   <img src="./Logo/Logo.svg" alt="Fig Logo" width="200">
