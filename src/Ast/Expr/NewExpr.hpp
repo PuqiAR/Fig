@@ -18,14 +18,14 @@ namespace Fig
             String name;
             Expr  *value;
         };
-        TypeExpr     *typeExpr;
+        Expr *typeExpr;
         DynArray<Arg> args;
 
         NewExpr()
         {
             type = AstType::NewExpr;
         }
-        NewExpr(TypeExpr *_te, DynArray<Arg> _args, SourceLocation _loc) :
+        NewExpr(Expr *_te, DynArray<Arg> _args, SourceLocation _loc) :
             typeExpr(_te), args(std::move(_args))
         {
             type     = AstType::NewExpr;

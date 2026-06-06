@@ -31,6 +31,8 @@ namespace Fig
         MemberExpr,     // obj.prop
         NewExpr, // new Point{}
         LambdaExpr,
+        TernaryExpr,    // cond ? then : else
+        PostfixExpr,     // expr++ / expr--
 
         /* Statements */
         ExprStmt,
@@ -45,12 +47,16 @@ namespace Fig
         ReturnStmt,
         BreakStmt,
         ContinueStmt,
+        ForStmt,        // for loop
+        ImportStmt,     // import
 
         /* Type Expressions */
         TypeExpr,
-        NamedTypeExpr,
-        NullableTypeExpr,
+        NamedTypeExpr,   // 废弃，用 IdentiExpr/MemberExpr/ApplyExpr 替代
+        NullableTypeExpr, // 废弃，用 NullableExpr 替代
         FnTypeExpr,
+        ApplyExpr,      // 泛型实例化: List<Int>
+        NullableExpr,   // 可空后缀: Int?
     };
 
     struct AstNode
@@ -60,15 +66,6 @@ namespace Fig
 
         virtual String toString() const = 0;
         virtual ~AstNode() {};
-    };
-
-    struct TypeExpr : public AstNode
-    {
-        TypeExpr()
-        {
-            type = AstType::TypeExpr;
-        }
-        virtual ~TypeExpr() = default;
     };
 
     struct Expr : public AstNode
@@ -114,6 +111,57 @@ namespace Fig
         virtual String toString() const override
         {
             return "<BlockStmt>";
+        }
+    };
+
+    // --- Type Expressions (inherit Expr — 类型即值) ---
+
+    struct TypeExpr : public Expr
+    {
+        TypeExpr() { type = AstType::TypeExpr; }
+        virtual ~TypeExpr() = default;
+    };
+
+    // ApplyExpr: 泛型实例化，List<Int> → ApplyExpr(base, [Int])
+    struct ApplyExpr final : public Expr
+    {
+        Expr           *base; // 基础类型表达式
+        DynArray<Expr *> args; // 泛型参数
+
+        ApplyExpr() { type = AstType::ApplyExpr; }
+        ApplyExpr(Expr *_base, DynArray<Expr *> _args, SourceLocation _loc) :
+            base(_base), args(std::move(_args))
+        {
+            type     = AstType::ApplyExpr;
+            location = std::move(_loc);
+        }
+        virtual String toString() const override
+        {
+            String s = base->toString() + "<";
+            for (size_t i = 0; i < args.size(); ++i)
+            {
+                if (i) s += ", ";
+                s += args[i]->toString();
+            }
+            s += ">";
+            return s;
+        }
+    };
+
+    // NullableExpr: 可空后缀 Int? → NullableExpr(Int)
+    struct NullableExpr final : public Expr
+    {
+        Expr *inner;
+
+        NullableExpr() { type = AstType::NullableExpr; }
+        NullableExpr(Expr *_inner, SourceLocation _loc) : inner(_inner)
+        {
+            type     = AstType::NullableExpr;
+            location = std::move(_loc);
+        }
+        virtual String toString() const override
+        {
+            return inner->toString() + "?";
         }
     };
 } // namespace Fig

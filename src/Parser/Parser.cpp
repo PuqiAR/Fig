@@ -15,12 +15,16 @@ namespace Fig
         
         while (currentToken().type != TokenType::EndOfFile)
         {
+            if (lexerError)
+            {
+                return std::unexpected(*lexerError);
+            }
             auto result = parseStatement();
             if (!result)
             {
                 return std::unexpected(result.error());
             }
-            
+
             Stmt *stmt = *result;
             if (stmt)
             {

@@ -1,6 +1,6 @@
 /*!
     @file src/Compiler/StmtCompiler.cpp
-    @brief 语句编译器实现：实装水位线机制，彻底消灭硬编码寄存器释放
+    @brief 语句编译
 */
 
 #include <Ast/Stmt/FnDefStmt.hpp>
@@ -35,7 +35,7 @@ namespace Fig
                 auto *v = static_cast<VarDecl *>(stmt);
                 if (current->enclosing == nullptr) // 处理全局变量
                 {
-                    Register mark   = current->freereg; // 记录水位线
+                    Register mark   = current->freereg; // mark
                     auto     regRes = compileExpr(v->initExpr);
                     if (!regRes)
                         return std::unexpected(regRes.error());
@@ -74,7 +74,7 @@ namespace Fig
                     Proto *newProto        = new Proto();
                     newProto->name         = f->name;
                     newProto->numParams    = static_cast<uint8_t>(f->params.size());
-                    newProto->maxRegisters = newProto->numParams; // 同步水位线
+                    newProto->maxRegisters = newProto->numParams; // sync
 
                     f->protoIndex = static_cast<int>(module->protos.size());
                     module->protos.push_back(newProto);
@@ -141,7 +141,7 @@ namespace Fig
                 auto         *i = static_cast<IfStmt *>(stmt);
                 DynArray<int> exitJumps;
 
-                Register mark   = current->freereg; // 记录水位线
+                Register mark   = current->freereg; // mark
                 auto     r_cond = compileExpr(i->cond);
                 if (!r_cond)
                     return std::unexpected(r_cond.error());
@@ -204,7 +204,7 @@ namespace Fig
                 auto *w        = static_cast<WhileStmt *>(stmt);
                 int   startIdx = static_cast<int>(current->proto->code.size());
 
-                Register mark   = current->freereg; // 记录水位线
+                Register mark   = current->freereg; // mark
                 auto     r_cond = compileExpr(w->cond);
                 if (!r_cond)
                     return std::unexpected(r_cond.error());
@@ -228,7 +228,7 @@ namespace Fig
 
             case AstType::ReturnStmt: {
                 auto    *rs   = static_cast<ReturnStmt *>(stmt);
-                Register mark = current->freereg; // 记录水位线
+                Register mark = current->freereg; // mark
                 Register retReg;
 
                 if (rs->value)
@@ -253,7 +253,7 @@ namespace Fig
             }
 
             case AstType::ExprStmt: {
-                Register mark = current->freereg; // 记录水位线
+                Register mark = current->freereg; // mark
                 auto     reg  = compileExpr(static_cast<ExprStmt *>(stmt)->expr);
                 if (!reg)
                     return std::unexpected(reg.error());

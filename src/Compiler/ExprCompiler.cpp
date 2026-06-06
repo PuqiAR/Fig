@@ -1,6 +1,6 @@
 /*!
     @file src/Compiler/ExprCompiler.cpp
-    @brief 表达式编译器实现：水位线控制Register与零拷贝复用机制
+    @brief 表达式编译
 */
 
 #include <Ast/Expr/CallExpr.hpp>
@@ -167,7 +167,7 @@ namespace Fig
 
                 if (sym->location == SymbolLocation::Local)
                 {
-                    // 零拷贝直读：如果是临时求值，直接返回变量的物理槽位，禁止产生副本
+                    // no-copy for temp eval
                     if (target == NO_REG)
                         return static_cast<Register>(sym->index);
 
@@ -253,7 +253,7 @@ namespace Fig
                         &c->location);
                 }
 
-                // 回滚水位线, 释放传参时的临时占用
+                // free arg temps
                 current->freereg = mark;
 
                 // 目若 target 未指定，allocateReg 将复用 baseReg，实现零开销回写
@@ -317,7 +317,7 @@ namespace Fig
                     return r_val;
                 }
 
-                Register mark = current->freereg; // 记录水位线
+                Register mark = current->freereg; // mark
 
                 auto r_l = compileExpr(in->left);
                 if (!r_l)

@@ -678,7 +678,7 @@ namespace Fig
         return idx;
     }
 
-    Result<Type, Error> Analyzer::resolveTypeExpr(TypeExpr *texpr)
+    Result<Type, Error> Analyzer::resolveTypeExpr(Expr *texpr)
     {
         if (!texpr)
             return typeCtx.GetBasic(TypeTag::Any);

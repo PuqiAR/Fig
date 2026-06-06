@@ -32,7 +32,7 @@ namespace Fig
         // 核心递归查找：解决跨越函数边界的捕获问题
         Result<Symbol*, Error> resolveSymbolInternal(const String &name, const SourceLocation &loc, Scope* startScope);
 
-        Result<Type, Error> resolveTypeExpr(TypeExpr *texpr);
+        Result<Type, Error> resolveTypeExpr(Expr *texpr);
         Result<void, Error> pass1(Program *prog);
         Result<void, Error> resolveTypes(Program *prog); 
         Result<void, Error> checkBodies(Program *prog);  

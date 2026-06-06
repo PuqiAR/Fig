@@ -1,8 +1,8 @@
 /*!
     @file src/Parser/TypeExprParser.cpp
-    @brief 类型表达式解析器实现：支持泛型与空安全
+    @brief 类型表达式解析器实现 — 类型即值，产生 Expr* 而非 TypeExpr*
     @author PuqiAR (im@puqiar.top)
-    @date 2026-03-08
+    @date 2026-06-06
 */
 
 #include <Parser/Parser.hpp>
@@ -49,38 +49,51 @@ namespace Fig
         return tp;
     }
 
-    // 解析基础命名类型与泛型: List<Int>
-    Result<TypeExpr *, Error> Parser::parseNamedTypeExpr()
+    
+    
+    Result<Expr *, Error> Parser::parseNamedTypeExpr()
     {
         StateProtector p(this, {State::ParsingNamedTypeExpr});
-        SourceLocation location = makeSourceLocation(currentToken());
 
-        DynArray<String> path;
-        while (true)
+        
+        if (!currentToken().isIdentifier())
         {
-            const Token  &tok  = consumeToken();
-            const String &name = srcManager.GetSub(tok.index, tok.length);
-            path.push_back(name);
-
-            if (match(TokenType::Dot))
-            {
-                if (!currentToken().isIdentifier())
-                    return std::unexpected(
-                        makeUnexpectTokenError("Type", "identifier", currentToken()));
-            }
-            else
-                break;
+            return std::unexpected(
+                makeUnexpectTokenError("TypeExpr", "type name", currentToken()));
         }
 
-        DynArray<TypeExpr *> arguments;
-        if (match(TokenType::Less)) // `<`
+        const Token  &firstTok  = consumeToken();
+        SourceLocation firstLoc = makeSourceLocation(firstTok);
+        const String &firstName = srcManager.GetSub(firstTok.index, firstTok.length);
+
+        IdentiExpr *ident = arena.Allocate<IdentiExpr>(firstName, firstLoc);
+        Expr       *base  = ident;
+
+        // a.b.c
+        while (match(TokenType::Dot))
         {
+            if (!currentToken().isIdentifier())
+            {
+                return std::unexpected(
+                    makeUnexpectTokenError("TypeExpr", "identifier after `.`", currentToken()));
+            }
+            const Token  &tok  = consumeToken();
+            const String &name = srcManager.GetSub(tok.index, tok.length);
+            SourceLocation loc = makeSourceLocation(tok);
+            base = arena.Allocate<MemberExpr>(base, name, loc);
+        }
+
+        // generic args
+        if (match(TokenType::Less))
+        {
+            DynArray<Expr *> args;
+
             while (true)
             {
                 auto result = parseTypeExpr();
                 if (!result)
                     return std::unexpected(result.error());
-                arguments.push_back(*result);
+                args.push_back(*result);
 
                 if (match(TokenType::Greater))
                     break; // `>`
@@ -88,12 +101,14 @@ namespace Fig
                     return std::unexpected(
                         makeUnexpectTokenError("TypeArgs", "'>' or ','", currentToken()));
             }
+
+            base = arena.Allocate<ApplyExpr>(base, std::move(args), firstLoc);
         }
 
-        return arena.Allocate<NamedTypeExpr>(path, arguments, location);
+        return base;
     }
 
-    Result<TypeExpr *, Error> Parser::parseFnTypeExpr()
+    Result<Expr *, Error> Parser::parseFnTypeExpr()
     {
         StateProtector p(this, {State::ParsingFnTypeExpr});
         SourceLocation location = makeSourceLocation(consumeToken()); // consume `func`
@@ -103,7 +118,7 @@ namespace Fig
                 makeUnexpectTokenError("FnTypeExpr", "lparen (", currentToken()));
         }
 
-        DynArray<TypeExpr *> paraTypes;
+        DynArray<Expr *> paraTypes;
 
         while (true)
         {
@@ -130,7 +145,7 @@ namespace Fig
             }
         }
 
-        TypeExpr *returnType = nullptr;
+        Expr *returnType = nullptr;
 
         if (match(TokenType::RightArrow)) // ->
         {
@@ -146,10 +161,10 @@ namespace Fig
         return fnTypeExpr;
     }
 
-    // 解析主入口: 处理 `?` 后缀
-    Result<TypeExpr *, Error> Parser::parseTypeExpr()
+    
+    Result<Expr *, Error> Parser::parseTypeExpr()
     {
-        TypeExpr *base = nullptr;
+        Expr *base = nullptr;
 
         if (currentToken().isIdentifier())
         {
@@ -174,10 +189,10 @@ namespace Fig
             return std::unexpected(makeUnexpectTokenError("TypeExpr", "name", currentToken()));
         }
 
-        // type (?)
+        // nullable
         if (currentToken().type == TokenType::Question) // ?
         {
-            base = arena.Allocate<NullableTypeExpr>(
+            base = arena.Allocate<NullableExpr>(
                 base, makeSourceLocation(consumeToken())); // consume `?`
         }
 

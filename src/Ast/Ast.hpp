@@ -16,6 +16,8 @@
 #include <Ast/Expr/MemberExpr.hpp>
 #include <Ast/Expr/NewExpr.hpp>
 #include <Ast/Expr/PrefixExpr.hpp>
+#include <Ast/Expr/TernaryExpr.hpp>
+#include <Ast/Expr/PostfixExpr.hpp>
 
 #include <Ast/Stmt/ControlFlowStmts.hpp>
 #include <Ast/Stmt/ExprStmt.hpp>
@@ -24,6 +26,8 @@
 #include <Ast/Stmt/ImplStmt.hpp>
 #include <Ast/Stmt/InterfaceDefStmt.hpp>
 #include <Ast/Stmt/StructDefStmt.hpp>
+#include <Ast/Stmt/ForStmt.hpp>
+#include <Ast/Stmt/ImportStmt.hpp>
 #include <Ast/Stmt/VarDecl.hpp>
 #include <Ast/Stmt/WhileStmt.hpp>
 #include <Ast/TypeExpr.hpp>

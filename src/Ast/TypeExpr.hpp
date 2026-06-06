@@ -12,13 +12,13 @@ namespace Fig
     struct NamedTypeExpr final : public TypeExpr
     {
         DynArray<String>     path;
-        DynArray<TypeExpr *> arguments;
+        DynArray<Expr *> arguments;
 
         NamedTypeExpr()
         {
             type = AstType::NamedTypeExpr;
         }
-        NamedTypeExpr(DynArray<String> _p, DynArray<TypeExpr *> _args, SourceLocation _loc) :
+        NamedTypeExpr(DynArray<String> _p, DynArray<Expr *> _args, SourceLocation _loc) :
             path(std::move(_p)), arguments(std::move(_args))
         {
             type     = AstType::NamedTypeExpr;
@@ -51,9 +51,9 @@ namespace Fig
 
     struct NullableTypeExpr final : public TypeExpr
     {
-        TypeExpr *inner;
+        Expr *inner;
 
-        NullableTypeExpr(TypeExpr *_inner, SourceLocation _loc) : inner(_inner)
+        NullableTypeExpr(Expr *_inner, SourceLocation _loc) : inner(_inner)
         {
             type     = AstType::NullableTypeExpr;
             location = std::move(_loc);
@@ -69,10 +69,10 @@ namespace Fig
     {
         // func (paratypes...) -> return_type
 
-        DynArray<TypeExpr *> paraTypes;
-        TypeExpr *returnType;
+        DynArray<Expr *> paraTypes;
+        Expr *returnType;
 
-        FnTypeExpr(DynArray<TypeExpr *> _paraTypes, TypeExpr *_returnType) :
+        FnTypeExpr(DynArray<Expr *> _paraTypes, Expr *_returnType) :
             paraTypes(std::move(_paraTypes)), returnType(_returnType)
         {
             type = AstType::FnTypeExpr;

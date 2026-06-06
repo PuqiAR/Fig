@@ -20,6 +20,8 @@ namespace Fig
         Negate,    // 取反 -
         Not,       // 逻辑非 ! / not
         AddressOf, // 取引用 &
+        Increment, // ++
+        Decrement, // --
 
         Count // 哨兵，(int) Count 获得运算符数量（注意，enum必须从 0 开始且不中断）
     };
@@ -59,6 +61,8 @@ namespace Fig
         BitXor,     // 异或 ^
         ShiftLeft,  // 左移
         ShiftRight, // 右移
+
+        As, // as
 
         // 成员访问
         MemberAccess, // .

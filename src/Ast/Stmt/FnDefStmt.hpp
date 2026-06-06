@@ -11,34 +11,34 @@
 namespace Fig
 {
     struct Param : public AstNode {
-        String    name;
-        TypeExpr *typeSpecifier;
-        Expr     *defaultValue;
-        Type      resolvedType;
+        String name;
+        Expr  *typeSpecifier;
+        Expr  *defaultValue;
+        Type   resolvedType;
         Param() { type = AstType::AstNode; }
         virtual ~Param() = default;
     };
 
     struct PosParam final : public Param {
-        PosParam(String _n, TypeExpr *_ts, Expr *_dv, SourceLocation _loc) {
+        PosParam(String _n, Expr *_ts, Expr *_dv, SourceLocation _loc) {
             name = std::move(_n); typeSpecifier = _ts; defaultValue = _dv; location = std::move(_loc);
         }
         virtual String toString() const override { return name; }
     };
 
     struct FnDefStmt final : public Stmt {
-        String           name;
+        String            name;
         DynArray<Param *> params;
-        TypeExpr        *returnTypeSpecifier;
-        BlockStmt       *body;
-        Type             resolvedReturnType;
-        Symbol          *resolvedSymbol = nullptr; // 连接物理符号
+        Expr             *returnTypeSpecifier;
+        BlockStmt        *body;
+        Type              resolvedReturnType;
+        Symbol           *resolvedSymbol = nullptr; // 连接物理符号
 
         int protoIndex = -1; // 在CompiledModule扁平化protos的下标
         DynArray<UpvalueInfo> upvalues;
 
         FnDefStmt() { type = AstType::FnDefStmt; }
-        FnDefStmt(bool _p, String _n, DynArray<Param *> _pa, TypeExpr *_rt, BlockStmt *_b, SourceLocation _loc)
+        FnDefStmt(bool _p, String _n, DynArray<Param *> _pa, Expr *_rt, BlockStmt *_b, SourceLocation _loc)
             : name(std::move(_n)), params(std::move(_pa)), returnTypeSpecifier(_rt), body(_b)
         {
             type = AstType::FnDefStmt; isPublic = _p; location = std::move(_loc);

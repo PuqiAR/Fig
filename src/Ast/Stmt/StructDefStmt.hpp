@@ -17,7 +17,7 @@ namespace Fig
             bool typeInfer;
 
             String    name;
-            TypeExpr *type;
+            Expr *type;
             Expr *initExpr;
         };
         bool                  isPublic;

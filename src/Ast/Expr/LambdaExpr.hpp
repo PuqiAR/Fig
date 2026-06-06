@@ -15,7 +15,7 @@ namespace Fig
         // func (params) [-> return type] ([=> expr] / [ {stmt} ])
 
         DynArray<Param *> params;
-        TypeExpr         *returnType;
+        Expr *returnType;
         AstNode          *body; // expr/blockstmt
         bool              isExprBody;
 
@@ -28,7 +28,7 @@ namespace Fig
 
         LambdaExpr(
             DynArray<Param *> _params,
-            TypeExpr         *_returnType,
+            Expr             *_returnType,
             AstNode          *_body,
             bool              _isExprBody,
             SourceLocation    _location) :

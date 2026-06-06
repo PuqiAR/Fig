@@ -5,24 +5,25 @@ int main()
 {
     using namespace Fig;
 
-    String        fileName = "test.fig";
-    String        filePath = "T:/Files/Maker/Code/MyCodingLanguage/The Fig Project/Fig/test.fig";
+    String fileName = "test.fig";
+    String filePath =
+        "T:/Files/Maker/Code/MyCodingLanguage/The Fig Project/Fig/" + fileName;
 
     SourceManager srcManager(filePath);
 
     String source = srcManager.Read();
     if (!srcManager.read)
     {
-        std::cerr << "Couldn't read file";
+        std::cerr << "Couldn't read file: " << filePath << '\n';
         return 1;
     }
 
-    Lexer  lexer(source, fileName);
+    Lexer lexer(source, fileName);
 
     Diagnostics diagnostics;
     Parser parser(lexer, srcManager, fileName, diagnostics);
 
-    auto   result = parser.Parse();
+    auto result = parser.Parse();
     if (!result)
     {
         ReportError(result.error(), srcManager);
@@ -32,8 +33,11 @@ int main()
     diagnostics.EmitAll(srcManager);
 
     Program *program = *result;
-    for (Stmt *stmt : program->nodes)
+    std::cout << "Parsed " << program->nodes.size() << " statements\n";
+    for (size_t i = 0; i < program->nodes.size(); ++i)
     {
-        std::cout << stmt->toString() << '\n';
+        std::cout << '[' << i << "] " << program->nodes[i]->toString() << '\n';
     }
+
+    return 0;
 }

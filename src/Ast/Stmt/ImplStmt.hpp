@@ -11,11 +11,11 @@ namespace Fig
 {
     struct ImplStmt final : public Stmt
     {
-        TypeExpr             *interfaceType;
-        TypeExpr             *structType;
+        Expr *interfaceType;
+        Expr *structType;
         DynArray<FnDefStmt *> methods;
 
-        ImplStmt(TypeExpr *_it, TypeExpr *_st, DynArray<FnDefStmt *> _m, SourceLocation _loc) :
+        ImplStmt(Expr *_it, Expr *_st, DynArray<FnDefStmt *> _m, SourceLocation _loc) :
             interfaceType(_it), structType(_st), methods(std::move(_m))
         {
             type     = AstType::ImplStmt;

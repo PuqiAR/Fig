@@ -35,6 +35,7 @@ namespace Fig
         bool   isEOF = false;
 
         Diagnostics &diagnostics;
+        std::optional<Error> lexerError;  // 词法错误缓存，避免 exit/abort
 
         // 惰性获取下一个 Token，跳过注释
         Token nextToken()
@@ -49,8 +50,12 @@ namespace Fig
                 auto result = lexer.NextToken();
                 if (!result)
                 {
-                    ReportError(result.error(), srcManager);
-                    std::exit(-1);
+                    lexerError = result.error();
+                    isEOF      = true;
+                    Token eof  = {0, 0, TokenType::EndOfFile};
+                    buffer.push_back(eof);
+                    index = buffer.size() - 1;
+                    return buffer[index];
                 }
                 const Token &token = result.value();
                 if (token.type == TokenType::Comments)
@@ -84,8 +89,12 @@ namespace Fig
                 auto result = lexer.NextToken();
                 if (!result)
                 {
-                    ReportError(result.error(), srcManager);
-                    std::abort();
+                    lexerError = result.error();
+                    isEOF      = true;
+                    Token eof  = {0, 0, TokenType::EndOfFile};
+                    buffer.push_back(eof);
+                    index = buffer.size() - 1;
+                    return buffer.back();
                 }
                 if (result->type == TokenType::Comments)
                     continue;
@@ -158,20 +167,10 @@ namespace Fig
             return baseTerminators;
         }
 
-        std::unordered_set<TokenType> &getTerminators()
-        {
-            static std::unordered_set<TokenType> terminators(getBaseTerminators());
-            return terminators;
-        }
-        void resetTermintors()
-        {
-            getTerminators() = getBaseTerminators();
-        }
-
         bool shouldTerminate()
         {
             const Token &token = currentToken();
-            if (getTerminators().contains(token.type))
+            if (getBaseTerminators().contains(token.type))
                 return true;
             for (auto it = stateStack.rbegin(); it < stateStack.rend(); ++it)
             {
@@ -261,9 +260,9 @@ namespace Fig
 
         Result<decltype(StructDefStmt::typeParameters), Error> parseTypeParameters();
         
-        Result<TypeExpr *, Error> parseTypeExpr();
-        Result<TypeExpr *, Error> parseNamedTypeExpr();
-        Result<TypeExpr *, Error> parseFnTypeExpr();
+        Result<Expr *, Error> parseTypeExpr();
+        Result<Expr *, Error> parseNamedTypeExpr();
+        Result<Expr *, Error> parseFnTypeExpr();
 
         Result<Expr *, Error> parseExpression(BindingPower = 0);
         Result<Expr *, Error> parseLiteralExpr();
@@ -277,6 +276,7 @@ namespace Fig
 
         Result<BlockStmt *, Error>       parseBlockStmt();
         Result<VarDecl *, Error>         parseVarDecl(bool);
+        Result<VarDecl *, Error>         parseConstDecl(bool);
         Result<IfStmt *, Error>          parseIfStmt();
         Result<WhileStmt *, Error>       parseWhileStmt();
         Result<DynArray<Param *>, Error> parseFnParams();
@@ -286,6 +286,8 @@ namespace Fig
         Result<Stmt *, Error> parseStructDef(bool);
         Result<Stmt *, Error> parseInterfaceDef(bool);
         Result<Stmt *, Error> parseImpl();
+        Result<Stmt *, Error> parseForStmt();
+        Result<Stmt *, Error> parseImportStmt();
 
         Result<Stmt *, Error> parseStatement();
 

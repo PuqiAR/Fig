@@ -161,7 +161,7 @@ namespace Fig
         {
             return std::unexpected(type_result.error());
         }
-        TypeExpr *type = *type_result;
+        Expr *type = *type_result;
 
         if (!match(TokenType::LeftBrace))
         {
@@ -175,6 +175,8 @@ namespace Fig
                 new Point{1, 2}
             Named:
                 new Point{x = 1, y = 2}
+            Shorthand:
+                new Point{y, x}
         */
 
         DynArray<NewExpr::Arg> args;
@@ -195,11 +197,12 @@ namespace Fig
                 break;
             }
 
-            if (currentToken().isIdentifier() && peekToken().type == TokenType::Assign)
+            // named arg
+            if (currentToken().isIdentifier() && peekToken().type == TokenType::Colon)
             {
                 const Token &name_token = consumeToken();
                 const String &name = srcManager.GetSub(name_token.index, name_token.length);
-                consumeToken(); // consume `=`
+                consumeToken(); // consume `:`
 
                 SET_STOP_AT(TokenType::Comma, TokenType::RightBrace); // , / }
                 auto result = parseExpression();
@@ -213,7 +216,20 @@ namespace Fig
                     *result
                 });
             }
-            else 
+            // shorthand
+            else if (currentToken().isIdentifier()
+                     && (peekToken().type == TokenType::Comma || peekToken().type == TokenType::RightBrace))
+            {
+                const Token &name_token = consumeToken();
+                const String &name = srcManager.GetSub(name_token.index, name_token.length);
+
+                
+                
+                IdentiExpr *ident =
+                    arena.Allocate<IdentiExpr>(name, makeSourceLocation(name_token));
+                args.push_back(NewExpr::Arg{name, ident});
+            }
+            else
             {
                 SET_STOP_AT(TokenType::Comma, TokenType::RightBrace); // , / }
                 auto result = parseExpression();
@@ -226,7 +242,7 @@ namespace Fig
                     .value = *result
                 });
             }
-            
+
 
             if (match(TokenType::Comma))
             {
@@ -273,7 +289,7 @@ namespace Fig
         }
         params = *paraResult;
 
-        TypeExpr *returnType = nullptr;
+        Expr *returnType = nullptr;
         Token     rightArrowToken;
         if (match(TokenType::RightArrow)) // ->
         {
@@ -332,6 +348,7 @@ namespace Fig
         Expr *lhs   = nullptr;
         Token token = currentToken();
 
+        // NUD
         if (token.isIdentifier())
         {
             const auto &lhs_result = parseIdentiExpr();
@@ -350,7 +367,7 @@ namespace Fig
             }
             lhs = *lhs_result;
         }
-        else if (IsTokenOp(token.type, false)) // 是否是一元运算符
+        else if (IsTokenOp(token.type, false)) // 是否是一元前缀运算符
         {
             const auto &lhs_result = parsePrefixExpr();
             if (!lhs_result)
@@ -408,6 +425,7 @@ namespace Fig
                 makeSourceLocation(prevToken())));
         }
 
+        // LED
         while (true)
         {
             token = currentToken();
@@ -416,53 +434,112 @@ namespace Fig
                 break;
             }
 
-            if (IsTokenOp(token.type /* isBinary = true */)) // 是否为二元运算符
+            // is / as
+            if (token.type == TokenType::Is || token.type == TokenType::As)
             {
                 BinaryOperator op  = TokenToBinaryOp(token);
                 BindingPower   lbp = GetBinaryOpLBp(op);
                 if (rbp >= lbp)
                 {
-                    // 前操作数的右绑定力比当前操作数的左绑定力大
-                    // lhs被吸走
+                    break;
+                }
+                consumeToken(); // consume `is` or `as`
+                auto typeRes = parseTypeExpr();
+                if (!typeRes)
+                {
+                    return std::unexpected(typeRes.error());
+                }
+                lhs = arena.Allocate<InfixExpr>(lhs, op, *typeRes);
+            }
+            // binary
+            else if (IsTokenOp(token.type /* isBinary = true */))
+            {
+                BinaryOperator op  = TokenToBinaryOp(token);
+                BindingPower   lbp = GetBinaryOpLBp(op);
+                if (rbp >= lbp)
+                {
                     break;
                 }
 
                 auto result = parseInfixExpr(lhs);
                 if (!result)
                 {
-                    resetTermintors();
                     return result;
                 }
                 lhs = *result;
             }
-            // 后缀运算符优先级非常大，几乎永远跟在操作数后面，因此我们可以直接结合
-            // 而不用走正常路径
-            else if (token.type == TokenType::LeftBracket) // `[`
+            // [index]
+            else if (token.type == TokenType::LeftBracket)
             {
                 const auto &expr_result = parseIndexExpr(lhs);
                 if (!expr_result)
                 {
-                    resetTermintors();
                     return expr_result;
                 }
                 lhs = *expr_result;
             }
-            else if (token.type == TokenType::LeftParen) // `(`
+            // call
+            else if (token.type == TokenType::LeftParen)
             {
                 const auto &expr_result = parseCallExpr(lhs);
                 if (!expr_result)
                 {
-                    resetTermintors();
                     return expr_result;
                 }
                 lhs = *expr_result;
             }
+            // .member
+            else if (token.type == TokenType::Dot)
+            {
+                consumeToken(); // consume `.`
+                if (!currentToken().isIdentifier())
+                {
+                    return std::unexpected(
+                        makeUnexpectTokenError("MemberExpr", "identifier after `.`", currentToken()));
+                }
+                const Token  &nameToken = consumeToken();
+                const String &name =
+                    srcManager.GetSub(nameToken.index, nameToken.length);
+                SourceLocation loc = makeSourceLocation(nameToken);
+                lhs = arena.Allocate<MemberExpr>(lhs, name, loc);
+            }
+            // x++ x--
+            else if (token.type == TokenType::DoublePlus || token.type == TokenType::DoubleMinus)
+            {
+                UnaryOperator op = TokenToUnaryOp(consumeToken());
+                lhs = arena.Allocate<PostfixExpr>(op, lhs);
+            }
+            // ?:
+            else if (token.type == TokenType::Question)
+            {
+                // ?: 最低优先
+                // 赋值 rbp = 101，所以只有当 rbp < 100 时才可能进到三元
+                // 实际上三元是最低优先级的非赋值运算符，我们给一个很小的 lbp
+                constexpr BindingPower TERNARY_LBP = 150;
+                if (rbp >= TERNARY_LBP)
+                {
+                    break;
+                }
+                consumeToken(); // consume `?`
+                auto thenRes = parseExpression(0); // 重置绑定力，右结合
+                if (!thenRes)
+                {
+                    return std::unexpected(thenRes.error());
+                }
+                if (!match(TokenType::Colon))
+                {
+                    return std::unexpected(
+                        makeUnexpectTokenError("TernaryExpr", "`:` for else branch", currentToken()));
+                }
+                auto elseRes = parseExpression(TERNARY_LBP - 1); // 右结合
+                if (!elseRes)
+                {
+                    return std::unexpected(elseRes.error());
+                }
+                lhs = arena.Allocate<TernaryExpr>(lhs, *thenRes, *elseRes, lhs->location);
+            }
             else
             {
-                // return std::unexpected(Error(ErrorType::ExpectedExpression,
-                //     "expression unexpectedly ended",
-                //     "insert expressions",
-                //     makeSourceLocation(token)));
                 return lhs;
             }
         }

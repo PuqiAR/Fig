@@ -16,6 +16,8 @@ namespace Fig
             {TokenType::Minus, UnaryOperator::Negate},
             {TokenType::Not, UnaryOperator::Not},
             {TokenType::Ampersand, UnaryOperator::AddressOf},
+            {TokenType::DoublePlus, UnaryOperator::Increment},
+            {TokenType::DoubleMinus, UnaryOperator::Decrement},
         };
         return unaryOpMap;
     }
@@ -40,6 +42,8 @@ namespace Fig
 
             {TokenType::And, BinaryOperator::LogicalAnd},
             {TokenType::Or, BinaryOperator::LogicalOr},
+            {TokenType::DoubleAmpersand, BinaryOperator::LogicalAnd},
+            {TokenType::DoublePipe, BinaryOperator::LogicalOr},
 
             {TokenType::Power, BinaryOperator::Power},
 
@@ -49,6 +53,7 @@ namespace Fig
             {TokenType::AsteriskEqual, BinaryOperator::MultiplyAssign},
             {TokenType::SlashEqual, BinaryOperator::DivideAssign},
             {TokenType::PercentEqual, BinaryOperator::ModuloAssign},
+            {TokenType::Caret, BinaryOperator::BitXor},
             {TokenType::CaretEqual, BinaryOperator::BitXorAssign},
 
             {TokenType::Pipe, BinaryOperator::BitOr},
@@ -56,7 +61,7 @@ namespace Fig
             {TokenType::ShiftLeft, BinaryOperator::ShiftLeft},
             {TokenType::ShiftRight, BinaryOperator::ShiftRight},
 
-            {TokenType::Dot, BinaryOperator::MemberAccess},
+            {TokenType::As, BinaryOperator::As},
         };
         return binaryOpMap;
     }
@@ -78,6 +83,8 @@ namespace Fig
             {UnaryOperator::Negate, 20001},
             {UnaryOperator::Not, 20001},
             {UnaryOperator::AddressOf, 20001},
+            {UnaryOperator::Increment, 20001},
+            {UnaryOperator::Decrement, 20001},
         };
         return unbpm;
     }
@@ -109,6 +116,7 @@ namespace Fig
             {BinaryOperator::GreaterEqual, 2100},
 
             {BinaryOperator::Is, 2100},
+            {BinaryOperator::As, 2100},
 
             {BinaryOperator::ShiftLeft, 3000},
             {BinaryOperator::ShiftRight, 3000},
@@ -117,10 +125,9 @@ namespace Fig
             {BinaryOperator::Subtract, 4000},
             {BinaryOperator::Multiply, 4500},
             {BinaryOperator::Divide, 4500},
+            {BinaryOperator::Modulo, 4500},
 
             {BinaryOperator::Power, 5000},
-
-            {BinaryOperator::MemberAccess, 40001},
         };
         return bnbpm;
     }
@@ -152,6 +159,8 @@ namespace Fig
             case BinaryOperator::ModuloAssign:
             case BinaryOperator::BitXorAssign:
             case BinaryOperator::Power: return GetBinaryOpLBp(op) - 1;
+
+            case BinaryOperator::As: return GetBinaryOpLBp(op) + 1;
 
             default:
                 /*

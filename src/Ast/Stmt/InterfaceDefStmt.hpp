@@ -16,8 +16,8 @@ namespace Fig
         struct Method
         {
             String              name;
-            DynArray<TypeExpr*> params;
-            TypeExpr           *retType;
+            DynArray<Expr*> params;
+            Expr *retType;
             SourceLocation      location;
         };
 
