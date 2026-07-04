@@ -5,18 +5,17 @@ int main()
 {
     using namespace Fig;
 
-    String fileName = "test.fig";
+    String fileName = "[memory]";
     String filePath =
-        "T:/Files/Maker/Code/MyCodingLanguage/The Fig Project/Fig/" + fileName;
+        "System" + fileName;
 
     SourceManager srcManager(filePath);
 
-    String source = srcManager.Read();
-    if (!srcManager.read)
-    {
-        std::cerr << "Couldn't read file: " << filePath << '\n';
-        return 1;
-    }
+    String source = R"(
+        var a = 10;
+        var a: Int;
+        var a := 200 * 30 + 2;
+    )";
 
     Lexer lexer(source, fileName);
 
