@@ -196,6 +196,7 @@ namespace Fig
         Function,
         Struct,
         Instance,
+        TypeObj,
     };
 
     struct StructObject /* : public Object */; // 结构体基类的定义，前向声明
@@ -234,6 +235,37 @@ namespace Fig
         constexpr bool isInstance() const
         {
             return type == ObjectType::Instance;
+        }
+
+        constexpr bool isTypeObj() const
+        {
+            return type == ObjectType::TypeObj;
+        }
+    };
+
+    enum class TypeTag : uint8_t
+    {
+        Null,
+        Int,
+        Double,
+        String,
+        Bool,
+        Any,
+        Type,
+        Function,
+        Struct,
+        Interface,
+    };
+
+    struct TypeObject : Object
+    {
+        String  name;
+        TypeTag tag;
+
+        TypeObject(String _name, TypeTag _t) : name(std::move(_name)), tag(_t)
+        {
+            type  = ObjectType::TypeObj;
+            klass = nullptr; // TypeObject 自身的 klass 指向 TypeTypeObject，初始化后设置
         }
     };
 } // namespace Fig

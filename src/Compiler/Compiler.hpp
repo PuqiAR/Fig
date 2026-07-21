@@ -50,6 +50,15 @@ namespace Fig
 
     public:
         Compiler(SourceManager &m, Diagnostics &d) : manager(m), diag(d) {}
-        Result<CompiledModule *, Error> Compile(Program *program);
+        Result<CompiledModule *, Error> Compile(Program *)
+        {
+            auto *mod  = new CompiledModule();
+            auto *boot = new Proto();
+            boot->name = "[bootstrapper]";
+            boot->maxRegisters = 1;
+            boot->code.push_back(Op::iAsBx(OpCode::Exit, 0, 0));
+            mod->protos.push_back(boot);
+            return mod;
+        }
     };
 }

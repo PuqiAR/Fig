@@ -9,6 +9,7 @@
 
 #include <Ast/Operator.hpp>
 #include <Object/ObjectBase.hpp>
+#include <Sema/Type.hpp>
 
 namespace Fig
 {
@@ -23,33 +24,29 @@ namespace Fig
             // + 6 bytes padding
         };
     */
+    struct FieldMeta
+    {
+        String name;
+        Type   type;
+    };
+
     struct StructObject final : public Object
     {
-        String name; // 元信息(仅供调试/打印/反射)
-
-        // 内存布局信息
-        std::uint8_t fieldCount;
-        Object      *operators[GetOperatorsSize()];
-        /*
-            运算符重载，nullptr代表无重载
-            一般为 NativeFunction / Function
-
-            排列：
-                [unary              operators   ]( binary                 operators]
-                0     -             UnaryOperators::Count     BinaryOperators::Count
-        */
-
+        String          name;
+        std::uint8_t    fieldCount;
+        FieldMeta      *fields;   // [fieldCount]
+        Object         *operators[GetOperatorsSize()];
+        // operators: [UnaryOp 0..N][BinaryOp 0..N], nullptr = 无重载
 
         Object *GetUnaryOperator(UnaryOperator _op)
         {
-            std::uint8_t idx = static_cast<std::uint8_t>(_op);
-            return operators[idx];
+            return operators[static_cast<std::uint8_t>(_op)];
         }
 
         Object *GetBinaryOperator(BinaryOperator _op)
         {
-            std::uint16_t idx = static_cast<std::uint8_t>(UnaryOperator::Count) + static_cast<std::uint8_t>(_op);
-            return operators[idx];
+            return operators[static_cast<std::uint8_t>(UnaryOperator::Count)
+                             + static_cast<std::uint8_t>(_op)];
         }
     };
 }; // namespace Fig
