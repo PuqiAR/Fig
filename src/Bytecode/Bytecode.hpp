@@ -18,51 +18,62 @@ namespace Fig
 
     enum class OpCode : std::uint8_t
     {
-        Exit,
-        Exit_MaxRecursionDepthExceeded,
+        // 控制流
+        Exit,                          // iAsBx, return sBx
+        Exit_MaxRecursionDepthExceeded, // iAsBx, fatal: 超出最大递归深度
 
-        LoadK,
-        LoadTrue,
-        LoadFalse,
-        LoadNull,
+        // 常量加载
+        LoadK,                         // iABx, R(A) = K(Bx)
+        LoadTrue,                      // iABC, R(A) = true
+        LoadFalse,                     // iABC, R(A) = false
+        LoadNull,                      // iABC, R(A) = null
 
-        FastCall,
-        Call,
-        Return,
+        // 函数调用
+        FastCall,                      // iABC, call Proto[A], args from R(B)
+        Call,                          // iABC, call R(A), args from R(B)
+        Return,                        // iABC, return R(A)
 
-        LoadFn,
+        // 闭包
+        LoadFn,                        // iABx, R(A) = new Closure(Proto[Bx])
 
-        Jmp,
-        JmpIfFalse,
+        // 跳转
+        Jmp,                           // iAsBx, PC += sBx
+        JmpIfFalse,                    // iAsBx, if !R(A) then PC += sBx
 
-        Mov,
+        // 寄存器移动
+        Mov,                           // iABx, R(A) = R(Bx)
 
-        Add,
-        Sub,
-        Mul,
-        Div,
-        Mod,
-        BitXor,
+        // 算术运算
+        Add,                           // iABC, R(A) = R(B) + R(C)
+        Sub,                           // iABC, R(A) = R(B) - R(C)
+        Mul,                           // iABC, R(A) = R(B) * R(C)
+        Div,                           // iABC, R(A) = R(B) / R(C)
+        Mod,                           // iABC, R(A) = R(B) % R(C)   (WIP)
+        BitXor,                        // iABC, R(A) = R(B) ^ R(C)   (WIP)
 
-        IntFastAdd,
-        IntFastSub,
-        IntFastMul,
-        IntFastDiv,
+        // 快速整数算术（仅 int，无类型检查）
+        IntFastAdd,                    // iABC, R(A) = R(B) + R(C)  (int)
+        IntFastSub,                    // iABC, R(A) = R(B) - R(C)  (int)
+        IntFastMul,                    // iABC, R(A) = R(B) * R(C)  (int)
+        // 结果可能为非整数
+        IntFastDiv,                    // iABC, R(A) = (double)R(B) / R(C)  (int)
 
-        Equal,
-        NotEqual,
-        Greater,
-        Less,
-        GreaterEqual,
-        LessEqual,
+        // 比较
+        Equal,                         // iABC, R(A) = R(B) == R(C)
+        NotEqual,                      // iABC, R(A) = R(B) != R(C)
+        Greater,                       // iABC, R(A) = R(B) >  R(C)
+        Less,                          // iABC, R(A) = R(B) <  R(C)
+        GreaterEqual,                  // iABC, R(A) = R(B) >= R(C)
+        LessEqual,                     // iABC, R(A) = R(B) <= R(C)
 
-        GetGlobal,
-        SetGlobal,
-        GetUpval,
-        SetUpval,
-        Copy,
+        // 变量存取
+        GetGlobal,                     // iABx, R(A) = G(Bx)
+        SetGlobal,                     // iABx, G(Bx) = R(A)
+        GetUpval,                      // iABC, R(A) = *Upval(B)
+        SetUpval,                      // iABC, *Upval(B) = R(A)
+        Copy,                          // iABC, R(A) = R(B)
 
-        Count
+        Count                          // 哨兵
     };
 
     namespace Op
