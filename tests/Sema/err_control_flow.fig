@@ -1,3 +1,0 @@
-func main() {
-    break; // 错误：break 不在循环内
-}
